@@ -3,6 +3,8 @@ import AuthLayout from '../components/layouts/AuthLayout';
 import MainLayout from '../components/layouts/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 
+import Header from '../components/common/header/Header';
+
 // TODO: 페이지 import 추가
 // import LoginPage from '../pages/auth/LoginPage';
 
@@ -11,7 +13,7 @@ export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
     children: [
-      // { path: '/login',  element: <LoginPage /> },
+       { path: '/login',  element: <Header/> },
       // { path: '/signup', element: <SignupPage /> },
     ],
   },
