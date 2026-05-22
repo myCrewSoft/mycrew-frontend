@@ -19,5 +19,6 @@ export const buttonSizeStyle: Record<ButtonSize, string> = {
   sm: 'h-9 px-4 text-sm rounded-xl',
   md: 'h-11 px-5 text-sm rounded-2xl',
   lg: 'h-14 px-8 text-base rounded-full',
-  xl: 'h-16 px-10 text-lg rounded-full',  // ✅ xl 추가
+  xl: 'h-16 px-10 text-lg rounded-full',
+  icon: 'h-8 w-8 p-0 rounded-full',
 }

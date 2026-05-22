@@ -1,7 +1,5 @@
-// components/common/button/Button.tsx
-
 import { Loader2 } from 'lucide-react'
-import { buttonVariantStyle, buttonSizeStyle } from './button.styles'
+import { buttonSizeStyle, buttonVariantStyle } from './button.styles'
 import type { ButtonProps } from './button.types'
 
 const Button = ({
@@ -14,15 +12,16 @@ const Button = ({
   leftIcon,
   rightIcon,
   className = '',
+  type = 'button',
   ...props
 }: ButtonProps) => {
   return (
     <button
+      type={type}
       disabled={disabled || loading}
       className={`
         inline-flex items-center justify-center gap-2
         font-semibold
-        rounded-2xl
         transition-all duration-200
         active:scale-[0.98]
         disabled:cursor-not-allowed disabled:opacity-50
@@ -33,11 +32,7 @@ const Button = ({
       `}
       {...props}
     >
-      {loading ? (
-        <Loader2 size={16} className="animate-spin" />
-      ) : (
-        leftIcon
-      )}
+      {loading ? <Loader2 size={16} className="animate-spin" /> : leftIcon}
       {children}
       {!loading && rightIcon}
     </button>
