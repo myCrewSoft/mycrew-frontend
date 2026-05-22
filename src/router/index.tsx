@@ -2,9 +2,9 @@ import { createBrowserRouter } from 'react-router-dom';
 import AuthLayout from '../components/layouts/AuthLayout';
 import MainLayout from '../components/layouts/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
+import Card from '../components/common/card/Card';
+import { Layout } from 'lucide-react';
 
-
-import Button from '../components/common/button/Button';
 
 // TODO: 페이지 import 추가
 // import LoginPage from '../pages/auth/LoginPage';
@@ -14,7 +14,7 @@ export const router = createBrowserRouter([
   {
     element: <AuthLayout />,
     children: [
-       { path: '/login',  element: <Button>저장</Button> },
+       { path: '/login',  element: <MainLayout/>},
       // { path: '/signup', element: <SignupPage /> },
     ],
   },
