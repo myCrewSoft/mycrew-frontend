@@ -11,10 +11,12 @@ import {
   Kanban,
   Mail,
   Network,
+  ShieldCheck,
   Video,
   type LucideIcon,
 } from 'lucide-react'
-import Button from '../button/Button'
+import ModuleNavItem from './ModuleNavItem'
+import Button from '../../common/button/Button'
 
 interface MenuItem {
   icon: LucideIcon
@@ -41,6 +43,12 @@ const menuItems: MenuItem[] = [
   { icon: ClipboardList, label: '게시판', path: '/board' },
 ]
 
+const adminMenuItem: MenuItem = {
+  icon: ShieldCheck,
+  label: '관리자',
+  path: '/admin',
+}
+
 const MainSidebar = ({
   isSubOpen,
   onToggleSub,
@@ -50,36 +58,43 @@ const MainSidebar = ({
 
   return (
     <>
-      <aside className="flex h-full w-16 flex-shrink-0 flex-col items-center bg-[#0d1527] py-4 text-white">
-        <Link
-          to="/"
-          className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563eb] to-[#5ac8fa] text-xl font-black text-white no-underline shadow-md transition-transform hover:scale-105"
-        >
-          M
-        </Link>
+      <aside className="flex h-screen w-16 flex-shrink-0 flex-col justify-between bg-[#0d1527] py-4 text-white">
+        <div className="flex w-full flex-col items-center">
+          <Link
+            to="/"
+            className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563eb] to-[#5ac8fa] text-xl font-black text-white no-underline shadow-md transition-transform hover:scale-105"
+          >
+            M
+          </Link>
 
-        <nav className="flex w-full flex-col gap-1 px-1">
-          {menuItems.map(({ icon: Icon, label, path }) => {
-            const isActive = location.pathname.startsWith(path)
+          <nav className="flex w-full flex-col gap-1 px-1">
+            {menuItems.map((item) => (
+              <ModuleNavItem
+                key={item.path}
+                icon={item.icon}
+                label={item.label}
+                path={item.path}
+                active={location.pathname.startsWith(item.path)}
+              />
+            ))}
+          </nav>
+        </div>
 
-            return (
-              <Link
-                key={path}
-                to={path}
-                className={`flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl no-underline transition-all duration-200 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-[#2563eb] to-[#5ac8fa] font-bold text-white shadow-sm'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Icon size={18} />
-                <span className="origin-center scale-90 text-[9px] tracking-tight">
-                  {label}
-                </span>
-              </Link>
-            )
-          })}
-        </nav>
+        <div className="w-full px-1">
+          <Link
+            to={adminMenuItem.path}
+            className={`flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl no-underline transition-all duration-200 ${
+              location.pathname.startsWith(adminMenuItem.path)
+                ? 'bg-gradient-to-r from-[#2563eb] to-[#5ac8fa] font-bold text-white shadow-sm'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <ShieldCheck size={18} />
+            <span className="origin-center scale-90 text-[9px] tracking-tight">
+              {adminMenuItem.label}
+            </span>
+          </Link>
+        </div>
       </aside>
 
       <aside

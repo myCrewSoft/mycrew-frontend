@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import Header from '../common/header/Header'
-import MainSidebar from '../common/sidebar/MainSidebar'
+import Header from './Header'
+import MainSidebar from './sidebar/MainSidebar'
 
 export default function MainLayout() {
   const [isSubOpen, setIsSubOpen] = useState(true)
@@ -14,10 +14,10 @@ export default function MainLayout() {
         onOpenSub={() => setIsSubOpen(true)}
       />
 
-      <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         <Header />
 
-        <main className="flex-1 overflow-y-auto bg-[#f1f5f9] p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6">
           <Outlet />
         </main>
       </div>

@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import AuthLayout from '../components/layouts/AuthLayout'
 import MainLayout from '../components/layouts/MainLayout'
 import ProtectedRoute from '../components/ProtectedRoute'
+import CommonComponentsGuide from '../pages/CommonComponentsGuide'
 
 // TODO: 페이지 import 추가
 // import LoginPage from '../pages/auth/LoginPage'
@@ -9,8 +10,12 @@ import ProtectedRoute from '../components/ProtectedRoute'
 export const router = createBrowserRouter([
   // 인증 불필요
   {
+    element: <MainLayout />,
+    children: [{ index: true, element: <CommonComponentsGuide /> }],
+  },
+  {
     element: <AuthLayout />,
-    children: [{ path: '/login', element: <MainLayout /> }],
+    //children: [{ path: '/login', element: <LoginPage  /> }],
   },
 
   // 로그인 필요
@@ -21,7 +26,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      // { path: '/', element: <MainPage /> },
+      // { path: '/dashboard', element: <DashboardPage /> },
     ],
   },
 
