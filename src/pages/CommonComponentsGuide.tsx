@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { Bell, Check, Mail, MessageSquare, Plus } from 'lucide-react'
+import {
+  Bell,
+  Check,
+  ClipboardList,
+  List,
+  ListChecks,
+  Mail,
+  MessageSquare,
+  Plus,
+} from 'lucide-react'
 import Badge from '../components/common/dataDisplay/badge/Badge'
 import Button from '../components/common/button/Button'
 import FloatingButton from '../components/common/button/FloatingButton'
@@ -24,6 +33,9 @@ import type { ToastItem } from '../components/common/toast/toast.types'
 import DropdownMenu from '../components/common/overlay/dropdownMenu/DropdownMenu'
 import ToastViewport from '../components/common/toast/ToastViewport'
 import { useToast } from '../components/common/toast/ToastProvider'
+import SubSidebarActionButton from '../components/layouts/sidebar/SubSidebarActionButton'
+import SubSidebarMenuItem from '../components/layouts/sidebar/SubSidebarMenuItem'
+import SubSidebarSection from '../components/layouts/sidebar/SubSidebarSection'
 
 interface ApprovalRow {
   id: string
@@ -250,6 +262,39 @@ const Source2323 = () => {
             />
 
             <ContentCard
+              title="서브 사이드바 구성"
+              description="업무 추가, 프로젝트 생성 같은 주요 액션과 프로젝트 목록, 업무 상태 목록처럼 모듈 안쪽 메뉴를 묶을 때 사용합니다."
+            >
+              <div className="flex max-w-xs flex-col gap-5 rounded-2xl bg-slate-50 p-4">
+                <div className="flex flex-col gap-2">
+                  <SubSidebarActionButton variant="primary">
+                    업무 추가
+                  </SubSidebarActionButton>
+                  <SubSidebarActionButton>프로젝트 생성</SubSidebarActionButton>
+                </div>
+
+                <SubSidebarSection title="프로젝트">
+                  <SubSidebarMenuItem
+                    icon={List}
+                    label="프로젝트 목록"
+                    path="/"
+                  />
+                  <SubSidebarMenuItem
+                    icon={ClipboardList}
+                    label="업무"
+                    path="/project/tasks"
+                    active
+                  />
+                  <SubSidebarMenuItem
+                    icon={ListChecks}
+                    label="해야할 일"
+                    path="/project/todo"
+                  />
+                </SubSidebarSection>
+              </div>
+            </ContentCard>
+
+            <ContentCard
               title="모달 / 확인창"
               description="저장, 삭제, 제출 같은 확인 액션은 Modal의 variant, confirmText, onConfirm 속성으로 처리합니다."
             >
@@ -260,7 +305,7 @@ const Source2323 = () => {
 
             <ContentCard
               title="토스트 알림"
-              description="저장 완료, 삭제 실패, 업로드 성공 같은 짧은 피드백 메시지입니다."
+              description="저장 완료, 삭제 실패, 업로드 성공 같은 짧은 피드백 메시지입니다. 기본 3초 뒤 사라지고 duration으로 시간을 바꿀 수 있습니다."
             >
               <Button variant="outline" onClick={handleShowToast}>
                 알림 표시

@@ -17,14 +17,14 @@ const ModuleNavItem = ({
   return (
     <Link
       to={path}
-      className={`flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-xl no-underline transition-all duration-200 ${
+      className={`flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl no-underline transition-all duration-200 ${
         active
           ? 'bg-gradient-to-r from-[#2563eb] to-[#5ac8fa] font-bold text-white shadow-sm'
           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
     >
-      <Icon size={18} />
-      <span className="origin-center scale-90 text-[9px] tracking-tight">
+      <Icon size={24} />
+      <span className="text-[11px] font-semibold leading-none tracking-tight">
         {label}
       </span>
     </Link>
