@@ -2,16 +2,18 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from './Header'
 import MainSidebar from './sidebar/MainSidebar'
+import SubSidebar from './sidebar/SubSidebar'
 
 export default function MainLayout() {
   const [isSubOpen, setIsSubOpen] = useState(true)
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50">
-      <MainSidebar
-        isSubOpen={isSubOpen}
-        onToggleSub={() => setIsSubOpen((current) => !current)}
-        onOpenSub={() => setIsSubOpen(true)}
+      <MainSidebar />
+      <SubSidebar
+        isOpen={isSubOpen}
+        onToggle={() => setIsSubOpen((current) => !current)}
+        onOpen={() => setIsSubOpen(true)}
       />
 
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
