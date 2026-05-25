@@ -15,6 +15,8 @@ interface HeaderPopoverProps {
   // footer는 "전체 보기"처럼 하단에 고정해서 보여줄 액션이 있을 때 사용합니다.
   footer?: ReactNode
   className?: string
+  // bodyClassName은 팝오버 본문 영역의 스크롤/높이 스타일을 팝오버마다 다르게 바꾸고 싶을 때 사용합니다.
+  bodyClassName?: string
 }
 
 const HeaderPopover = ({
@@ -23,6 +25,7 @@ const HeaderPopover = ({
   children,
   footer,
   className = '',
+  bodyClassName = 'max-h-[420px] overflow-y-auto',
 }: HeaderPopoverProps) => {
   // open은 팝오버가 현재 열려 있는지 저장하는 상태입니다.
   const [open, setOpen] = useState(false)
@@ -75,7 +78,7 @@ const HeaderPopover = ({
           </div>
 
           {/* children 영역은 팝오버마다 자유롭게 다른 UI를 넣는 자리입니다. */}
-          <div className="max-h-[420px] overflow-y-auto">{children}</div>
+          <div className={bodyClassName}>{children}</div>
 
           {footer && (
             <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center">
