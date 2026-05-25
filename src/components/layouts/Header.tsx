@@ -2,8 +2,16 @@ import { Bell, ChevronDown, Mail, MessageSquare } from 'lucide-react'
 import NotificationIconButton from '../common/button/NotificationIconButton'
 import SearchInput from '../common/form/searchInput/SearchInput'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
+import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
+import { notificationApi } from '../../api/notificationApi'
+import { useApi } from '../../hooks/useApi'
 
 const Header = () => {
+  const { execute: readAllNotifications } = useApi<null>(
+    notificationApi.readAllNotifications,
+    { immediate: false },
+  )
+
   return (
     <header className="flex h-16 w-full min-w-0 items-center justify-between border-b border-slate-100 bg-white px-8 py-3">
       <SearchInput
@@ -57,6 +65,9 @@ const Header = () => {
 
         <HeaderPopover
           title="알림"
+          onClose={() => {
+            void readAllNotifications().catch(() => undefined)
+          }}
           trigger={({ open, toggle }) => (
             <NotificationIconButton
               active={open}
@@ -73,7 +84,7 @@ const Header = () => {
             />
           )}
         >
-          {/* 알림 팝오버 내용 컴포넌트를 여기에 넣으면 됩니다. 예: <NotificationPopoverContent /> */}
+          <NotificationPopoverContent />
         </HeaderPopover>
 
         <div className="mx-1 h-5 w-[1px] bg-slate-200" />
