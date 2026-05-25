@@ -3,6 +3,8 @@ import AuthLayout from '../components/layouts/AuthLayout'
 import MainLayout from '../components/layouts/MainLayout'
 import ProtectedRoute from '../components/ProtectedRoute'
 import CommonComponentsGuide from '../pages/CommonComponentsGuide'
+import CalendarPage from '../pages/calendar/CalendarPage'
+import { CalendarProvider } from '../pages/calendar/CalendarProvider'
 
 // TODO: 페이지 import 추가
 // import LoginPage from '../pages/auth/LoginPage'
@@ -11,7 +13,17 @@ export const router = createBrowserRouter([
   // 인증 불필요
   {
     element: <MainLayout />,
-    children: [{ index: true, element: <CommonComponentsGuide /> }],
+    children: [
+      { index: true, element: <CommonComponentsGuide /> }
+    ],
+  },
+  {
+    element: (
+      <CalendarProvider>
+        <MainLayout />
+      </CalendarProvider>
+    ),
+    children: [{ path: '/calendar', element: <CalendarPage /> }],
   },
   {
     element: <AuthLayout />,
