@@ -12,7 +12,6 @@ const FormField = ({
   label,
   helperText,
   errorText,
-  required = false,
   rightSlot,
   className = '',
   ...props
@@ -21,7 +20,6 @@ const FormField = ({
     <label className="flex w-full flex-col gap-2">
       <span className="flex items-center gap-1 text-sm font-semibold text-slate-700">
         {label}
-        {required && <span className="text-red-500">*</span>}
       </span>
 
       <div className="relative">

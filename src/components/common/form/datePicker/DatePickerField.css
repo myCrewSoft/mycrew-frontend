@@ -1,0 +1,80 @@
+.common-datepicker-popper {
+  z-index: 100;
+}
+
+.common-datepicker-calendar {
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 20px 45px rgb(15 23 42 / 0.18);
+  color: #0f172a;
+  font-family: inherit;
+}
+
+.common-datepicker-calendar .react-datepicker__header {
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.common-datepicker-calendar .react-datepicker__current-month,
+.common-datepicker-calendar .react-datepicker-time__header,
+.common-datepicker-calendar .react-datepicker-year-header {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.common-datepicker-calendar .react-datepicker__day-name,
+.common-datepicker-calendar .react-datepicker__day,
+.common-datepicker-calendar .react-datepicker__time-name {
+  color: #334155;
+}
+
+.common-datepicker-calendar .react-datepicker__day--outside-month {
+  color: #cbd5e1;
+}
+
+.common-datepicker-calendar .react-datepicker__day:hover,
+.common-datepicker-calendar .react-datepicker__month-text:hover,
+.common-datepicker-calendar .react-datepicker__quarter-text:hover,
+.common-datepicker-calendar .react-datepicker__year-text:hover {
+  border-radius: 9999px;
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.common-datepicker-calendar .react-datepicker__day--today {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.common-datepicker-calendar .react-datepicker__day--selected,
+.common-datepicker-calendar .react-datepicker__day--keyboard-selected,
+.common-datepicker-calendar .react-datepicker__time-list-item--selected {
+  border-radius: 9999px;
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 800;
+}
+
+.common-datepicker-calendar .react-datepicker__time-container {
+  border-left: 1px solid #e2e8f0;
+}
+
+.common-datepicker-calendar .react-datepicker__time-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.common-datepicker-calendar .react-datepicker__time-list-item:hover {
+  background-color: #dbeafe !important;
+  color: #1d4ed8;
+}
+
+.common-datepicker-calendar .react-datepicker__navigation {
+  top: 10px;
+}

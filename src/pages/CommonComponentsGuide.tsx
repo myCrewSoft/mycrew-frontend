@@ -17,6 +17,7 @@ import NotificationIconButton from '../components/common/button/NotificationIcon
 import Checkbox from '../components/common/form/checkbox/Checkbox'
 import ContentCard from '../components/common/dataDisplay/card/ContentCard'
 import DataTable from '../components/common/dataDisplay/dataTable/DataTable'
+import DatePickerField from '../components/common/form/datePicker/DatePickerField'
 import EmptyState from '../components/common/dataDisplay/emptyState/EmptyState'
 import FileUpload from '../components/common/form/fileUpload/FileUpload'
 import FilterBar from '../components/common/dataDisplay/filter/FilterBar'
@@ -57,6 +58,9 @@ const Source2323 = () => {
   const [checked, setChecked] = useState(true)
   const [toggleChecked, setToggleChecked] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const [dateValue, setDateValue] = useState<Date | null>(new Date())
+  const [dateTimeValue, setDateTimeValue] = useState<Date | null>(new Date())
+  const [timeValue, setTimeValue] = useState<Date | null>(new Date())
 
   const { showToast } = useToast()
 
@@ -107,7 +111,13 @@ const Source2323 = () => {
               wrapperClassName="max-w-sm"
               placeholder="문서, 게시글, 구성원 검색"
             />
-            <FormField label="기간" type="date" className="min-w-40" />
+            <DatePickerField
+              label="기간"
+              mode="date"
+              value={dateValue}
+              onChange={setDateValue}
+              className="min-w-40"
+            />
             <Select
               label="상태"
               defaultValue="all"
@@ -312,6 +322,32 @@ const Source2323 = () => {
               </Button>
             </ContentCard>
           </div>
+
+          <ContentCard
+            title="날짜 선택"
+            description="DatePickerField는 mode 값에 따라 날짜만, 날짜와 시간, 시간만 선택할 수 있는 공통 컴포넌트입니다."
+          >
+            <div className="grid gap-3 md:grid-cols-3">
+              <DatePickerField
+                label="날짜만 선택"
+                mode="date"
+                value={dateValue}
+                onChange={setDateValue}
+              />
+              <DatePickerField
+                label="날짜 + 시간 선택"
+                mode="datetime"
+                value={dateTimeValue}
+                onChange={setDateTimeValue}
+              />
+              <DatePickerField
+                label="시간만 선택"
+                mode="time"
+                value={timeValue}
+                onChange={setTimeValue}
+              />
+            </div>
+          </ContentCard>
 
           <DataTable
             data={approvalRows}
