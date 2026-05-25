@@ -1,13 +1,15 @@
-/* 컨텐츠 영역의 큰 캘린더용 */
-.calendar-main .fc .fc-daygrid-day.fc-day-today {
-  background-color: #eff6ff;
+/* 큰 캘린더 기본 상태 */
+.calendar-main {
+  container-type: inline-size;
 }
 
+.calendar-main .fc .fc-daygrid-day.fc-day-today,
 .calendar-main .fc .fc-timegrid-col.fc-day-today {
   background-color: #eff6ff;
 }
 
-.calendar-main .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+.calendar-main .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number,
+.calendar-main .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
   color: #1d4ed8;
   font-weight: 700;
 }
@@ -21,33 +23,42 @@
   background-color: #dbeafe;
 }
 
-.calendar-main .fc .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+.calendar-main .calendar-main-selected-day {
+  background-color: #dbeafe;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.calendar-main .calendar-main-selected-day .fc-daygrid-day-number {
   color: #1d4ed8;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.calendar-main .fc-daygrid-day-frame {
-  min-height: 0;
+.calendar-main .calendar-main-selected-day.fc-day-today,
+.calendar-main .fc-timegrid-col.calendar-main-selected-day.fc-day-today {
+  background-color: #bfdbfe;
+  box-shadow: inset 0 0 0 2px #1d4ed8;
 }
 
-.calendar-main .fc-daygrid-day-events {
-  margin-top: 4px;
+.calendar-main .fc-timegrid-col.calendar-main-selected-day,
+.calendar-main .fc-timegrid-col.calendar-main-selected-day .fc-timegrid-col-frame {
+  background-color: #dbeafe;
+}
+
+/* 큰 캘린더 일정 표시 */
+.calendar-main .fc-event-main {
+  overflow: hidden;
 }
 
 .calendar-main .fc-daygrid-event {
+  margin: 2px 6px 0;
   border: 0 !important;
   border-radius: 5px;
   background: transparent !important;
-  margin: 2px 6px 0;
   overflow: visible;
 }
 
 .calendar-main .fc-daygrid-event-harness {
   margin-top: 0;
-}
-
-.calendar-main .fc-event-main {
-  overflow: hidden;
 }
 
 .calendar-main-event {
@@ -92,6 +103,7 @@
 
 .calendar-main .fc-daygrid-more-link {
   display: inline-flex;
+  max-width: calc(100% - 12px);
   height: 22px;
   align-items: center;
   border-radius: 9999px;
@@ -99,264 +111,18 @@
   padding: 0 8px;
   background-color: #eff6ff;
   color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.calendar-main .fc-more-popover {
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 20px 45px rgb(15 23 42 / 0.18);
-}
-
-.calendar-main .fc-more-popover .fc-popover-header {
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-size: 13px;
-  font-weight: 800;
-  padding: 10px 12px;
-}
-
-.calendar-main .fc-more-popover .fc-popover-body {
-  padding: 8px;
-}
-
-.calendar-main .calendar-main-selected-day {
-  background-color: transparent;
-  box-shadow: inset 0 0 0 2px #2563eb;
-}
-
-.calendar-main .calendar-main-selected-day {
-  background-color: #dbeafe;
-  box-shadow: inset 0 0 0 2px #2563eb;
-}
-
-.calendar-main .calendar-main-selected-day .fc-daygrid-day-number {
-  color: #1d4ed8;
-  font-weight: 800;
-}
-
-.calendar-main .calendar-main-selected-day.fc-day-today {
-  background-color: #bfdbfe;
-  box-shadow: inset 0 0 0 2px #1d4ed8;
-}
-
-.calendar-main .fc-timegrid-col.calendar-main-selected-day {
-  background-color: #dbeafe;
-  box-shadow: inset 0 0 0 2px #2563eb;
-}
-
-.calendar-main .fc-timegrid-col.calendar-main-selected-day .fc-timegrid-col-frame {
-  background-color: #dbeafe;
-}
-
-.calendar-main .fc-timegrid-col.calendar-main-selected-day.fc-day-today {
-  background-color: #bfdbfe;
-  box-shadow: inset 0 0 0 2px #1d4ed8;
-}
-
-/* 서브 사이드바 영역의 미니 캘린더용 */
-.calendar-mini .fc {
-  font-size: 12px;
-}
-
-.calendar-mini .fc-scrollgrid {
-  border: 0;
-}
-
-.calendar-mini .fc-theme-standard td,
-.calendar-mini .fc-theme-standard th {
-  border: 0;
-}
-
-.calendar-mini .fc-col-header-cell {
-  padding-bottom: 1px;
-}
-
-.calendar-mini .fc-col-header-cell-cushion {
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.calendar-mini .fc-daygrid-body {
-  width: 100% !important;
-}
-
-.calendar-mini .fc-scrollgrid-sync-table {
-  width: 100% !important;
-}
-
-.calendar-mini .fc-daygrid-day {
-  height: 26px;
-}
-
-.calendar-mini .fc-daygrid-day-frame {
-  min-height: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-mini .fc-daygrid-day-events {
-  display: none;
-}
-
-.calendar-mini .fc-daygrid-day-bg {
-  display: none;
-}
-
-.calendar-mini .fc-daygrid-day-top {
-  min-height: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.calendar-mini .fc-daygrid-day-top {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-}
-
-.calendar-mini .fc-daygrid-day-number {
-  width: 26px;
-  height: 26px;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.calendar-mini .fc-day-other .fc-daygrid-day-number {
-  color: #cbd5e1;
-}
-
-.calendar-mini .fc .fc-daygrid-day.fc-day-today {
-  background-color: transparent;
-}
-
-.calendar-mini .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
-  background-color: transparent;
-}
-
-.calendar-mini .fc-daygrid-day {
   cursor: pointer;
-}
-
-.calendar-mini .fc-daygrid-day:hover .fc-daygrid-day-number {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-}
-
-.calendar-mini .fc-day-today .fc-daygrid-day-number {
-  background: #2563eb;
-  color: white;
-  font-weight: 700;
-}
-
-.calendar-mini .fc-day-today:hover .fc-daygrid-day-number {
-  background-color: #1d4ed8;
-  color: white;
-}
-
-.calendar-mini .calendar-mini-selected-day .fc-daygrid-day-number {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-  font-weight: 700;
-  box-shadow: inset 0 0 0 2px #2563eb;
-}
-
-.calendar-mini .calendar-mini-selected-day.fc-day-today .fc-daygrid-day-number {
-  background-color: #2563eb;
-  color: white;
-  box-shadow: 0 0 0 3px #bfdbfe;
-}
-
-.calendar-mini .fc-day-sun .fc-daygrid-day-number {
-  color: #dc2626;
-}
-
-.calendar-mini .fc-day-sat .fc-daygrid-day-number {
-  color: #2563eb;
-}
-
-.calendar-mini .fc-day-today.fc-day-sun .fc-daygrid-day-number,
-.calendar-mini .fc-day-today.fc-day-sat .fc-daygrid-day-number{
-  color: white;
-}
-
-/* 다가오는 일정 커스텀 툴팁 */
-.calendar-upcoming-item {
-  position: relative;
-}
-
-.calendar-upcoming-item[data-tooltip]::after {
-  position: absolute;
-  left: 10px;
-  bottom: calc(100% + 8px);
-  z-index: 80;
-  max-width: 220px;
-  padding: 7px 9px;
-  border-radius: 8px;
-  background-color: #0f172a;
-  color: #ffffff;
-  content: attr(data-tooltip);
   font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(4px);
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
-  white-space: normal;
-  word-break: keep-all;
+  font-weight: 800;
+  overflow: hidden;
+  position: relative;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  z-index: 2;
 }
 
-.calendar-upcoming-item[data-tooltip]::before {
-  position: absolute;
-  left: 18px;
-  bottom: calc(100% + 3px);
-  z-index: 81;
-  width: 10px;
-  height: 10px;
-  background-color: #0f172a;
-  content: '';
-  opacity: 0;
-  pointer-events: none;
-  transform: rotate(45deg) translateY(4px);
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
-}
-
-.calendar-upcoming-item[data-tooltip]:hover::after,
-.calendar-upcoming-item[data-tooltip]:hover::before {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.calendar-upcoming-item[data-tooltip]:hover::before {
-  transform: rotate(45deg) translateY(0);
-}
-
-/* 월간 캘린더 보정: 멀티데이 바는 이어지고, 행은 FullCalendar가 균등 계산하게 둡니다. */
-.calendar-main {
-  container-type: inline-size;
-}
-
+/* 월간 캘린더 높이 고정 */
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-body,
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-body table,
 .calendar-main .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
@@ -364,241 +130,31 @@
   table-layout: fixed;
 }
 
-.calendar-main .fc-dayGridMonth-view .fc-daygrid-day-frame {
-  min-height: 0;
-}
-
-.calendar-main .fc-dayGridMonth-view .fc-daygrid-day-events {
-  margin-bottom: 2px;
-}
-
-.calendar-main .fc-dayGridMonth-view .fc-daygrid-more-link {
-  position: relative;
-  z-index: 2;
-  cursor: pointer;
-}
-
-.calendar-main .fc-more-popover {
-  width: clamp(148px, calc(100cqw / 7 - 14px), 210px) !important;
-  min-width: 0 !important;
-  max-width: calc(100cqw / 7 - 14px) !important;
-  border: 1px solid #dbeafe;
-  border-radius: 16px;
-  background-color: #ffffff;
-  box-shadow: 0 24px 60px rgb(15 23 42 / 0.22);
-}
-
-.calendar-main .fc-more-popover .fc-popover-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid #dbeafe;
-  background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 900;
-  min-height: 34px;
-  padding: 5px 9px;
-}
-
-.calendar-main .fc-more-popover .fc-popover-title {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-main .fc-more-popover .fc-popover-close {
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: #64748b;
-  font-size: 18px;
-  line-height: 1;
-  opacity: 1;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.calendar-main .fc-more-popover .fc-popover-close:hover {
-  background-color: #dbeafe;
-  color: #1d4ed8;
-}
-
-.calendar-main .fc-more-popover .fc-popover-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 9px;
-}
-
-.calendar-main .fc-more-popover .fc-daygrid-event {
-  margin: 0;
-  border-radius: 7px;
-  background: transparent !important;
-}
-
-.calendar-main .fc-more-popover .calendar-main-event {
-  padding: 3px 7px;
-}
-
-/* 최종 월간 뷰 보정 */
-.calendar-main .fc-dayGridMonth-view .fc-scrollgrid-sync-table {
-  height: 100% !important;
-  table-layout: fixed;
-}
-
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-day,
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-day-frame {
+  min-height: 0;
   overflow: visible !important;
 }
 
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-day-events {
   min-height: 56px !important;
   max-height: 56px !important;
+  margin-bottom: 2px;
   overflow: visible !important;
 }
 
-.calendar-main .fc-dayGridMonth-view .fc-daygrid-event {
+.calendar-main .fc-dayGridMonth-view .fc-daygrid-event,
+.calendar-main .fc-dayGridMonth-view .calendar-main-event {
   height: 26px;
-  margin-top: 2px;
 }
 
 .calendar-main .fc-dayGridMonth-view .calendar-main-event {
-  height: 26px;
   padding-top: 2px;
   padding-bottom: 2px;
   line-height: 20px;
 }
 
-.calendar-main .fc-dayGridMonth-view .fc-daygrid-more-link {
-  max-width: calc(100% - 12px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-main .fc-more-popover {
-  width: calc(100cqw / 7) !important;
-  min-width: calc(100cqw / 7) !important;
-  max-width: calc(100cqw / 7) !important;
-}
-
-.calendar-main .fc-more-popover .fc-daygrid-event {
-  width: 100%;
-  margin-left: 0;
-  margin-right: 0;
-}
-
-.calendar-main .fc-more-popover .calendar-main-event {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* 더보기 팝오버: 기본 FullCalendar 팝오버를 일정 카드형 레이어로 정리합니다. */
-.calendar-main .fc-more-popover {
-  width: min(360px, calc(100vw - 48px)) !important;
-  min-width: min(360px, calc(100vw - 48px)) !important;
-  max-width: min(360px, calc(100vw - 48px)) !important;
-  overflow: visible;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background-color: #ffffff;
-  box-shadow: 0 24px 60px rgb(15 23 42 / 0.18);
-}
-
-.calendar-main .fc-more-popover::before {
-  position: absolute;
-  top: -8px;
-  left: 28px;
-  width: 16px;
-  height: 16px;
-  border-left: 1px solid #e2e8f0;
-  border-top: 1px solid #e2e8f0;
-  background-color: #ffffff;
-  content: '';
-  transform: rotate(45deg);
-}
-
-.calendar-main .fc-more-popover .fc-popover-header {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  min-height: 56px;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #edf2f7;
-  border-radius: 10px 10px 0 0;
-  background: #ffffff;
-  padding: 0 20px;
-}
-
-.calendar-main .fc-more-popover .fc-popover-title {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  color: #0f172a;
-  font-size: 18px;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-main .fc-more-popover .fc-popover-close {
-  display: inline-flex;
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: #334155;
-  font-size: 22px;
-  line-height: 1;
-  opacity: 1;
-  transition:
-    background-color 150ms ease,
-    color 150ms ease;
-}
-
-.calendar-main .fc-more-popover .fc-popover-close:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-.calendar-main .fc-more-popover .fc-popover-body {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  max-height: 360px;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
-  border-radius: 0 0 10px 10px;
-  background-color: #ffffff;
-  padding: 16px 20px 20px;
-}
-
-.calendar-main .fc-more-popover .fc-daygrid-event {
-  width: 100%;
-  margin: 0;
-  border-radius: 6px;
-}
-
-.calendar-main .fc-more-popover .calendar-main-event {
-  width: 100%;
-  height: 30px;
-  box-sizing: border-box;
-  padding: 4px 10px;
-  line-height: 20px;
-}
-
+/* 커스텀 더보기 팝오버 */
 .calendar-custom-more-popover {
   position: absolute;
   z-index: 70;
@@ -616,7 +172,6 @@
   width: 16px;
   height: 16px;
   background-color: #ffffff;
-  content: '';
   transform: rotate(45deg);
 }
 
@@ -628,8 +183,8 @@
 
 .calendar-custom-more-popover-above .calendar-custom-more-popover-arrow {
   bottom: -8px;
-  border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .calendar-custom-more-popover-header {
@@ -699,4 +254,179 @@
   box-sizing: border-box;
   padding: 4px 10px;
   line-height: 20px;
+}
+
+/* 미니 캘린더 */
+.calendar-mini .fc {
+  font-size: 12px;
+}
+
+.calendar-mini .fc-scrollgrid,
+.calendar-mini .fc-theme-standard td,
+.calendar-mini .fc-theme-standard th {
+  border: 0;
+}
+
+.calendar-mini .fc-col-header-cell {
+  padding-bottom: 1px;
+}
+
+.calendar-mini .fc-col-header-cell-cushion {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.calendar-mini .fc-daygrid-body,
+.calendar-mini .fc-scrollgrid-sync-table {
+  width: 100% !important;
+}
+
+.calendar-mini .fc-daygrid-day,
+.calendar-mini .fc-daygrid-day-frame,
+.calendar-mini .fc-daygrid-day-top {
+  height: 26px;
+  min-height: 26px;
+}
+
+.calendar-mini .fc-daygrid-day {
+  cursor: pointer;
+}
+
+.calendar-mini .fc-daygrid-day-frame,
+.calendar-mini .fc-daygrid-day-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-mini .fc-daygrid-day-top {
+  width: 100%;
+}
+
+.calendar-mini .fc-daygrid-day-events,
+.calendar-mini .fc-daygrid-day-bg {
+  display: none;
+}
+
+.calendar-mini .fc-daygrid-day-number {
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+  text-decoration: none;
+}
+
+.calendar-mini .fc-day-other .fc-daygrid-day-number {
+  color: #cbd5e1;
+}
+
+.calendar-mini .fc .fc-daygrid-day.fc-day-today,
+.calendar-mini .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-frame {
+  background-color: transparent;
+}
+
+.calendar-mini .fc-daygrid-day:hover .fc-daygrid-day-number {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.calendar-mini .fc-day-today .fc-daygrid-day-number {
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+}
+
+.calendar-mini .fc-day-today:hover .fc-daygrid-day-number {
+  background-color: #1d4ed8;
+  color: white;
+}
+
+.calendar-mini .calendar-mini-selected-day .fc-daygrid-day-number {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 2px #2563eb;
+}
+
+.calendar-mini .calendar-mini-selected-day.fc-day-today .fc-daygrid-day-number {
+  background-color: #2563eb;
+  color: white;
+  box-shadow: 0 0 0 3px #bfdbfe;
+}
+
+.calendar-mini .fc-day-sun .fc-daygrid-day-number {
+  color: #dc2626;
+}
+
+.calendar-mini .fc-day-sat .fc-daygrid-day-number {
+  color: #2563eb;
+}
+
+.calendar-mini .fc-day-today.fc-day-sun .fc-daygrid-day-number,
+.calendar-mini .fc-day-today.fc-day-sat .fc-daygrid-day-number {
+  color: white;
+}
+
+/* 다가오는 일정 툴팁 */
+.calendar-upcoming-item {
+  position: relative;
+}
+
+.calendar-upcoming-item[data-tooltip]::after {
+  position: absolute;
+  left: 10px;
+  bottom: calc(100% + 8px);
+  z-index: 80;
+  max-width: 220px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background-color: #0f172a;
+  color: #ffffff;
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.calendar-upcoming-item[data-tooltip]::before {
+  position: absolute;
+  left: 18px;
+  bottom: calc(100% + 3px);
+  z-index: 81;
+  width: 10px;
+  height: 10px;
+  background-color: #0f172a;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transform: rotate(45deg) translateY(4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.calendar-upcoming-item[data-tooltip]:hover::after,
+.calendar-upcoming-item[data-tooltip]:hover::before {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.calendar-upcoming-item[data-tooltip]:hover::before {
+  transform: rotate(45deg) translateY(0);
 }
