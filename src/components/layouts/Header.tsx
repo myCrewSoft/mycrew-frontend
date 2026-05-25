@@ -2,6 +2,7 @@ import { Bell, ChevronDown, Mail, MessageSquare } from 'lucide-react'
 import NotificationIconButton from '../common/button/NotificationIconButton'
 import SearchInput from '../common/form/searchInput/SearchInput'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
+import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
 
 const Header = () => {
   return (
@@ -37,6 +38,8 @@ const Header = () => {
 
         <HeaderPopover
           title="메신저"
+          className="!w-[660px] translate-x-60"
+          bodyClassName="max-h-none overflow-visible"
           trigger={({ open, toggle }) => (
             <NotificationIconButton
               active={open}
@@ -52,7 +55,7 @@ const Header = () => {
             />
           )}
         >
-          {/* 메신저 팝오버 내용 컴포넌트를 여기에 넣으면 됩니다. 예: <MessengerPopoverContent /> */}
+          <MessengerPopoverContent />
         </HeaderPopover>
 
         <HeaderPopover
