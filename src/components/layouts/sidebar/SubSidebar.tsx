@@ -1,6 +1,5 @@
 import { useLocation } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import Button from '../../common/button/Button'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
@@ -18,11 +17,15 @@ const SubSidebar = ({ isOpen, onToggle, onOpen }: SubSidebarProps) => {
   const sidebarConfig = subSidebarConfigs[sidebarKey] ?? subSidebarConfigs.project
 
   return (
-    <>
+    <div
+      className={`relative h-full flex-shrink-0 transition-all duration-300 ease-in-out ${
+        isOpen ? 'w-72' : 'w-0'
+      }`}
+    >
       <aside
-        className={`relative h-full flex-shrink-0 border-r border-slate-100 bg-[#f8fafc] transition-all duration-300 ease-in-out ${
+        className={`h-full border-r border-slate-100 bg-[#f8fafc] transition-all duration-300 ease-in-out ${
           isOpen
-            ? 'w-72 p-6 opacity-100'
+            ? 'w-full p-6 opacity-100'
             : 'w-0 overflow-hidden border-r-0 p-0 opacity-0'
         }`}
       >
@@ -58,32 +61,17 @@ const SubSidebar = ({ isOpen, onToggle, onOpen }: SubSidebarProps) => {
             </SubSidebarSection>
           ))}
         </div>
-
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onToggle}
-          className="absolute -right-3 top-6 z-50 min-w-0 border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
-          leftIcon={
-            isOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />
-          }
-          aria-label={isOpen ? '서브 사이드바 닫기' : '서브 사이드바 열기'}
-        />
       </aside>
 
-      {!isOpen && (
-        <div className="absolute left-24 top-6 z-50">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onOpen}
-            className="min-w-0 rounded-l-none rounded-r-md border-l-0 border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
-            leftIcon={<ChevronRight size={14} />}
-            aria-label="서브 사이드바 열기"
-          />
-        </div>
-      )}
-    </>
+      <button
+        type="button"
+        onClick={isOpen ? onToggle : onOpen}
+        aria-label={isOpen ? '서브 사이드바 닫기' : '서브 사이드바 열기'}
+        className="absolute -right-4 top-5 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-lg shadow-slate-200/70 ring-4 ring-slate-50 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+      >
+        {isOpen ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
+      </button>
+    </div>
   )
 }
 
