@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AxiosResponse } from 'axios';
 import { ApiError } from '../api/axiosInstance';
@@ -10,7 +11,7 @@ import type { ApiResponse, PageInfo } from '../api/axiosInstance';
  * axios.ts 인터셉터가 response 전체(AxiosResponse)를 반환하므로
  * 반환 타입을 AxiosResponse<ApiResponse<T>> 로 선언한다.
  */
-type ApiCallFn<T> = (...args: unknown[]) => Promise<AxiosResponse<ApiResponse<T>>>;
+type ApiCallFn<TData, TArgs extends unknown[] = any[]> = (...args: TArgs) => Promise<AxiosResponse<ApiResponse<TData>>>;
 
 /**
  * useApi / useApiList 훅의 옵션 타입.
@@ -28,13 +29,13 @@ type ApiCallFn<T> = (...args: unknown[]) => Promise<AxiosResponse<ApiResponse<T>
  * @example 상태 변화에 따른 재호출 패턴
  * const { data, execute } = useApiList(boardApi.getBoards, { immediate: false });
  * useEffect(() => {
- *   void execute({ page, filter });
+ * void execute({ page, filter });
  * }, [page, filter, execute]); // execute 참조가 고정되어 있어 완전히 안전하다
  */
-interface UseApiOptions<T> {
+interface UseApiOptions<TData, TArgs extends unknown[]> {
   immediate?: boolean;
-  initialData?: T | null;
-  immediateArgs?: unknown[];
+  initialData?: TData | null;
+  immediateArgs?: TArgs;
 }
 
 /**
@@ -42,21 +43,24 @@ interface UseApiOptions<T> {
  * execute 의 반환값은 AxiosResponse 가 아닌 ApiResponse<T> 다.
  * 인터셉터에서 response.data 를 꺼내 반환하므로 소비자는 ApiResponse 만 다루면 된다.
  */
-interface UseApiReturn<T> {
-  data: T | null;
+interface UseApiReturn<TData, TArgs extends unknown[]> {
+  data: TData | null;
   loading: boolean;
   error: ApiError | null;
-  execute: (...args: unknown[]) => Promise<ApiResponse<T>>;
+  execute: (...args: TArgs) => Promise<ApiResponse<TData>>; // 타입 안정성 확보!
   reset: () => void;
 }
 
 /**
  * useApiList 훅의 반환 타입.
  * useApi 와 동일하지만 pagination 상태를 추가로 제공한다.
+ * TArgs를 제네릭으로 추가하여 Omit된 execute에 정확한 인자 타입을 주입한다.
  */
-interface UseApiListReturn<T> extends Omit<UseApiReturn<T[]>, 'execute'> {
+interface UseApiListReturn<TData, TArgs extends unknown[]> 
+  extends Omit<UseApiReturn<TData[], TArgs>, 'execute'> {
   pagination: PageInfo | null;
-  execute: (...args: unknown[]) => Promise<ApiResponse<T[]>>;
+  // unknown[] 대신 TArgs를 사용하여 타입 안정성을 확보합니다.
+  execute: (...args: TArgs) => Promise<ApiResponse<TData[]>>;
 }
 
 // ── useApi ────────────────────────────────────────────────────────
@@ -94,31 +98,31 @@ interface UseApiListReturn<T> extends Omit<UseApiReturn<T[]>, 'execute'> {
  *
  * @example 마운트 시 id 전달이 필요한 경우
  * const { data: user, loading } = useApi(
- *   userApi.getUser,
- *   { immediateArgs: [userId] }
+ * userApi.getUser,
+ * { immediateArgs: [userId] }
  * );
  *
  * @example 버튼 등 이벤트에서 수동 호출
  * const { loading, execute: login } = useApi(
- *   authApi.login,
- *   { immediate: false }
+ * authApi.login,
+ * { immediate: false }
  * );
  * const handleSubmit = async () => {
- *   try {
- *     await login(formData);
- *     navigate('/');
- *   } catch (error) {
- *     if (error instanceof ApiError) alert(error.message);
- *   }
+ * try {
+ * await login(formData);
+ * navigate('/');
+ * } catch (error) {
+ * if (error instanceof ApiError) alert(error.message);
+ * }
  * };
  */
-export function useApi<T>(
-  apiCall: ApiCallFn<T>,
-  options: UseApiOptions<T> = {},
-): UseApiReturn<T> {
-  const { immediate = true, initialData = null, immediateArgs = [] } = options;
+export function useApi<TData, TArgs extends unknown[] = any[]>(
+  apiCall: ApiCallFn<TData, TArgs>,
+  options: UseApiOptions<TData, TArgs> = {},
+): UseApiReturn<TData, TArgs> {
+  const { immediate = true, initialData = null, immediateArgs = [] as unknown as TArgs } = options;
 
-  const [data,    setData]    = useState<T | null>(initialData);
+  const [data,    setData]    = useState<TData | null>(initialData);
   const [loading, setLoading] = useState<boolean>(false);
   const [error,   setError]   = useState<ApiError | null>(null);
 
@@ -127,7 +131,7 @@ export function useApi<T>(
    * 렌더링마다 인라인 익명 함수가 새로 생성되더라도 ref 로 항상 최신 함수를 참조하되,
    * execute 자체의 참조값은 변하지 않아 안정적이다.
    */
-  const apiCallRef = useRef<ApiCallFn<T>>(apiCall);
+  const apiCallRef = useRef<ApiCallFn<TData, TArgs>>(apiCall);
   useEffect(() => {
     apiCallRef.current = apiCall;
   });
@@ -153,7 +157,7 @@ export function useApi<T>(
    * 빈 의존성 배열로 execute 참조를 최초 1회 고정하여 불필요한 재생성을 막는다.
    */
   const execute = useCallback(
-    async (...args: unknown[]): Promise<ApiResponse<T>> => {
+    async (...args: TArgs): Promise<ApiResponse<TData>> => {
       setLoading(true);
       setError(null);
       try {
@@ -233,7 +237,7 @@ export function useApi<T>(
  * [페이지네이션 / 검색 필터 구현 예시]
  * const { data, execute } = useApiList(boardApi.getBoards, { immediate: false });
  * useEffect(() => {
- *   void execute({ page, filter });
+ * void execute({ page, filter });
  * }, [page, filter, execute]); // execute 참조가 고정되어 있으므로 안전하다
  *
  * @param apiCall  목록을 반환하는 API 함수
@@ -242,19 +246,19 @@ export function useApi<T>(
  *
  * @example
  * const { data: boards, pagination, loading } = useApiList(
- *   boardApi.getBoards,
- *   { immediateArgs: [{ page: 0, size: 10 }] }
+ * boardApi.getBoards,
+ * { immediateArgs: [{ page: 0, size: 10 }] }
  * );
  * // pagination?.totalPages, pagination?.page 로 페이지 정보 접근
  * // data === null → 로딩 전 / data === [] → 데이터 없음
  */
-export function useApiList<T>(
-  apiCall: ApiCallFn<T[]>,
-  options: UseApiOptions<T[]> = {},
-): UseApiListReturn<T> {
-  const { immediate = true, immediateArgs = [] } = options;
+export function useApiList<TData, TArgs extends unknown[] = any[]>(
+  apiCall: ApiCallFn<TData[], TArgs>,
+  options: UseApiOptions<TData[], TArgs> = {},
+): UseApiListReturn<TData, TArgs> {
+  const { immediate = true, immediateArgs = [] as unknown as TArgs } = options;
 
-  const [data,       setData]       = useState<T[] | null>(null);
+  const [data,       setData]       = useState<TData[] | null>(null);
   const [pagination, setPagination] = useState<PageInfo | null>(null);
   const [loading,    setLoading]    = useState<boolean>(false);
   const [error,      setError]      = useState<ApiError | null>(null);
@@ -263,7 +267,7 @@ export function useApiList<T>(
    * apiCall 을 ref 로 관리하여 execute 참조를 안정적으로 고정한다.
    * useApi 와 동일한 원칙을 따른다.
    */
-  const apiCallRef = useRef<ApiCallFn<T[]>>(apiCall);
+  const apiCallRef = useRef<ApiCallFn<TData[], TArgs>>(apiCall);
   useEffect(() => {
     apiCallRef.current = apiCall;
   });
@@ -286,7 +290,7 @@ export function useApiList<T>(
    * 언마운트 이후 도착한 응답은 isMountedRef 로 걸러 setState 를 건너뛴다.
    */
   const execute = useCallback(
-    async (...args: unknown[]): Promise<ApiResponse<T[]>> => {
+    async (...args: TArgs): Promise<ApiResponse<TData[]>> => {
       setLoading(true);
       setError(null);
       try {
