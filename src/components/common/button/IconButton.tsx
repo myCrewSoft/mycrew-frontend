@@ -4,7 +4,7 @@ interface Props
   extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean
 
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
 }
 
 const IconButton = ({
@@ -29,11 +29,13 @@ const IconButton = ({
         }
 
         ${
-          size === 'sm'
-            ? 'h-9 w-9'
-            : size === 'lg'
-            ? 'h-12 w-12'
-            : 'h-11 w-11'
+          size === 'xs'
+            ? 'h-7 w-7 rounded-xl'
+            : size === 'sm'
+              ? 'h-9 w-9'
+              : size === 'lg'
+              ? 'h-12 w-12'
+              : 'h-11 w-11'
         }
 
         ${className}
