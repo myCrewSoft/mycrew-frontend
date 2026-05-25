@@ -1,8 +1,9 @@
-import { Bell, ChevronDown, Mail, MessageSquare } from 'lucide-react'
+import { Bell, Mail, MessageSquare } from 'lucide-react'
 import NotificationIconButton from '../common/button/NotificationIconButton'
 import SearchInput from '../common/form/searchInput/SearchInput'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
 import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
+import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
 
 const Header = () => {
   return (
@@ -81,23 +82,7 @@ const Header = () => {
 
         <div className="mx-1 h-5 w-[1px] bg-slate-200" />
 
-        <button
-          className="flex items-center gap-3 rounded-xl p-1 transition-all hover:bg-slate-50"
-          type="button"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-xs font-bold text-white">
-            BJ
-          </div>
-
-          <div className="hidden text-left md:block">
-            <p className="text-sm font-bold leading-tight text-slate-800">
-              박범준
-            </p>
-            <p className="text-[11px] text-slate-400">FrontEnd Developer</p>
-          </div>
-
-          <ChevronDown size={14} className="text-slate-400" />
-        </button>
+        <HeaderProfileStatusMenu />
       </div>
     </header>
   )
