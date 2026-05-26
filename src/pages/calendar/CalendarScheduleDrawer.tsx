@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Button from '../../components/common/button/Button'
+import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import IconButton from '../../components/common/button/IconButton'
 import DatePickerField from '../../components/common/form/datePicker/DatePickerField'
 import FormField from '../../components/common/form/formField/FormField'
@@ -23,14 +24,6 @@ interface CalendarScheduleDrawerProps {
 interface OptionItem {
   value: string
   label: string
-}
-
-interface AttendeeOption {
-  id: string
-  name: string
-  department: string
-  position: string
-  avatarColor: string
 }
 
 const scheduleTypeOptions: OptionItem[] = [
@@ -58,71 +51,10 @@ const alarmOptions: OptionItem[] = [
   { value: '1440', label: '1일 전' },
 ]
 
-// 백엔드 연동 전까지는 본인 프로젝트/업무/참석자 목록을 더미 데이터로 둡니다.
-const projectOptions: OptionItem[] = [
-  { value: '101', label: 'myCrewSoft 구축' },
-  { value: '102', label: '인프라 마이그레이션' },
-  { value: '103', label: '서비스 고도화' },
-]
-
-const taskOptions: OptionItem[] = [
-  { value: '201', label: '캘린더 UI 구현' },
-  { value: '202', label: '일정 API 연동' },
-  { value: '203', label: '반복 일정 검증' },
-]
-
-const attendeeOptions: AttendeeOption[] = [
-  {
-    id: '1',
-    name: '김민수',
-    department: '개발팀',
-    position: '대리',
-    avatarColor: '#14b8a6',
-  },
-  {
-    id: '2',
-    name: '이서연',
-    department: '디자인팀',
-    position: '매니저',
-    avatarColor: '#f97316',
-  },
-  {
-    id: '3',
-    name: '박준호',
-    department: '기획팀',
-    position: '대리',
-    avatarColor: '#8b5cf6',
-  },
-  {
-    id: '4',
-    name: '정하늘',
-    department: '인사팀',
-    position: '팀장',
-    avatarColor: '#ec4899',
-  },
-  {
-    id: '5',
-    name: '최지훈',
-    department: '개발팀',
-    position: '팀장',
-    avatarColor: '#0ea5e9',
-  },
-  {
-    id: '6',
-    name: '한유진',
-    department: '기획팀',
-    position: '매니저',
-    avatarColor: '#22c55e',
-  },
-]
-
-const departmentOptions: OptionItem[] = [
-  { value: 'all', label: '전체 부서' },
-  { value: '개발팀', label: '개발팀' },
-  { value: '디자인팀', label: '디자인팀' },
-  { value: '기획팀', label: '기획팀' },
-  { value: '인사팀', label: '인사팀' },
-]
+// 프로젝트/업무/참석자는 임의 데이터를 넣지 않습니다.
+// 백엔드 연동 후 API 응답을 아래 배열 대신 내려받아 연결하면 됩니다.
+const projectOptions: OptionItem[] = []
+const taskOptions: OptionItem[] = []
 
 const createInitialFormValues = (
   selectedDate: string,
@@ -201,9 +133,9 @@ const CalendarScheduleDrawer = ({
   const [formValues, setFormValues] = useState<ScheduleFormValues>(() =>
     createInitialFormValues(selectedDate),
   )
-  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<string[]>([])
-  const [attendeeKeyword, setAttendeeKeyword] = useState('')
-  const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<
+    Array<string | number>
+  >([])
   const [alarmMinutes, setAlarmMinutes] = useState('30')
   const [relatedProjectId, setRelatedProjectId] = useState('')
   const [relatedTaskId, setRelatedTaskId] = useState('')
@@ -218,45 +150,6 @@ const CalendarScheduleDrawer = ({
     setRelatedProjectId('')
     setRelatedTaskId('')
   }
-
-  const handleAttendeeToggle = (attendeeId: string) => {
-    setSelectedAttendeeIds((current) =>
-      current.includes(attendeeId)
-        ? current.filter((id) => id !== attendeeId)
-        : [...current, attendeeId],
-    )
-  }
-
-  const filteredAttendees = useMemo(() => {
-    const keyword = attendeeKeyword.trim().toLowerCase()
-
-    if (!keyword && selectedDepartment === 'all') {
-      return []
-    }
-
-    return attendeeOptions.filter((attendee) => {
-      const matchesKeyword =
-        !keyword ||
-        attendee.name.toLowerCase().includes(keyword) ||
-        attendee.department.toLowerCase().includes(keyword) ||
-        attendee.position.toLowerCase().includes(keyword)
-      const matchesDepartment =
-        selectedDepartment === 'all' ||
-        attendee.department === selectedDepartment
-
-      return matchesKeyword && matchesDepartment
-    })
-  }, [attendeeKeyword, selectedDepartment])
-
-  const selectedAttendees = useMemo(
-    () =>
-      attendeeOptions.filter((attendee) =>
-        selectedAttendeeIds.includes(attendee.id),
-      ),
-    [selectedAttendeeIds],
-  )
-  const shouldShowAttendeeEmptyGuide =
-    !attendeeKeyword.trim() && selectedDepartment === 'all'
 
   const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
   const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
@@ -517,143 +410,12 @@ const CalendarScheduleDrawer = ({
               }
             />
 
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-semibold text-slate-700">
-                참석자 검색
-              </span>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-3">
-                  <input
-                    value={attendeeKeyword}
-                    onChange={(event) => setAttendeeKeyword(event.target.value)}
-                    placeholder="이름으로 검색"
-                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400"
-                  />
-                  <select
-                    value={selectedDepartment}
-                    onChange={(event) =>
-                      setSelectedDepartment(event.target.value)
-                    }
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-400"
-                  >
-                    {departmentOptions.map((department) => (
-                      <option key={department.value} value={department.value}>
-                        {department.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {!shouldShowAttendeeEmptyGuide && (
-                <div className="mt-4 max-h-[224px] overflow-y-auto rounded-xl border border-slate-200">
-                  {filteredAttendees.map((attendee) => {
-                    const checked = selectedAttendeeIds.includes(attendee.id)
-
-                    return (
-                      <label
-                        key={attendee.id}
-                        className="flex h-14 cursor-pointer items-center gap-3 border-b border-slate-200 px-3 last:border-b-0 hover:bg-slate-50"
-                      >
-                        <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                          style={{ backgroundColor: attendee.avatarColor }}
-                        >
-                          {attendee.name.slice(0, 1)}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-slate-900">
-                            {attendee.name}
-                          </span>
-                          <span className="block truncate text-xs font-medium text-slate-500">
-                            {attendee.department} · {attendee.position}
-                          </span>
-                        </span>
-
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => handleAttendeeToggle(attendee.id)}
-                          className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-                    )
-                  })}
-
-                  {filteredAttendees.length === 0 && (
-                    <div className="px-3 py-6 text-center text-sm text-slate-400">
-                      검색 결과가 없습니다.
-                    </div>
-                  )}
-                </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-sm font-bold text-slate-900">
-                      선택된 참석자
-                    </span>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      총 {selectedAttendeeIds.length}명이 일정에 초대됩니다.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAttendeeIds([])}
-                    disabled={selectedAttendeeIds.length === 0}
-                    className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                  >
-                    전체 삭제
-                  </button>
-                </div>
-
-                <div className="mt-4 min-h-12 rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-3">
-                  {selectedAttendees.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {selectedAttendees.map((attendee) => (
-                        <span
-                          key={attendee.id}
-                          className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none text-white"
-                            style={{ backgroundColor: attendee.avatarColor }}
-                          >
-                            {attendee.name.slice(0, 1)}
-                          </span>
-
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-bold text-slate-900">
-                              {attendee.name}
-                            </span>
-                            <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-400">
-                              {attendee.department} · {attendee.position}
-                            </span>
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleAttendeeToggle(attendee.id)}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                            aria-label={`${attendee.name} 참석자 제거`}
-                          >
-                            <X size={13} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex h-10 items-center text-sm text-slate-400">
-                      선택된 참석자가 없습니다.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <EmployeeSearchPicker
+              variant="detailed"
+              employees={[]}
+              selectedEmployeeIds={selectedAttendeeIds}
+              onChange={setSelectedAttendeeIds}
+            />
 
             <Select
               label="알림 시간"
