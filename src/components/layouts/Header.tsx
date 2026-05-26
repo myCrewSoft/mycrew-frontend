@@ -1,7 +1,9 @@
-import { Bell, ChevronDown, Mail, MessageSquare } from 'lucide-react'
+import { Bell, Mail, MessageSquare } from 'lucide-react'
 import NotificationIconButton from '../common/button/NotificationIconButton'
 import SearchInput from '../common/form/searchInput/SearchInput'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
+import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
+import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
 import { notificationApi } from '../../api/notificationApi'
 import { useApi } from '../../hooks/useApi'
@@ -45,6 +47,8 @@ const Header = () => {
 
         <HeaderPopover
           title="메신저"
+          className="!w-[660px] translate-x-60"
+          bodyClassName="max-h-none overflow-visible"
           trigger={({ open, toggle }) => (
             <NotificationIconButton
               active={open}
@@ -60,7 +64,7 @@ const Header = () => {
             />
           )}
         >
-          {/* 메신저 팝오버 내용 컴포넌트를 여기에 넣으면 됩니다. 예: <MessengerPopoverContent /> */}
+          <MessengerPopoverContent />
         </HeaderPopover>
 
         <HeaderPopover
@@ -89,23 +93,7 @@ const Header = () => {
 
         <div className="mx-1 h-5 w-[1px] bg-slate-200" />
 
-        <button
-          className="flex items-center gap-3 rounded-xl p-1 transition-all hover:bg-slate-50"
-          type="button"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-xs font-bold text-white">
-            BJ
-          </div>
-
-          <div className="hidden text-left md:block">
-            <p className="text-sm font-bold leading-tight text-slate-800">
-              박범준
-            </p>
-            <p className="text-[11px] text-slate-400">FrontEnd Developer</p>
-          </div>
-
-          <ChevronDown size={14} className="text-slate-400" />
-        </button>
+        <HeaderProfileStatusMenu />
       </div>
     </header>
   )
