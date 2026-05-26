@@ -41,11 +41,15 @@ const SubSidebar = ({ isOpen, onToggle, onOpen }: SubSidebarProps) => {
   }
 
   return (
-    <>
+    <div
+      className={`relative h-full flex-shrink-0 transition-all duration-300 ease-in-out ${
+        isOpen ? 'w-72' : 'w-0'
+      }`}
+    >
       <aside
-        className={`relative h-full flex-shrink-0 border-r border-slate-100 bg-[#f8fafc] transition-all duration-300 ease-in-out ${
+        className={`h-full border-r border-slate-100 bg-[#f8fafc] transition-all duration-300 ease-in-out ${
           isOpen
-            ? 'w-72 p-6 opacity-100'
+            ? 'w-full p-6 opacity-100'
             : 'w-0 overflow-hidden border-r-0 p-0 opacity-0'
         }`}
       >
