@@ -11,7 +11,6 @@ import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
 interface SubSidebarProps {
   isOpen: boolean
   onToggle: () => void
-  onOpen: () => void
 }
 
 // 특정 메뉴에서 기본 메뉴 목록이 아니라 전용 UI를 보여주고 싶을 때 사용하는 매핑입니다.
@@ -21,7 +20,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   calendar: CalendarSubSidebarContent,
 }
 
-const SubSidebar = ({ isOpen, onToggle, onOpen }: SubSidebarProps) => {
+const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   const location = useLocation()
 
   // 현재 URL의 첫 번째 경로를 기준으로 어떤 서브사이드바를 보여줄지 결정합니다.
@@ -92,33 +91,19 @@ const SubSidebar = ({ isOpen, onToggle, onOpen }: SubSidebarProps) => {
           </div>
         )}
 
-        {/* 서브사이드바가 열려 있을 때 보이는 닫기 버튼입니다. */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onToggle}
-          className="absolute -right-3 top-6 z-50 min-w-0 border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
-          leftIcon={
-            isOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />
-          }
-          aria-label={isOpen ? '서브 사이드바 닫기' : '서브 사이드바 열기'}
-        />
       </aside>
 
-      {/* 서브사이드바가 닫혀 있을 때 왼쪽에 작게 보이는 열기 버튼입니다. */}
-      {!isOpen && (
-        <div className="absolute left-24 top-6 z-50">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onOpen}
-            className="min-w-0 rounded-l-none rounded-r-md border-l-0 border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
-            leftIcon={<ChevronRight size={14} />}
-            aria-label="서브 사이드바 열기"
-          />
-        </div>
-      )}
-    </>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={onToggle}
+        className="absolute left-full top-6 z-50 min-w-0 -translate-x-1/2 rounded-full border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
+        leftIcon={
+          isOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />
+        }
+        aria-label={isOpen ? '서브 사이드바 닫기' : '서브 사이드바 열기'}
+      />
+    </div>
   )
 }
 
