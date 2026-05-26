@@ -227,16 +227,16 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
   board: {
     title: '게시판',
     actions: [
-      { label: '게시글 작성', variant: 'primary' },
-      { label: '게시판 생성' },
+          { label: '글쓰기', variant: 'primary' },
     ],
     sections: [
       {
-        title: '게시판',
+    title: '',
         items: [
-          { icon: ClipboardList, label: '전체 게시글', path: '/board/all' },
-          { icon: Sparkles, label: '공지사항', path: '/board/notices' },
-          { icon: Archive, label: '보관 게시글', path: '/board/archive' },
+         { icon: Sparkles, label: '공지사항', path: '/board/notices' },
+         { icon: Users, label: '부서게시판', path: '/board/departments' },
+         { icon: ClipboardList, label: '자유게시판', path: '/board/free' },
+         { icon: Archive, label: '익명게시판', path: '/board/anonymous' },
         ],
       },
     ],
