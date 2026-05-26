@@ -261,5 +261,5 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
 }
 
 export const getSidebarKey = (pathname: string) => {
-  return pathname.split('/').filter(Boolean)[0] ?? 'project'
+  return pathname.split('/').filter(Boolean)[0] ?? ''
 }
