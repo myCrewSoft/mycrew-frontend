@@ -17,6 +17,9 @@ interface HeaderPopoverProps {
   className?: string
   // bodyClassName은 팝오버 본문 영역의 스크롤/높이 스타일을 팝오버마다 다르게 바꾸고 싶을 때 사용합니다.
   bodyClassName?: string
+  // 제목 오른쪽 버튼
+  headerAction?: ReactNode
+  onClose?: () => void
 }
 
 const HeaderPopover = ({
@@ -26,6 +29,8 @@ const HeaderPopover = ({
   footer,
   className = '',
   bodyClassName = 'max-h-[420px] overflow-y-auto',
+  headerAction,
+  onClose,
 }: HeaderPopoverProps) => {
   // open은 팝오버가 현재 열려 있는지 저장하는 상태입니다.
   const [open, setOpen] = useState(false)
@@ -33,8 +38,18 @@ const HeaderPopover = ({
   // popoverRef는 바깥 클릭을 구분하기 위해 전체 팝오버 영역을 가리킵니다.
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  const close = () => setOpen(false)
-  const toggle = () => setOpen((current) => !current)
+  const close = () => {
+    setOpen(false)
+    onClose?.()
+  }
+  const toggle = () => {
+    if (open) {
+      close()
+      return
+    }
+
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -73,8 +88,9 @@ const HeaderPopover = ({
           className={`absolute right-0 top-12 z-50 w-[340px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl ${className}`}
           aria-label={title}
         >
-          <div className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
+          <div className="flex h-10 items-center justify-between border-b border-slate-200 px-4">
             <h2 className="text-[15px] font-bold text-slate-950">{title}</h2>
+            {headerAction}
           </div>
 
           {/* children 영역은 팝오버마다 자유롭게 다른 UI를 넣는 자리입니다. */}
