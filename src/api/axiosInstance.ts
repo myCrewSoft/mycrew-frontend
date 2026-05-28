@@ -38,6 +38,13 @@ export interface ApiResponse<T = unknown> {
   pagination?: PageInfo;
 }
 
+interface RefreshResponse {
+  accessToken: string;
+  refreshToken?: string;
+  empId?: number;
+  authVersion?: number;
+}
+
 /**
  * API 호출 실패 시 throw 되는 커스텀 에러 클래스.
  * GlobalExceptionHandler 가 반환하는 errorCode 와 HTTP 상태코드를 함께 담는다.
@@ -83,6 +90,10 @@ const refreshInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const isAuthEndpoint = (url = '') =>
+  url.includes('/api/v1/auth/login') ||
+  url.includes('/api/v1/auth/refresh');
+
 // ── 요청 인터셉터 ─────────────────────────────────────────────────
 
 /**
@@ -92,6 +103,12 @@ const refreshInstance = axios.create({
  */
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (isAuthEndpoint(config.url)) {
+      delete config.headers.Authorization;
+      delete config.headers.authorization;
+      return config;
+    }
+
     const token = localStorage.getItem('accessToken');
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
@@ -165,11 +182,8 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url ?? '';
-    const isAuthRequest =
-      requestUrl.includes('/api/v1/auth/login') ||
-      requestUrl.includes('/api/v1/auth/refresh');
 
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint(requestUrl)) {
 
       /**
        * 이미 갱신 중이면 대기열에 추가하고 갱신 완료를 기다린다.
@@ -197,7 +211,7 @@ axiosInstance.interceptors.response.use(
          * axiosInstance 를 사용하면 이 요청이 401 을 받을 때
          * 동일 인터셉터에 걸려 교착 상태가 발생할 수 있다.
          */
-        const response = await refreshInstance.post<ApiResponse<{ accessToken: string }>>(
+        const response = await refreshInstance.post<ApiResponse<RefreshResponse>>(
           '/api/v1/auth/refresh',
           { refreshToken },
         );
@@ -207,13 +221,27 @@ axiosInstance.interceptors.response.use(
          * 백엔드 장애로 data 가 없을 경우 undefined 가 되어
          * 아래 if 문에서 catch 블록으로 흘러가 로그아웃 처리된다.
          */
-        const accessToken = response.data.data?.accessToken;
+        const data = response.data.data;
+        const accessToken = data?.accessToken;
 
         if (!accessToken) {
           throw new Error('재발급된 Access Token 이 없습니다.');
         }
 
         localStorage.setItem('accessToken', accessToken);
+
+        if (data.refreshToken) {
+          localStorage.setItem('refreshToken', data.refreshToken);
+        }
+
+        if (typeof data.empId === 'number') {
+          localStorage.setItem('empId', String(data.empId));
+        }
+
+        if (typeof data.authVersion === 'number') {
+          localStorage.setItem('authVersion', String(data.authVersion));
+        }
+
         axiosInstance.defaults.headers.Authorization = `Bearer ${accessToken}`;
 
         /**
