@@ -47,7 +47,7 @@ export const router = createBrowserRouter([
   // 관리자 전용
   {
     element: (
-      <ProtectedRoute role="ROLE_ADMIN">
+      <ProtectedRoute>
         <MainLayout />
       </ProtectedRoute>
     ),
