@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { meetingRoomReservationApi } from '../../../api/RevervationApi'
+import { meetingRoomReservationApi } from '../../../api/ReservationApi'
 import { useApi } from '../../../hooks/useApi'
 import type { MeetingRoomReservation } from '../../../types/Reservation'
 import IconButton from '../../common/button/IconButton'

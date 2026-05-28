@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { meetingRoomReservationApi } from '../../api/RevervationApi'
+import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
 import type { MeetingRoom } from '../../types/Reservation'
 import { formatDateKey } from '../../utils/date'

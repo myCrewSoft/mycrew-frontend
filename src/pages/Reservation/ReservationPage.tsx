@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import PageComponent from '../../components/layouts/PageComponent'
-import { meetingRoomReservationApi } from '../../api/RevervationApi'
+import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
 import type {
   CreateReservationRequest,
