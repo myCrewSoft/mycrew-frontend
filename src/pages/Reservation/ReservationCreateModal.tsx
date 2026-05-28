@@ -62,7 +62,7 @@ const ReservationCreateModal = ({
     }
 
     return ''
-  }, [formValues])
+  }, [formValues, rooms.length])
 
   const handleSubmit = () => {
     if (validationMessage) return

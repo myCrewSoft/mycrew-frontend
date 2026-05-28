@@ -8,7 +8,7 @@ import CalendarPage from '../pages/calendar/CalendarPage';
 import { CalendarProvider } from '../pages/calendar/CalendarProvider';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
-import { ReservationProvider } from '../pages/Reservation/ReservationContext';
+import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
 
 export const router = createBrowserRouter([
   {
