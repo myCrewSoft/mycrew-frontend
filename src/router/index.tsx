@@ -6,6 +6,7 @@ import CommonComponentsGuide from '../pages/CommonComponentsGuide'
 import CalendarPage from '../pages/calendar/CalendarPage'
 import { CalendarProvider } from '../pages/calendar/CalendarProvider'
 import { boardRoutes } from './routes/boardRoutes'
+import { driveRoutes } from './routes/DriveRoutes'
 
 // TODO: 페이지 import 추가
 // import LoginPage from '../pages/auth/LoginPage'
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
     children: [
            { index: true, element: <CommonComponentsGuide /> },
       ...boardRoutes,
+      ...driveRoutes,
     ],
   },
   {
