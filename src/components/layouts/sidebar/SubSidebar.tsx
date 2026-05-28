@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../../common/button/Button'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
@@ -22,6 +22,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   const location = useLocation()
+  const navigate = useNavigate()
 
   // 현재 URL의 첫 번째 경로를 기준으로 어떤 서브사이드바를 보여줄지 결정합니다.
   // 예: /calendar/my → calendar, /project/list → project
@@ -33,6 +34,12 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
 
   // 현재 경로에 맞는 전용 서브사이드바 컴포넌트가 있는지 확인합니다.
   const CustomSidebarContent = customSidebarContentMap[sidebarKey]
+
+  const handleActionClick = (actionLabel: string) => {
+    if (sidebarKey === 'board' && actionLabel.includes('글')) {
+      navigate(`${location.pathname}?mode=create`)
+    }
+  }
 
   // 전용 컴포넌트도 없고 기본 설정도 없으면 서브사이드바와 여닫기 버튼 렌더링 X
   if (!CustomSidebarContent && !sidebarConfig) {
@@ -69,6 +76,7 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
                 <SubSidebarActionButton
                   key={action.label}
                   variant={action.variant}
+                  onClick={() => handleActionClick(action.label)}
                 >
                   {action.label}
                 </SubSidebarActionButton>
