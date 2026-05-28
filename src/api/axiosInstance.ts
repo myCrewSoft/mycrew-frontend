@@ -164,8 +164,12 @@ axiosInstance.interceptors.response.use(
    */
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = originalRequest?.url ?? '';
+    const isAuthRequest =
+      requestUrl.includes('/api/v1/auth/login') ||
+      requestUrl.includes('/api/v1/auth/refresh');
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
 
       /**
        * 이미 갱신 중이면 대기열에 추가하고 갱신 완료를 기다린다.
