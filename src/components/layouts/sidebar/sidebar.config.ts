@@ -26,9 +26,10 @@ import {
 } from 'lucide-react'
 
 export interface MenuItem {
-  icon: LucideIcon
+  icon?: LucideIcon
   label: string
   path: string
+  children?: MenuItem[]
 }
 
 export interface SubSidebarAction {
@@ -234,7 +235,27 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
     title: '',
         items: [
          { icon: Sparkles, label: '공지사항', path: '/board/notices' },
-         { icon: Users, label: '부서게시판', path: '/board/departments' },
+         { icon: Users, label: '부서게시판', path: '/board/departments',
+children: [
+            {
+              label: '개발팀',
+              path: '/board/departments/dev',
+            },
+            {
+              label: '디자인팀',
+              path: '/board/departments/design',
+            },
+            {
+              label: '인사팀',
+              path: '/board/departments/hr',
+            },
+            {
+              label: '마케팅팀',
+              path: '/board/departments/marketing',
+            },
+          ],
+
+          },
          { icon: ClipboardList, label: '자유게시판', path: '/board/free' },
          { icon: Archive, label: '익명게시판', path: '/board/anonymous' },
         ],
