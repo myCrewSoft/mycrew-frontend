@@ -15,8 +15,9 @@ const getReservations = (date: string) => {
   })
 }
 
+// 가장 가까운 예약을 조회합니다.
 const getMyUpcomingReservations = () => {
-  return axiosInstance.get('/reservations/my/upcoming')
+  return axiosInstance.get('/reservations/upcoming')
 }
 
 // 예약 등록 API입니다.

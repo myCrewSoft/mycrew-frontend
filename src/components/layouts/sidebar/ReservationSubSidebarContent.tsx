@@ -72,7 +72,7 @@ const ReservationSubSidebarContent = () => {
 
   useEffect(() => {
     void fetchMyUpcomingReservations().catch(() => {
-      // 백엔드에 내 다음 예약 API가 아직 없을 수 있으므로 서브사이드바는 조용히 빈 상태로 둡니다.
+      // 백엔드에 예정 예약 API가 아직 없을 수 있으므로 서브사이드바는 조용히 빈 상태로 둡니다.
     })
   }, [fetchMyUpcomingReservations])
 
