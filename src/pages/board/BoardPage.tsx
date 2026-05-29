@@ -9,7 +9,7 @@ import {
   FileText,
 } from 'lucide-react'
 
-import { useLocation, useSearchParams, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
 
 import BoardWriteForm from './BoardWriteForm'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
@@ -85,6 +85,7 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
 
 const BoardPage = () => {
   const location = useLocation()
+  const navigate = useNavigate()
   const { dept } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -226,6 +227,15 @@ const BoardPage = () => {
             {boardList.map((board) => (
               <div
                 key={board.boardId}
+
+                role="button"
+               tabIndex={0}
+                onClick={() => navigate(`${location.pathname}/${board.boardId}`)}
+                onKeyDown={(event) => {
+                 if (event.key === 'Enter' || event.key === ' ') {
+                    navigate(`${location.pathname}/${board.boardId}`)
+                 }
+               }}
                 className="flex h-14 items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50 cursor-pointer"
               >
                 <div className="w-24 text-slate-600">{board.boardId}</div>
