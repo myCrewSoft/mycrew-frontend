@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, RefreshCw, UserPlus, Users } from 'lucide-react';
+import { Camera, Eye, RefreshCw, UserPlus, Users } from 'lucide-react';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
@@ -15,37 +15,48 @@ import Modal from '../../components/common/overlay/modal/Modal';
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination';
 import SearchInput from '../../components/common/form/searchInput/SearchInput';
 import Select from '../../components/common/form/select/Select';
+import { adminEmployeeStatusOptions } from '../../types/adminEmployee';
 import type { PageInfo } from '../../api/axiosInstance';
 import type {
   AdminEmployeeDetail,
   AdminEmployeeListItem,
   AdminEmployeeRegisterRequest,
+  AdminEmployeeStatusCode,
   AdminMailAccount,
   AdminRoleAssignment,
 } from '../../types/adminEmployee';
 
 const pageSize = 10;
 
-const employeeStatusLabels: Record<string, string> = {
-  EMP_INITIAL: '계정 등록 단계',
-  EMP_INACTIVE: '비활성',
-  EMP_RETIRED: '퇴사',
-  EMP_VACATION: '휴가',
-  EMP_LOGIN: '출근',
-  EMP_LOGOUT: '퇴근',
-};
+const employeeStatusLabels = Object.fromEntries(
+  adminEmployeeStatusOptions.map((status) => [status.code, status.label]),
+) as Record<AdminEmployeeStatusCode, string>;
 
 const employeeStatusVariants: Record<
-  string,
+  AdminEmployeeStatusCode,
   'success' | 'warning' | 'neutral' | 'outline'
 > = {
   EMP_INITIAL: 'outline',
+  EMP_ACTIVE: 'success',
   EMP_INACTIVE: 'neutral',
   EMP_RETIRED: 'neutral',
   EMP_VACATION: 'warning',
   EMP_LOGIN: 'success',
   EMP_LOGOUT: 'neutral',
 };
+
+const isAdminEmployeeStatusCode = (
+  value: string | null | undefined,
+): value is AdminEmployeeStatusCode =>
+  adminEmployeeStatusOptions.some((status) => status.code === value);
+
+const getStatusLabel = (value: string | null | undefined) =>
+  isAdminEmployeeStatusCode(value) ? employeeStatusLabels[value] : undefined;
+
+const getStatusVariant = (value: string | null | undefined) =>
+  isAdminEmployeeStatusCode(value)
+    ? employeeStatusVariants[value]
+    : 'neutral';
 
 const formatCode = (value: string | null | undefined, fallback = '-') =>
   value && value.trim() ? value : fallback;
@@ -65,12 +76,14 @@ const getPositionName = (employee: AdminEmployeeListItem) =>
 
 const getStatusName = (employee: AdminEmployeeListItem) =>
   employee.empStat?.empStatNm ??
-  employeeStatusLabels[employee.empStatCd ?? ''] ??
+  getStatusLabel(employee.empStatCd) ??
   employee.empStatCd ??
   '알 수 없음';
 
 const getDetailStatusName = (employee: AdminEmployeeDetail) =>
-  employee.empStat?.empStatNm ?? '알 수 없음';
+  employee.empStat?.empStatNm ??
+  getStatusLabel(employee.empStat?.empStatCd) ??
+  '알 수 없음';
 
 const getRoleName = (role: AdminRoleAssignment) =>
   role.roleName ?? role.roleCd ?? String(role.roleId ?? '-');
@@ -138,6 +151,11 @@ export default function AdminEmployeesPage() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] =
     useState<AdminEmployeeDetail | null>(null);
+  const [statusUpdatingCode, setStatusUpdatingCode] =
+    useState<AdminEmployeeStatusCode | null>(null);
+  const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -229,6 +247,7 @@ export default function AdminEmployeesPage() {
     setDetailOpen(true);
     setDetailLoading(true);
     setDetailError(null);
+    setStatusUpdateError(null);
     setSelectedDetail(null);
 
     try {
@@ -251,11 +270,59 @@ export default function AdminEmployeesPage() {
   };
 
   const closeDetail = () => {
-    if (detailLoading) {
+    if (detailLoading || statusUpdatingCode) {
       return;
     }
 
     setDetailOpen(false);
+  };
+
+  const updateEmployeeStatus = async (empStatCd: AdminEmployeeStatusCode) => {
+    if (!selectedDetail || statusUpdatingCode) {
+      return;
+    }
+
+    setStatusUpdatingCode(empStatCd);
+    setStatusUpdateError(null);
+
+    try {
+      await adminApi.updateEmployeeStatus(selectedDetail.empId, { empStatCd });
+
+      setSelectedDetail((current) =>
+        current
+          ? {
+              ...current,
+              empStat: {
+                empStatCd,
+                empStatNm: employeeStatusLabels[empStatCd],
+              },
+            }
+          : current,
+      );
+      setEmployees((current) =>
+        current.map((employee) =>
+          employee.empId === selectedDetail.empId
+            ? {
+                ...employee,
+                empStatCd,
+                empStat: {
+                  empStatCd,
+                  empStatNm: employeeStatusLabels[empStatCd],
+                },
+              }
+            : employee,
+        ),
+      );
+      setReloadKey((current) => current + 1);
+    } catch (err) {
+      setStatusUpdateError(
+        err instanceof ApiError
+          ? err.message
+          : '사원 상태 변경 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setStatusUpdatingCode(null);
+    }
   };
 
   const closeRegister = () => {
@@ -429,7 +496,7 @@ export default function AdminEmployeesPage() {
                     const status = employee.empStatCd ?? 'UNKNOWN';
                     return (
                       <Badge
-                        variant={employeeStatusVariants[status] ?? 'neutral'}
+                        variant={getStatusVariant(status)}
                       >
                         {getStatusName(employee)}
                       </Badge>
@@ -446,7 +513,7 @@ export default function AdminEmployeesPage() {
                   header: '사용',
                   render: (employee) => (
                     <Badge
-                      variant={employee.enabled === 'Y' ? 'success' : 'neutral'}
+                      variant={employee.enabled === 'Y' ? 'success' : 'danger'}
                     >
                       {employee.enabled === 'Y' ? '사용' : '중지'}
                     </Badge>
@@ -484,6 +551,7 @@ export default function AdminEmployeesPage() {
       <Modal
         open={detailOpen}
         title="사원 상세"
+        size="xl"
         description={
           selectedDetail
             ? `${selectedDetail.empNm} / ${formatEmployeeId(selectedDetail.empId)}`
@@ -494,7 +562,7 @@ export default function AdminEmployeesPage() {
           <Button
             variant="outline"
             onClick={closeDetail}
-            disabled={detailLoading}
+            disabled={detailLoading || Boolean(statusUpdatingCode)}
           >
             닫기
           </Button>
@@ -510,72 +578,142 @@ export default function AdminEmployeesPage() {
             description={detailError}
           />
         ) : selectedDetail ? (
-          <div className="flex flex-col gap-5">
-            <dl className="grid gap-3 md:grid-cols-2">
-              <DetailRow label="사번" value={formatEmployeeId(selectedDetail.empId)} />
-              <DetailRow label="이름" value={selectedDetail.empNm} />
-              <DetailRow label="상태" value={getDetailStatusName(selectedDetail)} />
-              <DetailRow
-                label="사용 여부"
-                value={selectedDetail.enabled === 'Y' ? '사용' : '중지'}
-              />
-              <DetailRow
-                label="부서"
-                value={selectedDetail.department?.deptNm}
-              />
-              <DetailRow
-                label="직위"
-                value={selectedDetail.jobPosition?.jobPstnNm}
-              />
-              <DetailRow
-                label="직급"
-                value={selectedDetail.jobGrade?.jobGrdNm}
-              />
-              <DetailRow label="연락처" value={selectedDetail.mblTelno} />
-              <DetailRow label="입사일" value={selectedDetail.entcoYmd} />
-              <DetailRow label="퇴사일" value={selectedDetail.retcoYmd} />
-              <DetailRow
-                label="주소"
-                value={[selectedDetail.zip, selectedDetail.addr]
-                  .filter(Boolean)
-                  .join(' ')}
-              />
-              <DetailRow label="직무" value={selectedDetail.jobDutyCn} />
-            </dl>
+          <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+            <aside className="flex flex-col gap-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-slate-300">
+                  <Camera size={44} />
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-lg font-bold text-slate-950">
+                    {selectedDetail.empNm}
+                  </h3>
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {formatEmployeeId(selectedDetail.empId)}
+                  </p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge
+                    variant={getStatusVariant(selectedDetail.empStat?.empStatCd)}
+                  >
+                    {getDetailStatusName(selectedDetail)}
+                  </Badge>
+                  <Badge
+                    variant={
+                      selectedDetail.enabled === 'Y' ? 'success' : 'danger'
+                    }
+                  >
+                    {selectedDetail.enabled === 'Y' ? '사용' : '중지'}
+                  </Badge>
+                </div>
+              </div>
 
-            <div className="rounded-lg border border-slate-100 p-3">
-              <h3 className="text-xs font-bold text-slate-500">메일 계정</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedDetail.mailAccountList?.length ? (
-                  selectedDetail.mailAccountList.map((mail, index) => (
-                    <Badge
-                      key={`${getMailAddress(mail)}-${index}`}
-                      variant={mail.useYn === 'N' ? 'neutral' : 'outline'}
-                    >
-                      {getMailAddress(mail)}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-sm font-semibold text-slate-400">-</span>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-900">상태 변경</h3>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {adminEmployeeStatusOptions.map((status) => {
+                    const active =
+                      selectedDetail.empStat?.empStatCd === status.code;
+
+                    return (
+                      <Button
+                        key={status.code}
+                        variant={active ? 'primary' : 'outline'}
+                        size="sm"
+                        disabled={active || Boolean(statusUpdatingCode)}
+                        loading={statusUpdatingCode === status.code}
+                        onClick={() => void updateEmployeeStatus(status.code)}
+                      >
+                        {status.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {statusUpdateError && (
+                  <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                    {statusUpdateError}
+                  </p>
                 )}
               </div>
-            </div>
+            </aside>
 
-            <div className="rounded-lg border border-slate-100 p-3">
-              <h3 className="text-xs font-bold text-slate-500">권한</h3>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {selectedDetail.roleAssignmentList?.length ? (
-                  selectedDetail.roleAssignmentList.map((role, index) => (
-                    <Badge
-                      key={`${getRoleName(role)}-${index}`}
-                      variant="outline"
-                    >
-                      {getRoleName(role)}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-sm font-semibold text-slate-400">-</span>
-                )}
+            <div className="flex flex-col gap-5">
+              <dl className="grid gap-3 md:grid-cols-2">
+                <DetailRow
+                  label="사번"
+                  value={formatEmployeeId(selectedDetail.empId)}
+                />
+                <DetailRow label="이름" value={selectedDetail.empNm} />
+                <DetailRow
+                  label="상태"
+                  value={getDetailStatusName(selectedDetail)}
+                />
+                <DetailRow
+                  label="사용 여부"
+                  value={selectedDetail.enabled === 'Y' ? '사용' : '중지'}
+                />
+                <DetailRow
+                  label="부서"
+                  value={selectedDetail.department?.deptNm}
+                />
+                <DetailRow
+                  label="직위"
+                  value={selectedDetail.jobPosition?.jobPstnNm}
+                />
+                <DetailRow
+                  label="직급"
+                  value={selectedDetail.jobGrade?.jobGrdNm}
+                />
+                <DetailRow label="연락처" value={selectedDetail.mblTelno} />
+                <DetailRow label="입사일" value={selectedDetail.entcoYmd} />
+                <DetailRow label="퇴사일" value={selectedDetail.retcoYmd} />
+                <DetailRow
+                  label="주소"
+                  value={[selectedDetail.zip, selectedDetail.addr]
+                    .filter(Boolean)
+                    .join(' ')}
+                />
+                <DetailRow label="직무" value={selectedDetail.jobDutyCn} />
+              </dl>
+
+              <div className="rounded-lg border border-slate-100 p-3">
+                <h3 className="text-xs font-bold text-slate-500">메일 계정</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedDetail.mailAccountList?.length ? (
+                    selectedDetail.mailAccountList.map((mail, index) => (
+                      <Badge
+                        key={`${getMailAddress(mail)}-${index}`}
+                        variant={mail.useYn === 'N' ? 'neutral' : 'outline'}
+                      >
+                        {getMailAddress(mail)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-400">
+                      -
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-100 p-3">
+                <h3 className="text-xs font-bold text-slate-500">권한</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedDetail.roleAssignmentList?.length ? (
+                    selectedDetail.roleAssignmentList.map((role, index) => (
+                      <Badge
+                        key={`${getRoleName(role)}-${index}`}
+                        variant="outline"
+                      >
+                        {getRoleName(role)}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm font-semibold text-slate-400">
+                      -
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

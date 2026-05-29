@@ -10,6 +10,34 @@ export interface AdminEmployeeSearchParams {
   size?: number;
 }
 
+export type AdminEmployeeStatusCode =
+  | 'EMP_INITIAL'
+  | 'EMP_ACTIVE'
+  | 'EMP_INACTIVE'
+  | 'EMP_RETIRED'
+  | 'EMP_VACATION'
+  | 'EMP_LOGIN'
+  | 'EMP_LOGOUT';
+
+export interface AdminEmployeeStatusOption {
+  code: AdminEmployeeStatusCode;
+  label: string;
+}
+
+export const adminEmployeeStatusOptions: AdminEmployeeStatusOption[] = [
+  { code: 'EMP_INITIAL', label: '계정 등록 단계' },
+  { code: 'EMP_ACTIVE', label: '정상 재직' },
+  { code: 'EMP_INACTIVE', label: '비활성' },
+  { code: 'EMP_RETIRED', label: '퇴사' },
+  { code: 'EMP_VACATION', label: '휴가' },
+  { code: 'EMP_LOGIN', label: '출근' },
+  { code: 'EMP_LOGOUT', label: '퇴근' },
+];
+
+export interface AdminEmployeeStatusUpdateRequest {
+  empStatCd: AdminEmployeeStatusCode;
+}
+
 export interface AdminRoleAssignment {
   roleId?: number;
   roleName?: string;

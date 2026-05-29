@@ -7,6 +7,7 @@ import type {
   AdminEmployeeListItem,
   AdminEmployeeRegisterRequest,
   AdminEmployeeSearchParams,
+  AdminEmployeeStatusUpdateRequest,
 } from '../types/adminEmployee';
 
 export const adminApi = {
@@ -27,5 +28,11 @@ export const adminApi = {
     empId: number,
   ): Promise<AxiosResponse<ApiResponse<AdminEmployeeDetail>>> => {
     return axiosInstance.get(`/api/admin/members/${empId}`);
+  },
+  updateEmployeeStatus: (
+    empId: number,
+    request: AdminEmployeeStatusUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.put(`/api/admin/members/${empId}/status`, request);
   },
 };
