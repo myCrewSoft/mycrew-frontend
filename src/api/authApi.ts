@@ -1,18 +1,6 @@
 import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
-
-export interface LoginRequest {
-  empId: number;
-  password: string;
-}
-
-export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  empId: number;
-  authVersion: number;
-  firstLoginRequired: boolean;
-}
+import type { LoginRequest, LoginResponse } from '../types/auth';
 
 export const authApi = {
   login: (request: LoginRequest) =>

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import type { RefreshResponse } from '../types/auth';
 
 // ── 타입 확장 ─────────────────────────────────────────────────────
 /**
@@ -36,13 +37,6 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   errorCode?: string;
   pagination?: PageInfo;
-}
-
-interface RefreshResponse {
-  accessToken: string;
-  refreshToken?: string;
-  empId?: number;
-  authVersion?: number;
 }
 
 /**
