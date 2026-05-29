@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, UserPlus, Users } from 'lucide-react';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
@@ -23,24 +24,45 @@ import type {
 const pageSize = 10;
 
 const employeeStatusLabels: Record<string, string> = {
-  EMP_ACTIVE: '재직',
-  EMP_INACTIVE: '휴직',
+  EMP_INITIAL: '계정 등록 단계',
+  EMP_INACTIVE: '비활성',
   EMP_RETIRED: '퇴사',
-  EMP_INITIAL: '초기',
+  EMP_VACATION: '휴가',
+  EMP_LOGIN: '출근',
+  EMP_LOGOUT: '퇴근',
 };
 
 const employeeStatusVariants: Record<
   string,
   'success' | 'warning' | 'neutral' | 'outline'
 > = {
-  EMP_ACTIVE: 'success',
-  EMP_INACTIVE: 'warning',
-  EMP_RETIRED: 'neutral',
   EMP_INITIAL: 'outline',
+  EMP_INACTIVE: 'neutral',
+  EMP_RETIRED: 'neutral',
+  EMP_VACATION: 'warning',
+  EMP_LOGIN: 'success',
+  EMP_LOGOUT: 'neutral',
 };
 
 const formatCode = (value: string | null | undefined, fallback = '-') =>
   value && value.trim() ? value : fallback;
+
+const getDepartmentName = (employee: AdminEmployeeListItem) =>
+  formatCode(employee.department?.deptNm ?? employee.deptCd);
+
+const getPositionName = (employee: AdminEmployeeListItem) =>
+  formatCode(
+    employee.jobPosition?.jobPstnNm ??
+      employee.jobGrade?.jobGrdNm ??
+      employee.jobPstnCd ??
+      employee.jobGrdCd,
+  );
+
+const getStatusName = (employee: AdminEmployeeListItem) =>
+  employee.empStat?.empStatNm ??
+  employeeStatusLabels[employee.empStatCd ?? ''] ??
+  employee.empStatCd ??
+  'UNKNOWN';
 
 const formatEmployeeId = (empId: number) => `EMP-${empId}`;
 
@@ -67,6 +89,8 @@ const formatDate = (date: Date | null) => {
 };
 
 export default function AdminEmployeesPage() {
+  const [searchParams] = useSearchParams();
+  const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
   const [employees, setEmployees] = useState<AdminEmployeeListItem[]>([]);
   const [pagination, setPagination] = useState<PageInfo | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -95,6 +119,7 @@ export default function AdminEmployeesPage() {
           page: page - 1,
           size: pageSize,
           keyword: submittedKeyword || undefined,
+          empStatCd: selectedEmpStatCd || undefined,
         });
 
         if (active) {
@@ -124,7 +149,7 @@ export default function AdminEmployeesPage() {
     return () => {
       active = false;
     };
-  }, [page, submittedKeyword, reloadKey]);
+  }, [page, submittedKeyword, reloadKey, selectedEmpStatCd]);
 
   useEffect(() => {
     const openRegister = () => {
@@ -139,21 +164,21 @@ export default function AdminEmployeesPage() {
 
   const summary = useMemo(() => {
     const total = pagination?.totalElements ?? employees.length;
-    const active = employees.filter(
-      (employee) => employee.empStatCd === 'EMP_ACTIVE',
+    const login = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_LOGIN',
     ).length;
-    const inactive = employees.filter(
-      (employee) => employee.empStatCd === 'EMP_INACTIVE',
+    const logout = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_LOGOUT',
     ).length;
-    const retired = employees.filter(
-      (employee) => employee.empStatCd === 'EMP_RETIRED',
+    const vacation = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_VACATION',
     ).length;
 
     return [
-      { label: '전체 사원', value: total, caption: '등록된 구성원' },
-      { label: '재직', value: active, caption: '현재 근무 중' },
-      { label: '휴직', value: inactive, caption: '휴직 등록' },
-      { label: '퇴사', value: retired, caption: '근무 종료' },
+      { label: '전체 사원', value: total, caption: '조회된 구성원' },
+      { label: '출근', value: login, caption: '현재 근무 중' },
+      { label: '퇴근', value: logout, caption: '근무 종료' },
+      { label: '휴가', value: vacation, caption: '휴가 등록' },
     ];
   }, [employees, pagination]);
 
@@ -325,13 +350,12 @@ export default function AdminEmployeesPage() {
                 {
                   key: 'dept',
                   header: '부서',
-                  render: (employee) => formatCode(employee.deptCd),
+                  render: (employee) => getDepartmentName(employee),
                 },
                 {
                   key: 'position',
                   header: '직급',
-                  render: (employee) =>
-                    formatCode(employee.jobPstnCd ?? employee.jobGrdCd),
+                  render: (employee) => getPositionName(employee),
                 },
                 {
                   key: 'status',
@@ -342,7 +366,7 @@ export default function AdminEmployeesPage() {
                       <Badge
                         variant={employeeStatusVariants[status] ?? 'neutral'}
                       >
-                        {employeeStatusLabels[status] ?? status}
+                        {getStatusName(employee)}
                       </Badge>
                     );
                   },

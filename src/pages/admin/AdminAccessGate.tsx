@@ -116,7 +116,7 @@ export default function AdminAccessGate() {
   return (
     <AdminLayout access={access}>
       {location.pathname.startsWith('/admin/users') ? (
-        <AdminEmployeesPage />
+        <AdminEmployeesPage key={location.search} />
       ) : (
         <AdminPage access={access} />
       )}

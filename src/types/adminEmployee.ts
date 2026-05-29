@@ -17,6 +17,31 @@ export interface AdminRoleAssignment {
   scopeId?: string;
 }
 
+export interface AdminDepartment {
+  deptCd: string;
+  prntDeptCd?: string | null;
+  deptNm: string;
+  useYn?: string | null;
+}
+
+export interface AdminJobPosition {
+  jobPstnCd: string;
+  jobPstnNm: string;
+  useYn?: string | null;
+}
+
+export interface AdminJobGrade {
+  jobGrdCd: string;
+  jobGrdNm: string;
+  useYn?: string | null;
+}
+
+export interface AdminEmpStat {
+  empStatCd: string;
+  empStatNm: string;
+  empStatExpln?: string | null;
+}
+
 export interface AdminEmployeeListItem {
   empId: number;
   deptCd: string | null;
@@ -36,6 +61,10 @@ export interface AdminEmployeeListItem {
   frstRegDt: string | null;
   lastMdfcnDt: string | null;
   enabled: string | null;
+  department: AdminDepartment | null;
+  jobPosition: AdminJobPosition | null;
+  jobGrade: AdminJobGrade | null;
+  empStat: AdminEmpStat | null;
   roleAssignmentList: AdminRoleAssignment[] | null;
 }
 
