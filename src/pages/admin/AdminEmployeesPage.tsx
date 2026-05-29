@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw, UserPlus, Users } from 'lucide-react';
+import { Eye, RefreshCw, UserPlus, Users } from 'lucide-react';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
@@ -17,8 +17,11 @@ import SearchInput from '../../components/common/form/searchInput/SearchInput';
 import Select from '../../components/common/form/select/Select';
 import type { PageInfo } from '../../api/axiosInstance';
 import type {
+  AdminEmployeeDetail,
   AdminEmployeeListItem,
   AdminEmployeeRegisterRequest,
+  AdminMailAccount,
+  AdminRoleAssignment,
 } from '../../types/adminEmployee';
 
 const pageSize = 10;
@@ -47,6 +50,8 @@ const employeeStatusVariants: Record<
 const formatCode = (value: string | null | undefined, fallback = '-') =>
   value && value.trim() ? value : fallback;
 
+const formatEmployeeId = (empId: number) => `EMP-${empId}`;
+
 const getDepartmentName = (employee: AdminEmployeeListItem) =>
   formatCode(employee.department?.deptNm ?? employee.deptCd);
 
@@ -62,9 +67,16 @@ const getStatusName = (employee: AdminEmployeeListItem) =>
   employee.empStat?.empStatNm ??
   employeeStatusLabels[employee.empStatCd ?? ''] ??
   employee.empStatCd ??
-  'UNKNOWN';
+  '알 수 없음';
 
-const formatEmployeeId = (empId: number) => `EMP-${empId}`;
+const getDetailStatusName = (employee: AdminEmployeeDetail) =>
+  employee.empStat?.empStatNm ?? '알 수 없음';
+
+const getRoleName = (role: AdminRoleAssignment) =>
+  role.roleName ?? role.roleCd ?? String(role.roleId ?? '-');
+
+const getMailAddress = (mail: AdminMailAccount) =>
+  mail.mailAddr ?? mail.emlAddr ?? mail.email ?? '-';
 
 const createInitialRegisterForm = (): AdminEmployeeRegisterRequest => ({
   empId: 0,
@@ -88,6 +100,21 @@ const formatDate = (date: Date | null) => {
   return `${year}-${month}-${day}`;
 };
 
+const DetailRow = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) => (
+  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+    <dt className="text-xs font-bold text-slate-500">{label}</dt>
+    <dd className="mt-1 break-words text-sm font-semibold text-slate-900">
+      {formatCode(value == null ? null : String(value))}
+    </dd>
+  </div>
+);
+
 export default function AdminEmployeesPage() {
   const [searchParams] = useSearchParams();
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
@@ -106,6 +133,11 @@ export default function AdminEmployeesPage() {
   const [registerDate, setRegisterDate] = useState<Date | null>(null);
   const [registerSubmitting, setRegisterSubmitting] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] =
+    useState<AdminEmployeeDetail | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -191,6 +223,39 @@ export default function AdminEmployeesPage() {
   const reload = () => {
     setPage(1);
     setReloadKey((current) => current + 1);
+  };
+
+  const openEmployeeDetail = async (empId: number) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailError(null);
+    setSelectedDetail(null);
+
+    try {
+      const response = await adminApi.getEmployeeDetail(empId);
+      const detail = response.data.data ?? null;
+      setSelectedDetail(detail);
+
+      if (!detail) {
+        setDetailError('사원 상세 정보가 없습니다.');
+      }
+    } catch (err) {
+      setDetailError(
+        err instanceof ApiError
+          ? err.message
+          : '사원 상세 조회 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    if (detailLoading) {
+      return;
+    }
+
+    setDetailOpen(false);
   };
 
   const closeRegister = () => {
@@ -387,6 +452,21 @@ export default function AdminEmployeesPage() {
                     </Badge>
                   ),
                 },
+                {
+                  key: 'actions',
+                  header: '관리',
+                  className: 'text-right',
+                  render: (employee) => (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Eye size={15} />}
+                      onClick={() => void openEmployeeDetail(employee.empId)}
+                    >
+                      상세
+                    </Button>
+                  ),
+                },
               ]}
             />
 
@@ -400,6 +480,107 @@ export default function AdminEmployeesPage() {
           </div>
         )}
       </ContentCard>
+
+      <Modal
+        open={detailOpen}
+        title="사원 상세"
+        description={
+          selectedDetail
+            ? `${selectedDetail.empNm} / ${formatEmployeeId(selectedDetail.empId)}`
+            : '사원 상세 정보를 조회합니다.'
+        }
+        onClose={closeDetail}
+        footer={
+          <Button
+            variant="outline"
+            onClick={closeDetail}
+            disabled={detailLoading}
+          >
+            닫기
+          </Button>
+        }
+      >
+        {detailLoading ? (
+          <div className="py-10 text-center text-sm font-semibold text-slate-500">
+            상세 정보를 불러오는 중입니다.
+          </div>
+        ) : detailError ? (
+          <EmptyState
+            title="상세 정보를 불러오지 못했습니다."
+            description={detailError}
+          />
+        ) : selectedDetail ? (
+          <div className="flex flex-col gap-5">
+            <dl className="grid gap-3 md:grid-cols-2">
+              <DetailRow label="사번" value={formatEmployeeId(selectedDetail.empId)} />
+              <DetailRow label="이름" value={selectedDetail.empNm} />
+              <DetailRow label="상태" value={getDetailStatusName(selectedDetail)} />
+              <DetailRow
+                label="사용 여부"
+                value={selectedDetail.enabled === 'Y' ? '사용' : '중지'}
+              />
+              <DetailRow
+                label="부서"
+                value={selectedDetail.department?.deptNm}
+              />
+              <DetailRow
+                label="직위"
+                value={selectedDetail.jobPosition?.jobPstnNm}
+              />
+              <DetailRow
+                label="직급"
+                value={selectedDetail.jobGrade?.jobGrdNm}
+              />
+              <DetailRow label="연락처" value={selectedDetail.mblTelno} />
+              <DetailRow label="입사일" value={selectedDetail.entcoYmd} />
+              <DetailRow label="퇴사일" value={selectedDetail.retcoYmd} />
+              <DetailRow
+                label="주소"
+                value={[selectedDetail.zip, selectedDetail.addr]
+                  .filter(Boolean)
+                  .join(' ')}
+              />
+              <DetailRow label="직무" value={selectedDetail.jobDutyCn} />
+            </dl>
+
+            <div className="rounded-lg border border-slate-100 p-3">
+              <h3 className="text-xs font-bold text-slate-500">메일 계정</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedDetail.mailAccountList?.length ? (
+                  selectedDetail.mailAccountList.map((mail, index) => (
+                    <Badge
+                      key={`${getMailAddress(mail)}-${index}`}
+                      variant={mail.useYn === 'N' ? 'neutral' : 'outline'}
+                    >
+                      {getMailAddress(mail)}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm font-semibold text-slate-400">-</span>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 p-3">
+              <h3 className="text-xs font-bold text-slate-500">권한</h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedDetail.roleAssignmentList?.length ? (
+                  selectedDetail.roleAssignmentList.map((role, index) => (
+                    <Badge
+                      key={`${getRoleName(role)}-${index}`}
+                      variant="outline"
+                    >
+                      {getRoleName(role)}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm font-semibold text-slate-400">-</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={registerOpen}

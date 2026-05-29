@@ -13,8 +13,16 @@ export interface AdminEmployeeSearchParams {
 export interface AdminRoleAssignment {
   roleId?: number;
   roleName?: string;
+  roleCd?: string;
   scopeTypeCd?: string;
   scopeId?: string;
+}
+
+export interface AdminMailAccount {
+  mailAddr?: string | null;
+  emlAddr?: string | null;
+  email?: string | null;
+  useYn?: string | null;
 }
 
 export interface AdminDepartment {
@@ -66,6 +74,30 @@ export interface AdminEmployeeListItem {
   jobGrade: AdminJobGrade | null;
   empStat: AdminEmpStat | null;
   roleAssignmentList: AdminRoleAssignment[] | null;
+}
+
+export interface AdminEmployeeDetail {
+  empId: number;
+  jobDutyCn: string | null;
+  empNm: string;
+  genderCd: string | null;
+  mblTelno: string | null;
+  zip: string | null;
+  addr: string | null;
+  prflImgFileId: number | null;
+  execYn: string | null;
+  entcoYmd: string | null;
+  retcoYmd: string | null;
+  frstRegDt: string | null;
+  lastMdfcnDt: string | null;
+  enabled: string | null;
+  mbrStampFileId: number | null;
+  department: AdminDepartment | null;
+  jobPosition: AdminJobPosition | null;
+  jobGrade: AdminJobGrade | null;
+  empStat: AdminEmpStat | null;
+  roleAssignmentList: AdminRoleAssignment[] | null;
+  mailAccountList: AdminMailAccount[] | null;
 }
 
 export interface AdminEmployeeRegisterRequest {

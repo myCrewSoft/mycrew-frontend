@@ -3,6 +3,7 @@ import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
 import type { AdminAccessResponse } from '../types/admin';
 import type {
+  AdminEmployeeDetail,
   AdminEmployeeListItem,
   AdminEmployeeRegisterRequest,
   AdminEmployeeSearchParams,
@@ -21,5 +22,10 @@ export const adminApi = {
     request: AdminEmployeeRegisterRequest,
   ): Promise<AxiosResponse<ApiResponse<string>>> => {
     return axiosInstance.post('/api/admin/members', request);
+  },
+  getEmployeeDetail: (
+    empId: number,
+  ): Promise<AxiosResponse<ApiResponse<AdminEmployeeDetail>>> => {
+    return axiosInstance.get(`/api/admin/members/${empId}`);
   },
 };
