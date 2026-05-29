@@ -1,6 +1,7 @@
 import {
   Archive,
   Calendar,
+  CalendarPlus,
   Check,
   ClipboardList,
   Clock,
@@ -56,6 +57,7 @@ export const menuItems: MenuItem[] = [
   { icon: Video, label: '회의', path: '/meeting' },
   { icon: Clock, label: '근태', path: '/attendance' },
   { icon: Calendar, label: '일정', path: '/calendar' },
+  { icon: CalendarPlus, label: '예약', path: '/reservations' },
   { icon: GraduationCap, label: '교육', path: '/education' },
   { icon: Network, label: '조직관리', path: '/organization' },
   { icon: ClipboardList, label: '게시판', path: '/board' },
@@ -174,22 +176,17 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
       },
     ],
   },
+  // 전용 컴포넌트로 대체
   calendar: {
     title: '일정',
-    actions: [
-      { label: '일정 추가', variant: 'primary' },
-      { label: '캘린더 추가' },
-    ],
-    sections: [
-      {
-        title: '캘린더',
-        items: [
-          { icon: Calendar, label: '내 일정', path: '/calendar/my' },
-          { icon: Users, label: '팀 일정', path: '/calendar/team' },
-          { icon: Check, label: '완료 일정', path: '/calendar/done' },
-        ],
-      },
-    ],
+    actions: [],
+    sections: [],
+  },
+  // 전용 컴포넌트로 대체
+  reservations: {
+    title: '예약',
+    actions: [],
+    sections: [],
   },
   education: {
     title: '교육',
@@ -236,7 +233,7 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
         items: [
          { icon: Sparkles, label: '공지사항', path: '/board/notices' },
          { icon: Users, label: '부서게시판', path: '/board/departments',
-children: [
+            children: [
             {
               label: '개발팀',
               path: '/board/departments/dev',
