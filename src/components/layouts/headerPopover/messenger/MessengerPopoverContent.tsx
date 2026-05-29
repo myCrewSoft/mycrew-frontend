@@ -12,6 +12,7 @@ const MessengerPopoverContent = () => {
     rooms: apiRooms,
     messages: apiMessages,
     members: apiMembers,
+    searchMembers,
     createChat,
   } = useMessengerData()
 
@@ -50,30 +51,25 @@ const MessengerPopoverContent = () => {
   const selectedRoom = roomSource.find((room) => room.id === selectedRoomId)
 
   // 검색어에 맞는 참여자만 보여줍니다.
+  // 실제 검색은 API가 담당하고, 이 필터는 응답이 넓게 내려왔을 때를 대비한 화면 보정입니다.
   const filteredMembers = useMemo(() => {
     const keyword = memberSearch.trim()
 
-    if (!keyword) return memberSource
+    if (!keyword) return []
 
     return memberSource.filter((member) =>
       `${member.name} ${member.department} ${member.jobTitle}`.includes(keyword),
     )
   }, [memberSearch, memberSource])
 
-  // 선택한 참여자 id 목록을 실제 참여자 객체 목록으로 바꿉니다.
-  const selectedMembers = useMemo(
-    () =>
-      memberSource.filter((member) => selectedMemberIds.includes(member.id)),
-    [memberSource, selectedMemberIds],
-  )
+  const handleMemberSearchChange = (keyword: string) => {
+    setMemberSearch(keyword)
 
-  const handleToggleMember = (memberId: number) => {
-    // 이미 선택된 구성원을 다시 누르면 제거하고, 선택되지 않은 구성원을 누르면 추가합니다.
-    setSelectedMemberIds((current) =>
-      current.includes(memberId)
-        ? current.filter((id) => id !== memberId)
-        : [...current, memberId],
-    )
+    // 검색어가 있을 때만 서버 검색을 호출합니다.
+    // 빈 검색어에서 전체 직원을 불러오면 메신저 팝오버가 무거워질 수 있습니다.
+    if (keyword.trim()) {
+      void searchMembers(keyword.trim())
+    }
   }
 
   const handleCreateChat = () => {
@@ -108,12 +104,11 @@ const MessengerPopoverContent = () => {
           roomDescription={newRoomDescription}
           memberSearch={memberSearch}
           members={filteredMembers}
-          selectedMembers={selectedMembers}
           selectedMemberIds={selectedMemberIds}
           onChangeRoomName={setNewRoomName}
           onChangeRoomDescription={setNewRoomDescription}
-          onChangeMemberSearch={setMemberSearch}
-          onToggleMember={handleToggleMember}
+          onChangeMemberSearch={handleMemberSearchChange}
+          onChangeSelectedMembers={setSelectedMemberIds}
           onCreate={handleCreateChat}
           onCancel={() => setViewMode('chat')}
         />

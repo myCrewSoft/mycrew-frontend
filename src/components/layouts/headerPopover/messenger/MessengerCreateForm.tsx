@@ -1,4 +1,8 @@
 import { X } from 'lucide-react'
+import { useMemo } from 'react'
+import EmployeeSearchPicker, {
+  type EmployeeSearchItem,
+} from '../../../common/employeeSearch/EmployeeSearchPicker'
 import type { ChatMember } from './messenger.types'
 
 interface MessengerCreateFormProps {
@@ -6,12 +10,11 @@ interface MessengerCreateFormProps {
   roomDescription: string
   memberSearch: string
   members: ChatMember[]
-  selectedMembers: ChatMember[]
   selectedMemberIds: number[]
   onChangeRoomName: (value: string) => void
   onChangeRoomDescription: (value: string) => void
   onChangeMemberSearch: (value: string) => void
-  onToggleMember: (memberId: number) => void
+  onChangeSelectedMembers: (memberIds: number[]) => void
   onCreate: () => void
   onCancel: () => void
 }
@@ -21,15 +24,28 @@ const MessengerCreateForm = ({
   roomDescription,
   memberSearch,
   members,
-  selectedMembers,
   selectedMemberIds,
   onChangeRoomName,
   onChangeRoomDescription,
   onChangeMemberSearch,
-  onToggleMember,
+  onChangeSelectedMembers,
   onCreate,
   onCancel,
 }: MessengerCreateFormProps) => {
+  // 메신저의 ChatMember는 jobTitle이라는 이름을 쓰고,
+  // 공통 사원 검색 컴포넌트는 position이라는 이름을 씁니다.
+  // 여기서 한 번만 화면 공통 타입으로 바꿔주면 컴포넌트 재사용이 쉬워집니다.
+  const employeeItems = useMemo<EmployeeSearchItem[]>(
+    () =>
+      members.map((member) => ({
+        id: member.id,
+        name: member.name,
+        department: member.department,
+        position: member.jobTitle,
+      })),
+    [members],
+  )
+
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white">
       {/* 새 대화 생성 화면의 상단 영역입니다. 닫기 버튼을 누르면 기존 채팅 화면으로 돌아갑니다. */}
@@ -76,79 +92,16 @@ const MessengerCreateForm = ({
             />
           </label>
 
-          {/* 참여자 검색어는 부모 상태로 관리합니다. 나중에 API 검색으로 바꿀 때 이 값으로 searchMembers를 호출하면 됩니다. */}
-          <div>
-            <label className="mb-2 block text-xs font-bold text-slate-700">
-              참여자 검색
-            </label>
-            <input
-              value={memberSearch}
-              onChange={(event) => onChangeMemberSearch(event.target.value)}
-              placeholder="이름, 부서, 직급으로 검색"
-              className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-400"
-            />
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-bold text-slate-700">참여자</p>
-              <span className="text-[11px] text-slate-400">
-                {selectedMembers.length}명 선택
-              </span>
-            </div>
-
-            {/* 선택된 참여자는 칩 형태로 먼저 보여줍니다. 칩을 누르면 선택 해제됩니다. */}
-            {selectedMembers.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {selectedMembers.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => onToggleMember(member.id)}
-                    className="flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600"
-                  >
-                    {member.name}
-                    <X size={12} />
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* 검색 결과 목록입니다. 구성원을 누르면 선택/해제가 토글됩니다. */}
-            <div className="max-h-44 overflow-y-auto rounded-lg border border-slate-200">
-              {members.map((member) => {
-                const selected = selectedMemberIds.includes(member.id)
-
-                return (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => onToggleMember(member.id)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
-                      selected ? 'bg-blue-50' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-bold text-slate-900">
-                        {member.name}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {member.jobTitle} · {member.department}
-                      </span>
-                    </span>
-
-                    <span
-                      className={`h-4 w-4 rounded-full border ${
-                        selected
-                          ? 'border-blue-500 bg-blue-500'
-                          : 'border-slate-300 bg-white'
-                      }`}
-                    />
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <EmployeeSearchPicker
+            variant="compact"
+            employees={employeeItems}
+            keyword={memberSearch}
+            selectedEmployeeIds={selectedMemberIds}
+            onKeywordChange={onChangeMemberSearch}
+            onChange={(nextMemberIds) =>
+              onChangeSelectedMembers(nextMemberIds.map(Number))
+            }
+          />
         </div>
       </div>
 
@@ -157,7 +110,7 @@ const MessengerCreateForm = ({
         <button
           type="button"
           onClick={onCreate}
-          disabled={selectedMembers.length === 0}
+          disabled={selectedMemberIds.length === 0}
           className="h-10 w-full rounded-lg bg-blue-600 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         >
           대화 시작
