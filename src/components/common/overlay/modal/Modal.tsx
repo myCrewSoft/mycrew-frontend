@@ -10,10 +10,18 @@ interface ModalProps {
   children?: ReactNode
   footer?: ReactNode
   onClose: () => void
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   variant?: 'default' | 'confirm' | 'danger'
   confirmText?: string
   cancelText?: string
   onConfirm?: () => void
+}
+
+const modalSizeStyle: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'max-w-lg',
+  md: 'max-w-2xl',
+  lg: 'max-w-4xl',
+  xl: 'max-w-5xl',
 }
 
 const Modal = ({
@@ -23,6 +31,7 @@ const Modal = ({
   children,
   footer,
   onClose,
+  size = 'sm',
   variant = 'default',
   confirmText = '확인',
   cancelText = '취소',
@@ -50,7 +59,9 @@ const Modal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-      <section className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+      <section
+        className={`max-h-[calc(100vh-2rem)] w-full overflow-hidden rounded-xl bg-white shadow-2xl ${modalSizeStyle[size]}`}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{title}</h2>
@@ -63,7 +74,11 @@ const Modal = ({
           </IconButton>
         </div>
 
-        {children && <div className="p-5">{children}</div>}
+        {children && (
+          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-5">
+            {children}
+          </div>
+        )}
 
         {resolvedFooter && (
           <div className="flex justify-end gap-2 border-t border-slate-100 p-5">

@@ -22,6 +22,7 @@ import {
 import Button from '../../common/button/Button';
 import Badge from '../../common/dataDisplay/badge/Badge';
 import { useAuth } from '../../../store/AuthContext';
+import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
 import type { AdminAccessResponse } from '../../../types/admin';
 
 interface AdminLayoutProps {
@@ -51,12 +52,10 @@ const adminNavItems: AdminNavItem[] = [
 
 const employeeFilterItems: EmployeeFilterItem[] = [
   { label: '전체 사원' },
-  { label: '계정 등록 단계', empStatCd: 'EMP_INITIAL' },
-  { label: '비활성', empStatCd: 'EMP_INACTIVE' },
-  { label: '퇴사', empStatCd: 'EMP_RETIRED' },
-  { label: '휴가', empStatCd: 'EMP_VACATION' },
-  { label: '출근', empStatCd: 'EMP_LOGIN' },
-  { label: '퇴근', empStatCd: 'EMP_LOGOUT' },
+  ...adminEmployeeStatusOptions.map((status) => ({
+    label: status.label,
+    empStatCd: status.code,
+  })),
 ];
 
 export default function AdminLayout({ access, children }: AdminLayoutProps) {
