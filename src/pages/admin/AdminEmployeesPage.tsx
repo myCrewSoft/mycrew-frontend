@@ -1,0 +1,491 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { FormEvent } from 'react';
+import { RefreshCw, UserPlus, Users } from 'lucide-react';
+import { adminApi } from '../../api/adminApi';
+import { ApiError } from '../../api/axiosInstance';
+import Badge from '../../components/common/dataDisplay/badge/Badge';
+import Button from '../../components/common/button/Button';
+import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
+import DataTable from '../../components/common/dataDisplay/dataTable/DataTable';
+import DatePickerField from '../../components/common/form/datePicker/DatePickerField';
+import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState';
+import FormField from '../../components/common/form/formField/FormField';
+import Modal from '../../components/common/overlay/modal/Modal';
+import Pagination from '../../components/common/dataDisplay/pagination/Pagination';
+import SearchInput from '../../components/common/form/searchInput/SearchInput';
+import Select from '../../components/common/form/select/Select';
+import type { PageInfo } from '../../api/axiosInstance';
+import type {
+  AdminEmployeeListItem,
+  AdminEmployeeRegisterRequest,
+} from '../../types/adminEmployee';
+
+const pageSize = 10;
+
+const employeeStatusLabels: Record<string, string> = {
+  EMP_ACTIVE: '재직',
+  EMP_INACTIVE: '휴직',
+  EMP_RETIRED: '퇴사',
+  EMP_INITIAL: '초기',
+};
+
+const employeeStatusVariants: Record<
+  string,
+  'success' | 'warning' | 'neutral' | 'outline'
+> = {
+  EMP_ACTIVE: 'success',
+  EMP_INACTIVE: 'warning',
+  EMP_RETIRED: 'neutral',
+  EMP_INITIAL: 'outline',
+};
+
+const formatCode = (value: string | null | undefined, fallback = '-') =>
+  value && value.trim() ? value : fallback;
+
+const formatEmployeeId = (empId: number) => `EMP-${empId}`;
+
+const createInitialRegisterForm = (): AdminEmployeeRegisterRequest => ({
+  empId: 0,
+  empNm: '',
+  rrno: '',
+  genderCd: 'M',
+  mblTelno: '',
+  zip: '',
+  addr: '',
+  entcoYmd: '',
+});
+
+const formatDate = (date: Date | null) => {
+  if (!date) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export default function AdminEmployeesPage() {
+  const [employees, setEmployees] = useState<AdminEmployeeListItem[]>([]);
+  const [pagination, setPagination] = useState<PageInfo | null>(null);
+  const [keyword, setKeyword] = useState('');
+  const [submittedKeyword, setSubmittedKeyword] = useState('');
+  const [page, setPage] = useState(1);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerForm, setRegisterForm] = useState<AdminEmployeeRegisterRequest>(
+    createInitialRegisterForm,
+  );
+  const [registerDate, setRegisterDate] = useState<Date | null>(null);
+  const [registerSubmitting, setRegisterSubmitting] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadEmployees = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminApi.getEmployees({
+          page: page - 1,
+          size: pageSize,
+          keyword: submittedKeyword || undefined,
+        });
+
+        if (active) {
+          setEmployees(response.data.data ?? []);
+          setPagination(response.data.pagination ?? null);
+        }
+      } catch (err) {
+        const apiError =
+          err instanceof ApiError
+            ? err
+            : new ApiError((err as Error).message, 'UNKNOWN', 0);
+
+        if (active) {
+          setEmployees([]);
+          setPagination(null);
+          setError(apiError);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadEmployees();
+
+    return () => {
+      active = false;
+    };
+  }, [page, submittedKeyword, reloadKey]);
+
+  useEffect(() => {
+    const openRegister = () => {
+      setRegisterOpen(true);
+    };
+
+    window.addEventListener('admin:open-employee-register', openRegister);
+    return () => {
+      window.removeEventListener('admin:open-employee-register', openRegister);
+    };
+  }, []);
+
+  const summary = useMemo(() => {
+    const total = pagination?.totalElements ?? employees.length;
+    const active = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_ACTIVE',
+    ).length;
+    const inactive = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_INACTIVE',
+    ).length;
+    const retired = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_RETIRED',
+    ).length;
+
+    return [
+      { label: '전체 사원', value: total, caption: '등록된 구성원' },
+      { label: '재직', value: active, caption: '현재 근무 중' },
+      { label: '휴직', value: inactive, caption: '휴직 등록' },
+      { label: '퇴사', value: retired, caption: '근무 종료' },
+    ];
+  }, [employees, pagination]);
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPage(1);
+    setSubmittedKeyword(keyword.trim());
+  };
+
+  const reload = () => {
+    setPage(1);
+    setReloadKey((current) => current + 1);
+  };
+
+  const closeRegister = () => {
+    if (registerSubmitting) {
+      return;
+    }
+
+    setRegisterOpen(false);
+    setRegisterError(null);
+  };
+
+  const updateRegisterForm = (
+    key: keyof AdminEmployeeRegisterRequest,
+    value: string | number,
+  ) => {
+    setRegisterForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const resetRegisterForm = () => {
+    setRegisterForm(createInitialRegisterForm());
+    setRegisterDate(null);
+    setRegisterError(null);
+  };
+
+  const handleRegisterSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRegisterSubmitting(true);
+    setRegisterError(null);
+
+    try {
+      const request = {
+        ...registerForm,
+        entcoYmd: formatDate(registerDate),
+      };
+
+      await adminApi.registerEmployee(request);
+      resetRegisterForm();
+      setRegisterOpen(false);
+      reload();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : '사원 등록 중 오류가 발생했습니다.';
+      setRegisterError(message);
+    } finally {
+      setRegisterSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="flex w-full flex-col gap-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-950">
+            사원 관리
+          </h2>
+          <p className="mt-2 text-sm font-medium text-slate-500">
+            사원 상태, 소속, 직급 정보를 검색하고 관리합니다.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            leftIcon={<RefreshCw size={17} />}
+            loading={loading}
+            onClick={reload}
+          >
+            새로고침
+          </Button>
+          <Button
+            variant="primary"
+            leftIcon={<UserPlus size={17} />}
+            onClick={() => setRegisterOpen(true)}
+          >
+            사원 등록
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {summary.map((item) => (
+          <ContentCard key={item.label} title={item.label}>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div className="text-3xl font-bold tracking-tight text-slate-950">
+                  {item.value}
+                </div>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  {item.caption}
+                </p>
+              </div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <Users size={21} />
+              </div>
+            </div>
+          </ContentCard>
+        ))}
+      </div>
+
+      <ContentCard
+        title="사원 목록"
+        actions={
+          <form onSubmit={handleSearch} className="flex min-w-80 gap-2">
+            <SearchInput
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="사원명, 사번, 부서 검색"
+              aria-label="사원 검색"
+              wrapperClassName="min-w-72"
+            />
+            <Button type="submit" variant="outline">
+              검색
+            </Button>
+          </form>
+        }
+      >
+        {error ? (
+          <EmptyState
+            title="사원 목록을 불러오지 못했습니다."
+            description={error.message}
+            actions={
+              <Button variant="outline" onClick={reload}>
+                다시 시도
+              </Button>
+            }
+          />
+        ) : (
+          <div className="flex flex-col gap-5">
+            <DataTable
+              data={employees}
+              getRowKey={(employee) => String(employee.empId)}
+              emptyText={
+                loading
+                  ? '사원 목록을 불러오는 중입니다.'
+                  : '표시할 사원이 없습니다.'
+              }
+              columns={[
+                {
+                  key: 'employee',
+                  header: '사원명',
+                  render: (employee) => (
+                    <div>
+                      <div className="font-bold text-slate-950">
+                        {employee.empNm}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        {formatEmployeeId(employee.empId)}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'dept',
+                  header: '부서',
+                  render: (employee) => formatCode(employee.deptCd),
+                },
+                {
+                  key: 'position',
+                  header: '직급',
+                  render: (employee) =>
+                    formatCode(employee.jobPstnCd ?? employee.jobGrdCd),
+                },
+                {
+                  key: 'status',
+                  header: '상태',
+                  render: (employee) => {
+                    const status = employee.empStatCd ?? 'UNKNOWN';
+                    return (
+                      <Badge
+                        variant={employeeStatusVariants[status] ?? 'neutral'}
+                      >
+                        {employeeStatusLabels[status] ?? status}
+                      </Badge>
+                    );
+                  },
+                },
+                {
+                  key: 'mobile',
+                  header: '연락처',
+                  render: (employee) => formatCode(employee.mblTelno),
+                },
+                {
+                  key: 'enabled',
+                  header: '사용',
+                  render: (employee) => (
+                    <Badge
+                      variant={employee.enabled === 'Y' ? 'success' : 'neutral'}
+                    >
+                      {employee.enabled === 'Y' ? '사용' : '중지'}
+                    </Badge>
+                  ),
+                },
+              ]}
+            />
+
+            {pagination && pagination.totalPages > 1 && (
+              <Pagination
+                page={page}
+                totalPages={pagination.totalPages}
+                onChange={setPage}
+              />
+            )}
+          </div>
+        )}
+      </ContentCard>
+
+      <Modal
+        open={registerOpen}
+        title="사원 등록"
+        description="로그인에 사용할 사번과 기본 인사 정보를 입력합니다."
+        onClose={closeRegister}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={closeRegister}
+              disabled={registerSubmitting}
+            >
+              취소
+            </Button>
+            <Button
+              type="submit"
+              form="admin-employee-register-form"
+              loading={registerSubmitting}
+            >
+              등록
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-employee-register-form"
+          className="grid gap-4 md:grid-cols-2"
+          onSubmit={handleRegisterSubmit}
+        >
+          <FormField
+            label="사번"
+            type="number"
+            min={1}
+            required
+            value={registerForm.empId || ''}
+            onChange={(event) =>
+              updateRegisterForm('empId', Number(event.target.value))
+            }
+          />
+          <FormField
+            label="사원명"
+            required
+            value={registerForm.empNm}
+            onChange={(event) =>
+              updateRegisterForm('empNm', event.target.value)
+            }
+          />
+          <FormField
+            label="주민등록번호"
+            required
+            placeholder="예: 900101-1234567"
+            value={registerForm.rrno}
+            onChange={(event) =>
+              updateRegisterForm('rrno', event.target.value)
+            }
+          />
+          <Select
+            label="성별"
+            required
+            value={registerForm.genderCd}
+            onChange={(event) =>
+              updateRegisterForm('genderCd', event.target.value)
+            }
+            options={[
+              { value: 'M', label: '남성' },
+              { value: 'F', label: '여성' },
+            ]}
+          />
+          <FormField
+            label="휴대전화"
+            required
+            placeholder="010-1234-5678"
+            value={registerForm.mblTelno}
+            onChange={(event) =>
+              updateRegisterForm('mblTelno', event.target.value)
+            }
+          />
+          <FormField
+            label="우편번호"
+            required
+            value={registerForm.zip}
+            onChange={(event) => updateRegisterForm('zip', event.target.value)}
+          />
+          <div className="md:col-span-2">
+            <FormField
+              label="주소"
+              required
+              value={registerForm.addr}
+              onChange={(event) =>
+                updateRegisterForm('addr', event.target.value)
+              }
+            />
+          </div>
+          <div className="md:col-span-2">
+            <DatePickerField
+              label="입사일"
+              value={registerDate}
+              onChange={setRegisterDate}
+              mode="date"
+              required
+            />
+          </div>
+          {registerError && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 md:col-span-2">
+              {registerError}
+            </p>
+          )}
+        </form>
+      </Modal>
+    </section>
+  );
+}

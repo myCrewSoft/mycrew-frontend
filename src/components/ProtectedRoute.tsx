@@ -7,12 +7,13 @@ interface Props {
 
 export default function ProtectedRoute({ children }: Props) {
   const { auth } = useAuth();
+  const hasRefreshToken = Boolean(localStorage.getItem('refreshToken'));
 
-  if (!auth.payload) {
+  if (!auth.payload && !hasRefreshToken) {
     return <Navigate to="/login" replace />;
   }
 
-  if (auth.isExpired) {
+  if (auth.isExpired && !hasRefreshToken) {
     return <Navigate to="/login?expired=true" replace />;
   }
 
