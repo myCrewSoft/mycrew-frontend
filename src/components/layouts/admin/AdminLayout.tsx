@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import Button from '../../common/button/Button';
 import Badge from '../../common/dataDisplay/badge/Badge';
+import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
 import type { AdminAccessResponse } from '../../../types/admin';
@@ -66,9 +67,13 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const isEmployeesPage = location.pathname.startsWith('/admin/users');
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
 
-  const handleLogout = () => {
-    clearAuth();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearAuth();
+      navigate('/login', { replace: true });
+    }
   };
 
   const openEmployeeRegister = () => {
@@ -251,8 +256,9 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
               variant="outline"
               size="sm"
               leftIcon={<LogOut size={16} />}
-              onClick={handleLogout}
-            >
+              onClick={() => void handleLogout()}
+
+>
               로그아웃
             </Button>
           </div>
