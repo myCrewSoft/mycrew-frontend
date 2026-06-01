@@ -11,6 +11,7 @@ import type { components } from "./generated"
 // 예시 - generate-api 실행 후 아래처럼 추가
 // 일정 관리
 export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
+export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = 
                 components['schemas']['ScheduleTargetResponseDto'];
