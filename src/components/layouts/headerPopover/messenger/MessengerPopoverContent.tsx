@@ -36,9 +36,9 @@ const MessengerPopoverContent = () => {
 
   // API 데이터가 아직 없으면 빈 배열로 처리합니다.
   // 연결 실패/빈 상태 전용 화면은 나중에 이 지점에서 붙이면 됩니다.
-  const roomSource = apiRooms ?? []
-  const messageSource = apiMessages ?? []
-  const memberSource = apiMembers ?? []
+  const roomSource = useMemo(() => apiRooms ?? [], [apiRooms])
+  const messageSource = useMemo(() => apiMessages ?? [], [apiMessages])
+  const memberSource = useMemo(() => apiMembers ?? [], [apiMembers])
 
   // 탭이 바뀔 때마다 보여줄 채팅방 목록을 계산합니다.
   const filteredRooms = useMemo(() => {

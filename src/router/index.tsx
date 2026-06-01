@@ -10,6 +10,7 @@ import { CalendarProvider } from '../pages/calendar/CalendarProvider';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
+import { meetingRoutes } from './routes/meetingRoutes';
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/components', element: <CommonComponentsGuide /> },
       ...boardRoutes,
+      ...meetingRoutes
     ],
   },
   {

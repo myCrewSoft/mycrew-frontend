@@ -142,23 +142,6 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
       },
     ],
   },
-  meeting: {
-    title: '회의',
-    actions: [
-      { label: '회의 만들기', variant: 'primary' },
-      { label: '회의록 작성' },
-    ],
-    sections: [
-      {
-        title: '회의 관리',
-        items: [
-          { icon: Video, label: '회의 목록', path: '/meeting/list' },
-          { icon: Calendar, label: '예정된 회의', path: '/meeting/scheduled' },
-          { icon: FileText, label: '회의록', path: '/meeting/minutes' },
-        ],
-      },
-    ],
-  },
   attendance: {
     title: '근태',
     actions: [
