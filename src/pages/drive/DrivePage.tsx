@@ -6,47 +6,12 @@ import Checkbox from '../../components/common/form/checkbox/Checkbox'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Tabs from '../../components/common/tabs/Tabs'
-
-// ─── 임시 목 데이터 (백엔드 연동 전까지 사용) ────────────────────────────
-// 실제 연동 시 아래 타입과 MOCK_ITEMS를 지우고
-// useApiList(() => driveApi.getMyDrive()) 로 교체하세요.
-
-type ItemType = '01' | '02' // 01: 폴더, 02: 파일
-
-interface DriveItem {
-  driveItemId: number
-  itemTypeCd: ItemType
-  itemNm: string
-  fileSz?: string       // 파일만
-  lastMdfcnDt: string
-  modifierNm?: string   // 수정한 사람
-  frstRegDt: string
-  bookmarkYn: 'Y' | 'N'
-}
-
-const MOCK_ITEMS: DriveItem[] = [
-  {
-    driveItemId: 1,
-    itemTypeCd: '01',
-    itemNm: '테스트',
-    lastMdfcnDt: '26.05.19 15:20',
-    frstRegDt: '26.05.19 15:20',
-    bookmarkYn: 'N',
-  },
-  {
-    driveItemId: 2,
-    itemTypeCd: '02',
-    itemNm: '1조발표용.jpg',
-    fileSz: '229.3 KB',
-    lastMdfcnDt: '25.12.29 16:06',
-    modifierNm: '노윤하',
-    frstRegDt: '26.05.15 09:47',
-    bookmarkYn: 'N',
-  },
-]
+import { useApiList } from '../../hooks/useApi'
+import { driveApi } from '../../api/driveApi'
+import type { DriveResponseDto } from '../../types/drive.dto'
 
 // ─── 파일 아이콘 ────────────────────────────────────────────────────────────
-const FileIcon = ({ item }: { item: DriveItem }) => {
+const FileIcon = ({ item }: { item: DriveResponseDto }) => {
   if (item.itemTypeCd === '01') {
     return <Folder size={20} className="text-amber-400" />
   }
@@ -55,7 +20,7 @@ const FileIcon = ({ item }: { item: DriveItem }) => {
 
 // ─── 상세 패널 ──────────────────────────────────────────────────────────────
 interface DetailPanelProps {
-  item: DriveItem | null
+  item: DriveResponseDto | null
   onClose: () => void
 }
 
@@ -133,12 +98,6 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
                       <td className="py-2 text-slate-500">생성일</td>
                       <td className="py-2 text-slate-800 font-medium">{item.frstRegDt}</td>
                     </tr>
-                    {item.modifierNm && (
-                      <tr>
-                        <td className="py-2 text-slate-500">수정자</td>
-                        <td className="py-2 text-slate-800 font-medium">{item.modifierNm}</td>
-                      </tr>
-                    )}
                   </>
                 )}
                 {!item && (
@@ -171,22 +130,22 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
 export default function DriveMyPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selectedIds, setSelectedIds] = useState<number[]>([])
-  const [selectedItem, setSelectedItem] = useState<DriveItem | null>(null)
+  const [selectedItem, setSelectedItem] = useState<DriveResponseDto | null>(null)
   const [showPanel, setShowPanel] = useState(true)
 
-  // 실제 연동 시 아래 목 데이터를 교체하세요
-  // const { data: items, loading } = useApiList(() => driveApi.getMyDrive())
-  const items = MOCK_ITEMS
+  const { data: items, loading } = useApiList(driveApi.getMyDriveList)
 
-  const allChecked = items.length > 0 && selectedIds.length === items.length
+  if (loading) return <div>로딩 중...</div>
+
+  const allChecked = (items ?? []).length > 0 && selectedIds.length === (items ?? []).length
   const toggleAll = () =>
-    setSelectedIds(allChecked ? [] : items.map((i) => i.driveItemId))
+    setSelectedIds(allChecked ? [] : (items ?? []).map((i) => i.driveItemId))
   const toggleOne = (id: number) =>
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]
     )
 
-  const handleRowClick = (item: DriveItem) => {
+  const handleRowClick = (item: DriveResponseDto) => {
     setSelectedItem(item)
     setShowPanel(true)
   }
@@ -199,7 +158,6 @@ export default function DriveMyPage() {
         {/* 상단 툴바 */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <div className="flex items-center gap-2">
-            {/* 전체 선택 체크박스 */}
             <Checkbox
               label=""
               checked={allChecked}
@@ -212,7 +170,6 @@ export default function DriveMyPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* 정렬 */}
             <Button
               variant="outline"
               leftIcon={<ArrowUpDown size={14} />}
@@ -221,7 +178,6 @@ export default function DriveMyPage() {
               수정한 날짜순
             </Button>
 
-            {/* 리스트 / 그리드 토글 */}
             <IconButton
               size="sm"
               aria-label="목록 보기"
@@ -239,7 +195,6 @@ export default function DriveMyPage() {
               <LayoutGrid size={16} />
             </IconButton>
 
-            {/* 상세 패널 토글 */}
             <IconButton
               size="sm"
               aria-label="상세 정보"
@@ -253,7 +208,7 @@ export default function DriveMyPage() {
 
         {/* 목록 */}
         <div className="flex-1 overflow-y-auto">
-          {items.length === 0 ? (
+          {(items ?? []).length === 0 ? (
             <div className="flex h-full items-center justify-center p-8">
               <EmptyState
                 title="파일이 없습니다."
@@ -270,14 +225,11 @@ export default function DriveMyPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                  <th className="w-8 py-2 pl-5">
-                    <span className="sr-only">선택</span>
-                  </th>
+                  <th className="w-8 py-2 pl-5"><span className="sr-only">선택</span></th>
                   <th className="w-8 py-2 pr-2">종류</th>
                   <th className="py-2 pr-4">이름</th>
                   <th className="w-28 py-2 pr-4">크기</th>
                   <th className="w-36 py-2 pr-4">수정한 날짜</th>
-                  <th className="w-24 py-2 pr-4">수정한 사람</th>
                   <th className="w-36 py-2 pr-4">생성한 날짜</th>
                   <th className="w-8 py-2 pr-4">
                     <Plus size={14} className="cursor-pointer text-slate-400 hover:text-slate-700" />
@@ -285,14 +237,12 @@ export default function DriveMyPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {items.map((item) => (
+                {(items ?? []).map((item) => (
                   <tr
                     key={item.driveItemId}
                     onClick={() => handleRowClick(item)}
                     className={`group cursor-pointer transition-colors hover:bg-slate-50 ${
-                      selectedItem?.driveItemId === item.driveItemId
-                        ? 'bg-blue-50'
-                        : ''
+                      selectedItem?.driveItemId === item.driveItemId ? 'bg-blue-50' : ''
                     }`}
                   >
                     <td
@@ -309,24 +259,11 @@ export default function DriveMyPage() {
                         aria-label={`${item.itemNm} 선택`}
                       />
                     </td>
-                    <td className="py-2.5 pr-2">
-                      <FileIcon item={item} />
-                    </td>
-                    <td className="py-2.5 pr-4 font-medium text-slate-800">
-                      {item.itemNm}
-                    </td>
-                    <td className="py-2.5 pr-4 text-slate-500">
-                      {item.fileSz ?? '-'}
-                    </td>
-                    <td className="py-2.5 pr-4 text-slate-500">
-                      {item.lastMdfcnDt}
-                    </td>
-                    <td className="py-2.5 pr-4 text-slate-500">
-                      {item.modifierNm ?? '-'}
-                    </td>
-                    <td className="py-2.5 pr-4 text-slate-500">
-                      {item.frstRegDt}
-                    </td>
+                    <td className="py-2.5 pr-2"><FileIcon item={item} /></td>
+                    <td className="py-2.5 pr-4 font-medium text-slate-800">{item.itemNm}</td>
+                    <td className="py-2.5 pr-4 text-slate-500">{item.fileSz ?? '-'}</td>
+                    <td className="py-2.5 pr-4 text-slate-500">{item.lastMdfcnDt ?? '-'}</td>
+                    <td className="py-2.5 pr-4 text-slate-500">{item.frstRegDt ?? '-'}</td>
                     <td className="py-2.5 pr-4">
                       <div
                         className="opacity-0 group-hover:opacity-100"
@@ -350,7 +287,7 @@ export default function DriveMyPage() {
           ) : (
             // ── 그리드 뷰 ──
             <div className="grid grid-cols-4 gap-3 p-4">
-              {items.map((item) => (
+              {(items ?? []).map((item) => (
                 <div
                   key={item.driveItemId}
                   onClick={() => handleRowClick(item)}
