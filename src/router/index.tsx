@@ -12,6 +12,7 @@ import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
 import ChatbotPage from '../pages/ai/Chatbotpage';
+import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
 
 
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
     element: <MainLayout />,
     children: [
       { path: '/components', element: <CommonComponentsGuide /> },
+      { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
       ...driveRoutes,
     ],
