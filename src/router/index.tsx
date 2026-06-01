@@ -12,6 +12,8 @@ import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
 import ChatbotPage from '../pages/ai/Chatbotpage';
+import { driveRoutes } from './routes/driveRoutes'
+
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
     children: [
       { path: '/components', element: <CommonComponentsGuide /> },
       ...boardRoutes,
+      ...driveRoutes,
     ],
   },
   {
