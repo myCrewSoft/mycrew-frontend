@@ -5,9 +5,12 @@
 //   2. 이 파일에 타입 별칭 추가
 // ─────────────────────────────────────────────────────
 
-// import { components } from './generated';
+import type { components } from "./generated";
+
 
 // 예시 - generate-api 실행 후 아래처럼 추가
 // export type MemberResponseDto = components['schemas']['MemberResponseDto'];
 // export type LoginRequestDto   = components['schemas']['LoginRequestDto'];
 // export type TokenResponseDto  = components['schemas']['TokenResponseDto'];
+// 게시판
+export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];

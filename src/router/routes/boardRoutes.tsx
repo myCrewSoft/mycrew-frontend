@@ -3,13 +3,13 @@ import BoardPage from '../../pages/board/BoardPage'
 import BoardDetailPage from '../../pages/board/BoardDetailPage'
 
 export const boardRoutes: RouteObject[] = [
-  { path: '/board', element: <BoardPage /> },
-  { path: '/board/notices', element: <BoardPage /> },
-  { path: '/board/notices/:boardId', element: <BoardDetailPage /> },
-  { path: '/board/departments', element: <BoardPage /> },
-  { path: '/board/departments/:boardId', element: <BoardDetailPage /> },
-  { path: '/board/free', element: <BoardPage /> },
-  { path: '/board/free/:boardId', element: <BoardDetailPage /> },
-  { path: '/board/anonymous', element: <BoardPage /> },
-  { path: '/board/anonymous/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards', element: <BoardPage /> },
+  { path: '/boards/notices', element: <BoardPage /> },
+  { path: '/boards/notices/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards/departments', element: <BoardPage /> },
+  { path: '/boards/departments/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards/free', element: <BoardPage /> },
+  { path: '/boards/free/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards/anonymous', element: <BoardPage /> },
+  { path: '/boards/anonymous/:boardId', element: <BoardDetailPage /> },
 ]
