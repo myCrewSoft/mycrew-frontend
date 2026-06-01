@@ -261,6 +261,7 @@ axiosInstance.interceptors.response.use(
         processQueue(refreshError, null);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('firstLoginRequired');
         window.location.href = '/login?expired=true';
         return Promise.reject(refreshError);
 

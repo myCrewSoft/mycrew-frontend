@@ -38,18 +38,32 @@ export interface AdminEmployeeStatusUpdateRequest {
   empStatCd: AdminEmployeeStatusCode;
 }
 
-export interface AdminRoleAssignment {
+export interface AdminRole {
   roleId?: number;
+  roleCd?: string | null;
+  roleNm?: string | null;
+  roleExpln?: string | null;
+}
+
+export interface AdminRoleAssignment {
+  roleAssignId?: number;
+  roleId?: number;
+  empId?: number;
   roleName?: string;
   roleCd?: string;
   scopeTypeCd?: string;
   scopeId?: string;
+  enabled?: string | null;
+  role?: AdminRole | null;
 }
 
 export interface AdminMailAccount {
+  emailAddr?: string | null;
   mailAddr?: string | null;
   emlAddr?: string | null;
   email?: string | null;
+  providerCd?: string | null;
+  tokenStatusCd?: string | null;
   useYn?: string | null;
 }
 
