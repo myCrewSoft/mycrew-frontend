@@ -67,6 +67,10 @@
   background-color: #dbeafe;
 }
 
+.calendar-main .fc-dayGridMonth-view .fc-highlight {
+  background-color: #e0f2fe;
+}
+
 /* 큰 캘린더 일정 표시 */
 .calendar-main .fc-event-main {
   overflow: hidden;
@@ -159,6 +163,20 @@
   overflow: visible !important;
 }
 
+.calendar-main .fc-dayGridMonth-view .fc-daygrid-day-frame {
+  height: 100%;
+}
+
+.calendar-main .fc-dayGridMonth-view .fc-daygrid-day-bg,
+.calendar-main .fc-dayGridMonth-view .fc-daygrid-bg-harness .fc-highlight {
+  inset: 0 !important;
+  pointer-events: none;
+}
+
+.calendar-main .fc-dayGridMonth-view .fc-daygrid-bg-harness {
+  pointer-events: none;
+}
+
 .calendar-main .fc-dayGridMonth-view .fc-daygrid-day-events {
   min-height: 56px !important;
   max-height: 56px !important;
@@ -178,6 +196,190 @@
 }
 
 /* 커스텀 더보기 팝오버 */
+/* 주간/일간 캘린더 */
+.calendar-main .fc-timeGridWeek-view .fc-scrollgrid,
+.calendar-main .fc-timeGridDay-view .fc-scrollgrid,
+.calendar-main .fc-listMonth-view .fc-list {
+  border-color: #e2e8f0;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-col-header,
+.calendar-main .fc-timeGridDay-view .fc-col-header {
+  background-color: #f8fafc;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-col-header-cell,
+.calendar-main .fc-timeGridDay-view .fc-col-header-cell {
+  height: 56px;
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
+  vertical-align: middle;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-col-header-cell-cushion,
+.calendar-main .fc-timeGridDay-view .fc-col-header-cell-cushion {
+  display: inline-flex;
+  min-width: 44px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 0 12px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion,
+.calendar-main .fc-timeGridDay-view .fc-col-header-cell.fc-day-today .fc-col-header-cell-cushion {
+  background-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgb(37 99 235 / 0.24);
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-axis,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-axis {
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-axis-frame,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-axis-frame {
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-axis-frame::after,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-axis-frame::after {
+  content: 'TIME';
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-slot,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-slot {
+  border-color: #eef2f7;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-slot-label,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-slot-label {
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-slot-label-cushion,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-slot-label-cushion {
+  padding: 0 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-now-indicator-line,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-now-indicator-line {
+  border-color: #2563eb;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-now-indicator-arrow,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-now-indicator-arrow {
+  border-color: #2563eb;
+}
+
+.calendar-main .fc-timeGridWeek-view .fc-timegrid-event,
+.calendar-main .fc-timeGridDay-view .fc-timegrid-event {
+  border: 0 !important;
+  border-radius: 8px;
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.calendar-main .fc-timeGridWeek-view .calendar-main-event,
+.calendar-main .fc-timeGridDay-view .calendar-main-event {
+  height: 100%;
+  align-items: flex-start;
+  border-radius: 8px;
+  padding: 6px 8px;
+  line-height: 17px;
+}
+
+/* 목록 캘린더 */
+.calendar-main .fc-listMonth-view .fc-list {
+  border: 0;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-table {
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  padding: 10px 14px 16px;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-day th {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-day-cushion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  padding: 10px 14px;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-day-text,
+.calendar-main .fc-listMonth-view .fc-list-day-side-text {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event td {
+  border: 0;
+  background-color: #ffffff;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event:hover td {
+  background-color: #f8fafc;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event-time {
+  width: 92px;
+  border-radius: 8px 0 0 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event-graphic {
+  width: 26px;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event-dot {
+  border-width: 5px;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-event-title {
+  border-radius: 0 8px 8px 0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.calendar-main .fc-listMonth-view .fc-list-empty {
+  border-radius: 12px;
+  background-color: #f8fafc;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .calendar-custom-more-popover {
   position: absolute;
   z-index: 70;

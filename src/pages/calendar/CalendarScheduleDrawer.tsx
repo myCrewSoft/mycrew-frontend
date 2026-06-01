@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Building2, ClipboardList, FolderKanban, Globe2, X } from 'lucide-react'
 import { useState } from 'react'
 import { ApiError } from '../../api/axiosInstance'
 import { scheduleApi } from '../../api/scheduleApi'
@@ -136,6 +136,63 @@ const getOneHourLater = (date: Date | null) => {
   return nextDate
 }
 
+const getScheduleScopeNotice = (
+  scheduleTypeCode: ScheduleTypeCode,
+  options: {
+    deptCd?: string
+    projectId?: string
+    taskId?: string
+  },
+) => {
+  if (scheduleTypeCode === 'C001') {
+    return {
+      icon: <Globe2 size={18} />,
+      title: '전사 전체 일정',
+      description: '모든 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-blue-100 bg-blue-50 text-blue-700',
+      titleClassName: 'text-blue-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C003') {
+    return {
+      icon: <Building2 size={18} />,
+      title: `${options.deptCd ?? '선택한 부서'} 일정`,
+      description: '해당 부서 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      titleClassName: 'text-emerald-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C005') {
+    const projectName = options.projectId
+      ? `프로젝트 #${options.projectId}`
+      : '선택한 프로젝트'
+
+    return {
+      icon: <FolderKanban size={18} />,
+      title: `${projectName} 일정`,
+      description: '해당 프로젝트 참여자에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+      titleClassName: 'text-cyan-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C006') {
+    const taskName = options.taskId ? `업무 #${options.taskId}` : '선택한 업무'
+
+    return {
+      icon: <ClipboardList size={18} />,
+      title: `${taskName} 일정`,
+      description: '해당 업무 담당자와 관련 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-slate-200 bg-slate-50 text-slate-600',
+      titleClassName: 'text-slate-950',
+    }
+  }
+
+  return null
+}
+
 const CalendarScheduleDrawer = ({
   open,
   selectedDate,
@@ -168,7 +225,7 @@ const CalendarScheduleDrawer = ({
     immediate: false,
   })
   const { loading: updating, execute: updateSchedule } = useApi<
-    number,
+    null,
     [string | number, ScheduleRequestDto]
   >(scheduleApi.updateSchedule, {
     immediate: false,
@@ -177,6 +234,12 @@ const CalendarScheduleDrawer = ({
   const submitting = saving || updating
   const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
   const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
+  const shouldShowAttendeePicker = formValues.scheduleTypeCode !== 'C001'
+  const scheduleScopeNotice = getScheduleScopeNotice(formValues.scheduleTypeCode, {
+    deptCd: formValues.deptCd,
+    projectId: relatedProjectId,
+    taskId: relatedTaskId,
+  })
 
   const handleScheduleTypeChange = (nextTypeCode: ScheduleTypeCode) => {
     setFormValues((current) => ({
@@ -302,10 +365,12 @@ const CalendarScheduleDrawer = ({
     reptYn: formValues.repeatYn ? 'Y' : 'N',
     reptTypeCd: formValues.repeatYn ? formValues.repeatTypeCode : undefined,
     reptEndDt: formValues.repeatYn ? formValues.repeatEndDate : undefined,
-    targets: selectedAttendeeIds.map((id) => ({
-      targetTypeCd: '01',
-      targetId: String(id),
-    })),
+    targets: shouldShowAttendeePicker
+      ? selectedAttendeeIds.map((id) => ({
+          targetTypeCd: '01',
+          targetId: String(id),
+        }))
+      : [],
   })
 
   const handleSubmit = async () => {
@@ -346,12 +411,16 @@ const CalendarScheduleDrawer = ({
 
   return (
     <aside
-      className={`h-full shrink-0 overflow-hidden border-slate-200 bg-white transition-[width,border-color] duration-300 ${
-        open ? 'w-[420px] border-l' : 'w-0 border-l-0'
+      className={`h-full shrink-0 overflow-hidden border-slate-200 bg-white transition-[width,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        open ? 'w-[420px] border-l' : 'w-0 border-l border-transparent'
       }`}
       aria-hidden={!open}
     >
-      <div className="flex h-full w-[420px] flex-col">
+      <div
+        className={`flex h-full w-[420px] flex-col shadow-[-16px_0_32px_rgba(15,23,42,0.06)] transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          open ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'
+        }`}
+      >
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
           <div>
             <h2 className="text-lg font-bold text-slate-950">
@@ -387,6 +456,28 @@ const CalendarScheduleDrawer = ({
                 handleScheduleTypeChange(event.target.value as ScheduleTypeCode)
               }
             />
+
+            {scheduleScopeNotice && (
+              <div
+                className={`rounded-2xl border px-4 py-4 ${scheduleScopeNotice.className}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+                    {scheduleScopeNotice.icon}
+                  </span>
+                  <div>
+                    <p
+                      className={`text-sm font-extrabold ${scheduleScopeNotice.titleClassName}`}
+                    >
+                      {scheduleScopeNotice.title}
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-5">
+                      {scheduleScopeNotice.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -524,12 +615,14 @@ const CalendarScheduleDrawer = ({
               }
             />
 
-            <EmployeeSearchPicker
-              variant="detailed"
-              employees={[]}
-              selectedEmployeeIds={selectedAttendeeIds}
-              onChange={setSelectedAttendeeIds}
-            />
+            {shouldShowAttendeePicker && (
+              <EmployeeSearchPicker
+                variant="detailed"
+                employees={[]}
+                selectedEmployeeIds={selectedAttendeeIds}
+                onChange={setSelectedAttendeeIds}
+              />
+            )}
 
             <Select
               label="알림 시간"

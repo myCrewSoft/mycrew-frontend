@@ -15,6 +15,12 @@ export const scheduleApi = {
     return axiosInstance.get('/api/schedules', { params })
   },
 
+  getSchedule: (
+    scheduleId: string | number,
+  ): Promise<AxiosResponse<ApiResponse<ScheduleResponseDto>>> => {
+    return axiosInstance.get(`/api/schedules/${scheduleId}`)
+  },
+
   createSchedule: (
     payload: ScheduleRequestDto,
   ): Promise<AxiosResponse<ApiResponse<number>>> => {
@@ -24,7 +30,7 @@ export const scheduleApi = {
   updateSchedule: (
     scheduleId: string | number,
     payload: ScheduleRequestDto,
-  ): Promise<AxiosResponse<ApiResponse<number>>> => {
+  ): Promise<AxiosResponse<ApiResponse<null>>> => {
     return axiosInstance.put(`/api/schedules/${scheduleId}`, payload)
   },
 
