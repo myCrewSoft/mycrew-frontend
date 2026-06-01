@@ -10,11 +10,19 @@ interface ModalProps {
   children?: ReactNode
   footer?: ReactNode
   onClose: () => void
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   variant?: 'default' | 'confirm' | 'danger'
   confirmText?: string
   cancelText?: string
   onConfirm?: () => void
   maxWidthClassName?: string
+}
+
+const modalSizeStyle: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'max-w-lg',
+  md: 'max-w-2xl',
+  lg: 'max-w-4xl',
+  xl: 'max-w-5xl',
 }
 
 const Modal = ({
@@ -24,6 +32,7 @@ const Modal = ({
   children,
   footer,
   onClose,
+  size = 'sm',
   variant = 'default',
   confirmText = '확인',
   cancelText = '취소',
@@ -69,7 +78,11 @@ const Modal = ({
           </IconButton>
         </div>
 
-        {children && <div className="p-5">{children}</div>}
+        {children && (
+          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-5">
+            {children}
+          </div>
+        )}
 
         {resolvedFooter && (
           <div className="flex justify-end gap-2 border-t border-slate-100 p-5">

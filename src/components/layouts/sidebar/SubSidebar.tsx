@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../../common/button/Button'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
+import ReservationSubSidebarContent from './ReservationSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
@@ -18,6 +19,7 @@ interface SubSidebarProps {
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
 const customSidebarContentMap: Record<string, ComponentType> = {
   calendar: CalendarSubSidebarContent,
+  reservations: ReservationSubSidebarContent,
 }
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
