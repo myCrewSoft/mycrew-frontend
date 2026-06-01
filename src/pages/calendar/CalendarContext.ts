@@ -1,4 +1,5 @@
 import { createContext, useContext } from 'react'
+import type { ScheduleListParams } from '../../api/scheduleApi'
 import type {
   CalendarEventItem,
   ScheduleTypeCode,
@@ -12,6 +13,11 @@ export interface CalendarContextValue {
   setCheckedScheduleTypeCodes: (nextCodes: ScheduleTypeCode[]) => void,
   selectedDate: string,
   setSelectedDate: (nextDate: string) => void
+  scheduleRange: ScheduleListParams,
+  setScheduleRange: (nextRange: ScheduleListParams) => void
+  calendarLoading: boolean,
+  calendarErrorMessage: string | null,
+  refreshSchedules: () => Promise<void>
 };
 
 export const CalendarContext = createContext<CalendarContextValue | null>(null);

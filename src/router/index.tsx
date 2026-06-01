@@ -1,25 +1,43 @@
-import { createBrowserRouter } from 'react-router-dom'
-import AuthLayout from '../components/layouts/AuthLayout'
-import MainLayout from '../components/layouts/MainLayout'
-import ProtectedRoute from '../components/ProtectedRoute'
-import CommonComponentsGuide from '../pages/CommonComponentsGuide'
-import CalendarPage from '../pages/calendar/CalendarPage'
-import { CalendarProvider } from '../pages/calendar/CalendarProvider'
-import { boardRoutes } from './routes/boardRoutes'
+import { createBrowserRouter } from 'react-router-dom';
+import AuthLayout from '../components/layouts/AuthLayout';
+import MainLayout from '../components/layouts/MainLayout';
+import ProtectedRoute from '../components/ProtectedRoute';
+import CommonComponentsGuide from '../pages/CommonComponentsGuide';
+import AdminAccessGate from '../pages/admin/AdminAccessGate';
+import LoginPage from '../pages/auth/LoginPage';
+import CalendarPage from '../pages/calendar/CalendarPage';
+import { CalendarProvider } from '../pages/calendar/CalendarProvider';
+import { boardRoutes } from './routes/boardRoutes';
+import ReservationPage from '../pages/Reservation/ReservationPage';
+import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
+import ChatbotPage from '../pages/ai/Chatbotpage';
 import { driveRoutes } from './routes/driveRoutes'
 
-// TODO: 페이지 import 추가
-// import LoginPage from '../pages/auth/LoginPage'
 
 export const router = createBrowserRouter([
-  // 인증 불필요
+  {
+    element: <AuthLayout />,
+    children: [
+      { index: true, element: <LoginPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/chatbot', element: <ChatbotPage /> },
+    ],
+  },
   {
     element: <MainLayout />,
     children: [
-           { index: true, element: <CommonComponentsGuide /> },
+      { path: '/components', element: <CommonComponentsGuide /> },
       ...boardRoutes,
       ...driveRoutes,
     ],
+  },
+  {
+    element: (
+      <ReservationProvider>
+        <MainLayout />
+      </ReservationProvider>
+    ),
+    children: [{ path: '/reservations', element: <ReservationPage /> }],
   },
   {
     element: (
@@ -30,12 +48,6 @@ export const router = createBrowserRouter([
     children: [{ path: '/calendar', element: <CalendarPage /> }],
   },
   {
-    element: <AuthLayout />,
-    //children: [{ path: '/login', element: <LoginPage  /> }],
-  },
-
-  // 로그인 필요
-  {
     element: (
       <ProtectedRoute>
         <MainLayout />
@@ -45,16 +57,12 @@ export const router = createBrowserRouter([
       // { path: '/dashboard', element: <DashboardPage /> },
     ],
   },
-
-  // 관리자 전용
   {
+    path: '/admin/*',
     element: (
-      <ProtectedRoute role="ROLE_ADMIN">
-        <MainLayout />
+      <ProtectedRoute>
+        <AdminAccessGate />
       </ProtectedRoute>
     ),
-    children: [
-      // { path: '/admin', element: <AdminPage /> },
-    ],
   },
-])
+]);
