@@ -5,7 +5,7 @@ import {
   type ScheduleTypeCode,
 } from '../../types/calendar'
 
-// 구분 코드 확인 
+// 백엔드에서 내려온 일정 구분 코드가 프론트에서 정의한 코드인지 확인합니다.
 const isScheduleTypeCode = (value?: string): value is ScheduleTypeCode => {
   return !!value && value in scheduleTypeColorTokenMap
 }
@@ -13,12 +13,11 @@ const isScheduleTypeCode = (value?: string): value is ScheduleTypeCode => {
 export const toCalendarEvent = (
   schedule: ScheduleResponseDto,
 ): CalendarEventItem | null => {
-  // id: number -> string
   if (!schedule.id || !schedule.title || !schedule.start) {
     return null
   }
 
-  // 구분 코드 검증
+  // 알 수 없는 일정 구분 코드는 색상과 라벨을 정할 수 없으므로 화면에 조용히 숨기지 않고 에러로 드러냅니다.
   if (!isScheduleTypeCode(schedule.scheduleTypeCode)) {
     throw new Error(
       `알 수 없는 일정 구분 코드입니다: ${schedule.scheduleTypeCode ?? '없음'}`,
@@ -26,11 +25,10 @@ export const toCalendarEvent = (
   }
 
   const scheduleTypeCode = schedule.scheduleTypeCode
-  
-  // 구분 코드에 맞춰 색상 적용
+
+  // 일정 구분 코드는 백엔드 값 그대로 쓰고, 색상만 프론트 정책으로 입힙니다.
   const colorToken = scheduleTypeColorTokenMap[scheduleTypeCode]
 
-  // 필수값 체크
   return {
     id: String(schedule.id),
     title: schedule.title,
@@ -45,6 +43,7 @@ export const toCalendarEvent = (
     repeat: schedule.repeat,
     repeatTypeCode: schedule.repeatTypeCode as CalendarEventItem['repeatTypeCode'],
     repeatEndDate: schedule.repeatEndDate,
+    targets: schedule.targets,
     backgroundColor: colorToken.background,
     borderColor: colorToken.border,
     textColor: colorToken.text,

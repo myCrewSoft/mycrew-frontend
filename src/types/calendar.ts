@@ -1,3 +1,5 @@
+import type { ScheduleTargetResponseDto } from './index'
+
 export type ScheduleTypeCode =
   | 'C001' // 사내 전체 일정
   | 'C002' // 개인(휴가 등) 일정
@@ -64,6 +66,7 @@ export interface CalendarEventItem {
   repeat?: boolean
   repeatTypeCode?: RepeatTypeCode
   repeatEndDate?: string
+  targets?: ScheduleTargetResponseDto[]
   backgroundColor: string
   borderColor: string
   textColor: string

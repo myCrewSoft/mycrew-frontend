@@ -11,7 +11,14 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import {
+  AlertCircle,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Plus,
+} from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Tabs from '../../components/common/tabs/Tabs'
@@ -78,6 +85,19 @@ const formatPopoverDate = (date: Date) =>
     weekday: 'short',
   }).format(date)
 
+const padDateTimePart = (value: number) => String(value).padStart(2, '0')
+
+const formatApiLocalDateTime = (date: Date) => {
+  const year = date.getFullYear()
+  const month = padDateTimePart(date.getMonth() + 1)
+  const day = padDateTimePart(date.getDate())
+  const hours = padDateTimePart(date.getHours())
+  const minutes = padDateTimePart(date.getMinutes())
+  const seconds = padDateTimePart(date.getSeconds())
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
 const CalendarPage = () => {
   // visibleCalendarEvents는 체크 필터가 적용된 일정 목록입니다.
   // selectedDate는 미니 캘린더와 큰 캘린더가 공유하는 선택 날짜입니다.
@@ -124,6 +144,30 @@ const CalendarPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [scheduleDrawerOpen]);
+
+  useEffect(() => {
+    const containerElement = calendarContainerRef.current
+
+    if (!containerElement) return
+
+    let frameId = 0
+    const updateCalendarSize = () => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        calendarRef.current?.getApi().updateSize()
+        setMorePopover(null)
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(updateCalendarSize)
+    resizeObserver.observe(containerElement)
+    updateCalendarSize()
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      resizeObserver.disconnect()
+    }
+  }, []);
 
   const handleViewChange = (nextView: string) => {
     const view = nextView as CalendarView;
@@ -286,23 +330,29 @@ const CalendarPage = () => {
         </div>
       </header>
 
+      {(calendarLoading || calendarErrorMessage) && (
+        <div
+          className={`flex min-h-11 shrink-0 items-center gap-2 border-b px-6 text-sm font-semibold ${
+            calendarErrorMessage
+              ? 'border-red-100 bg-red-50 text-red-700'
+              : 'border-blue-100 bg-blue-50 text-blue-700'
+          }`}
+        >
+          {calendarErrorMessage ? (
+            <AlertCircle size={16} className="shrink-0" />
+          ) : (
+            <Loader2 size={16} className="shrink-0 animate-spin" />
+          )}
+          <span>{calendarErrorMessage ?? '일정을 불러오는 중입니다.'}</span>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
           <div
             ref={calendarContainerRef}
             className="calendar-main relative h-full bg-white"
           >
-            {calendarLoading && (
-            <div className="absolute right-4 top-4 z-20 rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-bold text-blue-700 shadow-sm">
-              일정 불러오는 중
-            </div>
-          )}
-
-          {calendarErrorMessage && (
-            <div className="absolute left-4 right-4 top-4 z-20 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 shadow-sm">
-              {calendarErrorMessage}
-            </div>
-          )}
             <FullCalendar
               ref={calendarRef}
               plugins={[
@@ -338,9 +388,20 @@ const CalendarPage = () => {
                 setMorePopover(null);
               }}
               datesSet={(info) => {
-                setScheduleRange({
-                  beginDt: info.startStr,
-                  endDt: info.endStr,
+                const nextRange = {
+                  beginDt: formatApiLocalDateTime(info.start),
+                  endDt: formatApiLocalDateTime(info.end),
+                }
+
+                setScheduleRange((currentRange) => {
+                  if (
+                    currentRange?.beginDt === nextRange.beginDt &&
+                    currentRange.endDt === nextRange.endDt
+                  ) {
+                    return currentRange
+                  }
+
+                  return nextRange
                 })
                 setCalendarTitle(formatMonthTitle(info.view.currentStart))
               }}
@@ -381,9 +442,7 @@ const CalendarPage = () => {
         </div>
 
         <CalendarScheduleDrawer
-          key={`${selectedDate}-${selectedSchedule?.id ?? 'create'}-${
-            scheduleDrawerOpen ? 'open' : 'closed'
-          }`}
+          key={`${selectedDate}-${selectedSchedule?.id ?? 'create'}`}
           open={scheduleDrawerOpen}
           selectedDate={selectedDate}
           schedule={selectedSchedule}
