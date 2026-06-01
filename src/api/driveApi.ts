@@ -7,7 +7,7 @@ export const driveApi = {
 
   // 폴더 생성
   createFolder: (data: { itemNm: string; prntDriveItemId?: number }) =>
-    axiosInstance.post<ApiResponse<DriveResponseDto>>('/api/v1/drive/folders', data),
+    axiosInstance.post<ApiResponse<DriveResponseDto>>('/api/drive/folders', data),
 
   // 파일 업로드
   uploadFile: (file: File, prntDriveItemId?: number) => {
@@ -17,7 +17,7 @@ export const driveApi = {
       formData.append('prntDriveItemId', String(prntDriveItemId))
     }
     return axiosInstance.post<ApiResponse<DriveResponseDto>>(
-      '/api/v1/drive/files',
+      '/api/drive/files',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     )
@@ -25,7 +25,7 @@ export const driveApi = {
 
   //드라이브 목록 조회
   getMyDriveList : () => 
-      axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/v1/drives'),
+      axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive'),
 
 
 }

@@ -1,12 +1,14 @@
-import { useState } from 'react'
-import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, Upload, FolderPlus, ChevronDown } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Checkbox from '../../components/common/form/checkbox/Checkbox'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Tabs from '../../components/common/tabs/Tabs'
-import { useApiList } from '../../hooks/useApi'
+import Modal from '../../components/common/overlay/modal/Modal'
+import FormField from '../../components/common/form/formField/FormField'
+import { useApiList, useApi } from '../../hooks/useApi'
 import { driveApi } from '../../api/driveApi'
 import type { DriveResponseDto } from '../../types/drive.dto'
 
@@ -16,6 +18,49 @@ const FileIcon = ({ item }: { item: DriveResponseDto }) => {
     return <Folder size={20} className="text-amber-400" />
   }
   return <FileImage size={20} className="text-blue-400" />
+}
+
+// ─── 새로 만들기 드롭다운 ────────────────────────────────────────────────────
+interface NewItemDropdownProps {
+  onCreateFolder: () => void
+  onUploadFile: () => void
+}
+
+const NewItemDropdown = ({ onCreateFolder, onUploadFile }: NewItemDropdownProps) => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  return (
+    <div ref={ref} className="relative">
+      <Button
+        variant="primary"
+        leftIcon={<Plus size={15} />}
+        onClick={() => setOpen((v) => !v)}
+      >
+        새로 만들기
+      </Button>
+      {open && (
+        <div className="absolute left-0 top-11 z-20 min-w-40 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+          <button
+            type="button"
+            onClick={() => { onCreateFolder(); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <FolderPlus size={16} className="text-amber-400" />
+            폴더 생성
+          </button>
+          <button
+            type="button"
+            onClick={() => { onUploadFile(); setOpen(false) }}
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Upload size={16} className="text-blue-400" />
+            파일 업로드
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── 상세 패널 ──────────────────────────────────────────────────────────────
@@ -29,14 +74,9 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
 
   return (
     <aside className="flex h-full w-72 flex-shrink-0 flex-col border-l border-slate-200 bg-white">
-      {/* 패널 헤더 */}
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <div className="flex items-center gap-2">
-          {item ? (
-            <FileIcon item={item} />
-          ) : (
-            <Folder size={18} className="text-amber-400" />
-          )}
+          {item ? <FileIcon item={item} /> : <Folder size={18} className="text-amber-400" />}
           <span className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">
             {item ? item.itemNm : '내 드라이브'}
           </span>
@@ -46,7 +86,6 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
         </IconButton>
       </div>
 
-      {/* 탭 */}
       <div className="px-4 pt-2">
         <Tabs
           value={detailTab}
@@ -58,11 +97,9 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
         />
       </div>
 
-      {/* 탭 콘텐츠 */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {detailTab === 'info' && (
           <div className="flex flex-col items-center gap-4">
-            {/* 아이콘 미리보기 */}
             <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-50">
               {item?.itemTypeCd === '02' ? (
                 <FileImage size={48} className="text-blue-300" />
@@ -70,16 +107,12 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
                 <Folder size={48} className="text-amber-400" />
               )}
             </div>
-
-            {/* 메타 정보 */}
             <table className="w-full text-sm">
               <tbody className="divide-y divide-slate-100">
                 <tr>
                   <td className="py-2 text-slate-500 w-24">종류</td>
                   <td className="py-2 text-slate-800 font-medium">
-                    {item
-                      ? item.itemTypeCd === '01' ? '폴더' : '파일'
-                      : '내 드라이브'}
+                    {item ? (item.itemTypeCd === '01' ? '폴더' : '파일') : '내 드라이브'}
                   </td>
                 </tr>
                 {item?.fileSz && (
@@ -104,9 +137,7 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
                   <tr>
                     <td className="py-2 text-slate-500">사용 용량</td>
                     <td className="py-2">
-                      <button className="text-blue-500 text-sm font-medium hover:underline">
-                        용량 확인
-                      </button>
+                      <button className="text-blue-500 text-sm font-medium hover:underline">용량 확인</button>
                     </td>
                   </tr>
                 )}
@@ -114,7 +145,6 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
             </table>
           </div>
         )}
-
         {detailTab === 'activity' && (
           <EmptyState
             title="활동 내역이 없습니다."
@@ -132,8 +162,36 @@ export default function DriveMyPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectedItem, setSelectedItem] = useState<DriveResponseDto | null>(null)
   const [showPanel, setShowPanel] = useState(true)
+  const [folderModalOpen, setFolderModalOpen] = useState(false)
+  const [folderName, setFolderName] = useState('')
 
-  const { data: items, loading } = useApiList(driveApi.getMyDriveList)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { data: items, loading, execute: fetchList } = useApiList(driveApi.getMyDriveList)
+
+  const { execute: createFolder } = useApi(driveApi.createFolder, { immediate: false })
+  const { execute: uploadFile } = useApi(driveApi.uploadFile, { immediate: false })
+
+  const handleCreateFolder = async () => {
+    if (!folderName.trim()) return
+    await createFolder({ itemNm: folderName })
+    setFolderModalOpen(false)
+    setFolderName('')
+    void fetchList()
+  }
+
+  const closeFolderModal = () => {
+    setFolderModalOpen(false)
+    setFolderName('')
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await uploadFile(file)
+    e.target.value = ''  // input 초기화
+    void fetchList()
+  }
 
   if (loading) return <div>로딩 중...</div>
 
@@ -152,55 +210,37 @@ export default function DriveMyPage() {
 
   return (
     <div className="flex h-full gap-0 overflow-hidden">
-      {/* ── 메인 영역 ── */}
+      {/* 숨겨진 파일 input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
       <div className="flex min-w-0 flex-1 flex-col gap-0 rounded-xl bg-white overflow-hidden">
 
         {/* 상단 툴바 */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <div className="flex items-center gap-2">
-            <Checkbox
-              label=""
-              checked={allChecked}
-              onChange={toggleAll}
-              aria-label="전체 선택"
+            <Checkbox label="" checked={allChecked} onChange={toggleAll} aria-label="전체 선택" />
+            <NewItemDropdown
+              onCreateFolder={() => setFolderModalOpen(true)}
+              onUploadFile={() => fileInputRef.current?.click()}
             />
-            <Button variant="primary" leftIcon={<Plus size={15} />}>
-              새로 만들기
-            </Button>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              leftIcon={<ArrowUpDown size={14} />}
-              size="sm"
-            >
+            <Button variant="outline" leftIcon={<ArrowUpDown size={14} />} size="sm">
               수정한 날짜순
             </Button>
-
-            <IconButton
-              size="sm"
-              aria-label="목록 보기"
-              active={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-            >
+            <IconButton size="sm" aria-label="목록 보기" active={viewMode === 'list'} onClick={() => setViewMode('list')}>
               <LayoutList size={16} />
             </IconButton>
-            <IconButton
-              size="sm"
-              aria-label="격자 보기"
-              active={viewMode === 'grid'}
-              onClick={() => setViewMode('grid')}
-            >
+            <IconButton size="sm" aria-label="격자 보기" active={viewMode === 'grid'} onClick={() => setViewMode('grid')}>
               <LayoutGrid size={16} />
             </IconButton>
-
-            <IconButton
-              size="sm"
-              aria-label="상세 정보"
-              active={showPanel}
-              onClick={() => setShowPanel((v) => !v)}
-            >
+            <IconButton size="sm" aria-label="상세 정보" active={showPanel} onClick={() => setShowPanel((v) => !v)}>
               <Info size={16} />
             </IconButton>
           </div>
@@ -214,14 +254,14 @@ export default function DriveMyPage() {
                 title="파일이 없습니다."
                 description="파일을 업로드하거나 폴더를 생성해보세요."
                 actions={
-                  <Button variant="primary" leftIcon={<Plus size={15} />}>
-                    새로 만들기
-                  </Button>
+                  <NewItemDropdown
+                    onCreateFolder={() => setFolderModalOpen(true)}
+                    onUploadFile={() => fileInputRef.current?.click()}
+                  />
                 }
               />
             </div>
           ) : viewMode === 'list' ? (
-            // ── 리스트 뷰 ──
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
@@ -231,9 +271,7 @@ export default function DriveMyPage() {
                   <th className="w-28 py-2 pr-4">크기</th>
                   <th className="w-36 py-2 pr-4">수정한 날짜</th>
                   <th className="w-36 py-2 pr-4">생성한 날짜</th>
-                  <th className="w-8 py-2 pr-4">
-                    <Plus size={14} className="cursor-pointer text-slate-400 hover:text-slate-700" />
-                  </th>
+                  <th className="w-8 py-2 pr-4"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -245,19 +283,8 @@ export default function DriveMyPage() {
                       selectedItem?.driveItemId === item.driveItemId ? 'bg-blue-50' : ''
                     }`}
                   >
-                    <td
-                      className="pl-5"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleOne(item.driveItemId)
-                      }}
-                    >
-                      <Checkbox
-                        label=""
-                        checked={selectedIds.includes(item.driveItemId)}
-                        onChange={() => toggleOne(item.driveItemId)}
-                        aria-label={`${item.itemNm} 선택`}
-                      />
+                    <td className="pl-5" onClick={(e) => { e.stopPropagation(); toggleOne(item.driveItemId) }}>
+                      <Checkbox label="" checked={selectedIds.includes(item.driveItemId)} onChange={() => toggleOne(item.driveItemId)} aria-label={`${item.itemNm} 선택`} />
                     </td>
                     <td className="py-2.5 pr-2"><FileIcon item={item} /></td>
                     <td className="py-2.5 pr-4 font-medium text-slate-800">{item.itemNm}</td>
@@ -265,10 +292,7 @@ export default function DriveMyPage() {
                     <td className="py-2.5 pr-4 text-slate-500">{item.lastMdfcnDt ?? '-'}</td>
                     <td className="py-2.5 pr-4 text-slate-500">{item.frstRegDt ?? '-'}</td>
                     <td className="py-2.5 pr-4">
-                      <div
-                        className="opacity-0 group-hover:opacity-100"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu
                           items={[
                             { label: '이름 변경', onClick: () => {} },
@@ -285,24 +309,19 @@ export default function DriveMyPage() {
               </tbody>
             </table>
           ) : (
-            // ── 그리드 뷰 ──
             <div className="grid grid-cols-4 gap-3 p-4">
               {(items ?? []).map((item) => (
                 <div
                   key={item.driveItemId}
                   onClick={() => handleRowClick(item)}
                   className={`group flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-slate-50 ${
-                    selectedItem?.driveItemId === item.driveItemId
-                      ? 'border-blue-300 bg-blue-50'
-                      : 'border-slate-100 bg-white'
+                    selectedItem?.driveItemId === item.driveItemId ? 'border-blue-300 bg-blue-50' : 'border-slate-100 bg-white'
                   }`}
                 >
                   <div className="flex h-12 w-12 items-center justify-center">
                     <FileIcon item={item} />
                   </div>
-                  <span className="w-full truncate text-center text-xs font-medium text-slate-700">
-                    {item.itemNm}
-                  </span>
+                  <span className="w-full truncate text-center text-xs font-medium text-slate-700">{item.itemNm}</span>
                 </div>
               ))}
             </div>
@@ -310,13 +329,24 @@ export default function DriveMyPage() {
         </div>
       </div>
 
-      {/* ── 상세 패널 (고정) ── */}
-      {showPanel && (
-        <DetailPanel
-          item={selectedItem}
-          onClose={() => setShowPanel(false)}
+      {showPanel && <DetailPanel item={selectedItem} onClose={() => setShowPanel(false)} />}
+
+      {/* 폴더 생성 모달 */}
+      <Modal
+        open={folderModalOpen}
+        title="폴더 생성"
+        variant="confirm"
+        confirmText="생성"
+        onConfirm={handleCreateFolder}
+        onClose={closeFolderModal}
+      >
+        <FormField
+          label="폴더명"
+          placeholder="폴더명을 입력하세요"
+          value={folderName}
+          onChange={(e) => setFolderName(e.target.value)}
         />
-      )}
+      </Modal>
     </div>
   )
 }
