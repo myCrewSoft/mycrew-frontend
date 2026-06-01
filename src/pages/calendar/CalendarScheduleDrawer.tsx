@@ -1,36 +1,37 @@
 import { X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { ApiError } from '../../api/axiosInstance'
+import { scheduleApi } from '../../api/scheduleApi'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
+import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import DatePickerField from '../../components/common/form/datePicker/DatePickerField'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Textarea from '../../components/common/form/textarea/Textarea'
+import { useToast } from '../../components/common/toast/ToastProvider'
+import { useApi } from '../../hooks/useApi'
+import type { ScheduleRequestDto } from '../../types'
 import {
   scheduleTypeColorMap,
   scheduleTypeLabelMap,
+  type CalendarEventItem,
   type RepeatTypeCode,
   type ScheduleFormValues,
   type ScheduleTypeCode,
 } from '../../types/calendar'
+import { useCalendar } from './CalendarContext'
 
 interface CalendarScheduleDrawerProps {
   open: boolean
   selectedDate: string
+  schedule?: CalendarEventItem | null
   onClose: () => void
 }
 
 interface OptionItem {
   value: string
   label: string
-}
-
-interface AttendeeOption {
-  id: string
-  name: string
-  department: string
-  position: string
-  avatarColor: string
 }
 
 const scheduleTypeOptions: OptionItem[] = [
@@ -58,88 +59,31 @@ const alarmOptions: OptionItem[] = [
   { value: '1440', label: '1일 전' },
 ]
 
-// 백엔드 연동 전까지는 본인 프로젝트/업무/참석자 목록을 더미 데이터로 둡니다.
-const projectOptions: OptionItem[] = [
-  { value: '101', label: 'myCrewSoft 구축' },
-  { value: '102', label: '인프라 마이그레이션' },
-  { value: '103', label: '서비스 고도화' },
-]
-
-const taskOptions: OptionItem[] = [
-  { value: '201', label: '캘린더 UI 구현' },
-  { value: '202', label: '일정 API 연동' },
-  { value: '203', label: '반복 일정 검증' },
-]
-
-const attendeeOptions: AttendeeOption[] = [
-  {
-    id: '1',
-    name: '김민수',
-    department: '개발팀',
-    position: '대리',
-    avatarColor: '#14b8a6',
-  },
-  {
-    id: '2',
-    name: '이서연',
-    department: '디자인팀',
-    position: '매니저',
-    avatarColor: '#f97316',
-  },
-  {
-    id: '3',
-    name: '박준호',
-    department: '기획팀',
-    position: '대리',
-    avatarColor: '#8b5cf6',
-  },
-  {
-    id: '4',
-    name: '정하늘',
-    department: '인사팀',
-    position: '팀장',
-    avatarColor: '#ec4899',
-  },
-  {
-    id: '5',
-    name: '최지훈',
-    department: '개발팀',
-    position: '팀장',
-    avatarColor: '#0ea5e9',
-  },
-  {
-    id: '6',
-    name: '한유진',
-    department: '기획팀',
-    position: '매니저',
-    avatarColor: '#22c55e',
-  },
-]
-
-const departmentOptions: OptionItem[] = [
-  { value: 'all', label: '전체 부서' },
-  { value: '개발팀', label: '개발팀' },
-  { value: '디자인팀', label: '디자인팀' },
-  { value: '기획팀', label: '기획팀' },
-  { value: '인사팀', label: '인사팀' },
-]
+const projectOptions: OptionItem[] = []
+const taskOptions: OptionItem[] = []
 
 const createInitialFormValues = (
   selectedDate: string,
+  schedule?: CalendarEventItem | null,
 ): ScheduleFormValues => ({
-  title: '',
-  detail: '',
-  scheduleTypeCode: 'C002',
-  color: scheduleTypeColorMap.C002,
-  beginDate: `${selectedDate}T09:00`,
-  endDate: `${selectedDate}T10:00`,
-  allDay: false,
-  repeatYn: false,
+  title: schedule?.title ?? '',
+  detail: schedule?.detail ?? '',
+  scheduleTypeCode: schedule?.scheduleTypeCode ?? 'C002',
+  color: schedule
+    ? scheduleTypeColorMap[schedule.scheduleTypeCode]
+    : scheduleTypeColorMap.C002,
+  beginDate: schedule?.start ?? `${selectedDate}T09:00`,
+  endDate: schedule?.end ?? `${selectedDate}T10:00`,
+  allDay: schedule?.allDay ?? false,
+  deptCd: schedule?.deptCd,
+  projId: schedule?.projId,
+  repeatYn: schedule?.repeat ?? false,
+  repeatTypeCode: schedule?.repeatTypeCode,
+  repeatEndDate: schedule?.repeatEndDate,
 })
 
 const padTimeValue = (value: number) => String(value).padStart(2, '0')
 
-// DatePickerField는 Date 객체를 쓰고, 폼 상태는 백엔드 DTO에 맞추기 좋게 문자열로 보관합니다.
 const parseLocalDateTime = (value?: string) => {
   if (!value) return null
 
@@ -187,7 +131,6 @@ const getOneHourLater = (date: Date | null) => {
   if (!date) return null
 
   const nextDate = new Date(date)
-
   nextDate.setHours(nextDate.getHours() + 1)
 
   return nextDate
@@ -196,19 +139,45 @@ const getOneHourLater = (date: Date | null) => {
 const CalendarScheduleDrawer = ({
   open,
   selectedDate,
+  schedule,
   onClose,
 }: CalendarScheduleDrawerProps) => {
+  const isEditMode = !!schedule
   const [formValues, setFormValues] = useState<ScheduleFormValues>(() =>
-    createInitialFormValues(selectedDate),
+    createInitialFormValues(selectedDate, schedule),
   )
-  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<string[]>([])
-  const [attendeeKeyword, setAttendeeKeyword] = useState('')
-  const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<
+    Array<string | number>
+  >([])
   const [alarmMinutes, setAlarmMinutes] = useState('30')
-  const [relatedProjectId, setRelatedProjectId] = useState('')
-  const [relatedTaskId, setRelatedTaskId] = useState('')
+  const [relatedProjectId, setRelatedProjectId] = useState(
+    schedule?.projId ? String(schedule.projId) : '',
+  )
+  const [relatedTaskId, setRelatedTaskId] = useState(
+    schedule?.taskId ? String(schedule.taskId) : '',
+  )
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
 
-  // 일정 구분을 바꾸면 해당 구분의 기본 색상으로 같이 맞춥니다.
+  const { refreshSchedules } = useCalendar()
+  const { showToast } = useToast()
+
+  const { loading: saving, execute: createSchedule } = useApi<
+    number,
+    [ScheduleRequestDto]
+  >(scheduleApi.createSchedule, {
+    immediate: false,
+  })
+  const { loading: updating, execute: updateSchedule } = useApi<
+    number,
+    [string | number, ScheduleRequestDto]
+  >(scheduleApi.updateSchedule, {
+    immediate: false,
+  })
+
+  const submitting = saving || updating
+  const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
+  const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
+
   const handleScheduleTypeChange = (nextTypeCode: ScheduleTypeCode) => {
     setFormValues((current) => ({
       ...current,
@@ -218,48 +187,6 @@ const CalendarScheduleDrawer = ({
     setRelatedProjectId('')
     setRelatedTaskId('')
   }
-
-  const handleAttendeeToggle = (attendeeId: string) => {
-    setSelectedAttendeeIds((current) =>
-      current.includes(attendeeId)
-        ? current.filter((id) => id !== attendeeId)
-        : [...current, attendeeId],
-    )
-  }
-
-  const filteredAttendees = useMemo(() => {
-    const keyword = attendeeKeyword.trim().toLowerCase()
-
-    if (!keyword && selectedDepartment === 'all') {
-      return []
-    }
-
-    return attendeeOptions.filter((attendee) => {
-      const matchesKeyword =
-        !keyword ||
-        attendee.name.toLowerCase().includes(keyword) ||
-        attendee.department.toLowerCase().includes(keyword) ||
-        attendee.position.toLowerCase().includes(keyword)
-      const matchesDepartment =
-        selectedDepartment === 'all' ||
-        attendee.department === selectedDepartment
-
-      return matchesKeyword && matchesDepartment
-    })
-  }, [attendeeKeyword, selectedDepartment])
-
-  const selectedAttendees = useMemo(
-    () =>
-      attendeeOptions.filter((attendee) =>
-        selectedAttendeeIds.includes(attendee.id),
-      ),
-    [selectedAttendeeIds],
-  )
-  const shouldShowAttendeeEmptyGuide =
-    !attendeeKeyword.trim() && selectedDepartment === 'all'
-
-  const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
-  const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
 
   const handleAllDayChange = (checked: boolean) => {
     setFormValues((current) => {
@@ -325,17 +252,96 @@ const CalendarScheduleDrawer = ({
     }))
   }
 
-  const handleSubmit = () => {
-    // 아직 API가 없으므로, 백엔드로 보낼 데이터를 콘솔에서 먼저 확인합니다.
-    console.log({
-      ...formValues,
-      projectId: shouldShowProjectSelect ? relatedProjectId : undefined,
-      taskId: shouldShowTaskSelect ? relatedTaskId : undefined,
-      attendeeIds: selectedAttendeeIds,
-      alarmMinutes,
-    })
+  const validateScheduleForm = () => {
+    const title = formValues.title.trim()
+    const beginDate = parseLocalDateTime(formValues.beginDate)
+    const endDate = parseLocalDateTime(formValues.endDate)
+    const repeatEndDate = formValues.repeatYn
+      ? parseLocalDate(formValues.repeatEndDate)
+      : null
 
-    onClose()
+    if (!title) return '일정명을 입력해 주세요.'
+    if (!beginDate || !endDate) {
+      return '시작 일시와 종료 일시를 모두 입력해 주세요.'
+    }
+    if (endDate.getTime() < beginDate.getTime()) {
+      return '종료 일시는 시작 일시보다 빠를 수 없습니다.'
+    }
+    if (shouldShowProjectSelect && !relatedProjectId) {
+      return '프로젝트 일정을 등록하려면 프로젝트를 선택해 주세요.'
+    }
+    if (shouldShowTaskSelect && !relatedTaskId) {
+      return '업무 일정을 등록하려면 업무를 선택해 주세요.'
+    }
+    if (formValues.repeatYn && !formValues.repeatTypeCode) {
+      return '반복 유형을 선택해 주세요.'
+    }
+    if (formValues.repeatYn && !repeatEndDate) {
+      return '반복 종료일을 선택해 주세요.'
+    }
+
+    return null
+  }
+
+  const createSchedulePayload = (): ScheduleRequestDto => ({
+    schdClsfCd: formValues.scheduleTypeCode,
+    schdNm: formValues.title.trim(),
+    deptCd: formValues.deptCd,
+    projId:
+      shouldShowProjectSelect && relatedProjectId
+        ? Number(relatedProjectId)
+        : undefined,
+    taskId:
+      shouldShowTaskSelect && relatedTaskId
+        ? Number(relatedTaskId)
+        : undefined,
+    schdDetailCn: formValues.detail,
+    beginDt: formValues.beginDate,
+    endDt: formValues.endDate,
+    allDayYn: formValues.allDay ? 'Y' : 'N',
+    reptYn: formValues.repeatYn ? 'Y' : 'N',
+    reptTypeCd: formValues.repeatYn ? formValues.repeatTypeCode : undefined,
+    reptEndDt: formValues.repeatYn ? formValues.repeatEndDate : undefined,
+    targets: selectedAttendeeIds.map((id) => ({
+      targetTypeCd: '01',
+      targetId: String(id),
+    })),
+  })
+
+  const handleSubmit = async () => {
+    const validationMessage = validateScheduleForm()
+    setSaveErrorMessage(validationMessage)
+
+    if (validationMessage) return
+
+    try {
+      if (isEditMode) {
+        await updateSchedule(schedule.id, createSchedulePayload())
+      } else {
+        await createSchedule(createSchedulePayload())
+      }
+
+      await refreshSchedules()
+      showToast({
+        title: isEditMode
+          ? '일정이 수정되었습니다.'
+          : '일정이 등록되었습니다.',
+        description: '캘린더에 변경 사항이 반영되었습니다.',
+        variant: 'success',
+      })
+      onClose()
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setSaveErrorMessage(error.message)
+        return
+      }
+
+      setSaveErrorMessage(
+        isEditMode
+          ? '일정 수정 중 오류가 발생했습니다.'
+          : '일정 등록 중 오류가 발생했습니다.',
+      )
+    }
   }
 
   return (
@@ -348,10 +354,12 @@ const CalendarScheduleDrawer = ({
       <div className="flex h-full w-[420px] flex-col">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">일정 등록</h2>
+            <h2 className="text-lg font-bold text-slate-950">
+              {isEditMode ? '일정 수정' : '일정 등록'}
+            </h2>
           </div>
 
-          <IconButton aria-label="일정 등록 닫기" size="sm" onClick={onClose}>
+          <IconButton aria-label="일정 창 닫기" size="sm" onClick={onClose}>
             <X size={18} />
           </IconButton>
         </header>
@@ -447,7 +455,6 @@ const CalendarScheduleDrawer = ({
               />
             )}
 
-            
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-700">
@@ -517,143 +524,12 @@ const CalendarScheduleDrawer = ({
               }
             />
 
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-semibold text-slate-700">
-                참석자 검색
-              </span>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-3">
-                  <input
-                    value={attendeeKeyword}
-                    onChange={(event) => setAttendeeKeyword(event.target.value)}
-                    placeholder="이름으로 검색"
-                    className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400"
-                  />
-                  <select
-                    value={selectedDepartment}
-                    onChange={(event) =>
-                      setSelectedDepartment(event.target.value)
-                    }
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-400"
-                  >
-                    {departmentOptions.map((department) => (
-                      <option key={department.value} value={department.value}>
-                        {department.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {!shouldShowAttendeeEmptyGuide && (
-                <div className="mt-4 max-h-[224px] overflow-y-auto rounded-xl border border-slate-200">
-                  {filteredAttendees.map((attendee) => {
-                    const checked = selectedAttendeeIds.includes(attendee.id)
-
-                    return (
-                      <label
-                        key={attendee.id}
-                        className="flex h-14 cursor-pointer items-center gap-3 border-b border-slate-200 px-3 last:border-b-0 hover:bg-slate-50"
-                      >
-                        <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                          style={{ backgroundColor: attendee.avatarColor }}
-                        >
-                          {attendee.name.slice(0, 1)}
-                        </span>
-
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-slate-900">
-                            {attendee.name}
-                          </span>
-                          <span className="block truncate text-xs font-medium text-slate-500">
-                            {attendee.department} · {attendee.position}
-                          </span>
-                        </span>
-
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => handleAttendeeToggle(attendee.id)}
-                          className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </label>
-                    )
-                  })}
-
-                  {filteredAttendees.length === 0 && (
-                    <div className="px-3 py-6 text-center text-sm text-slate-400">
-                      검색 결과가 없습니다.
-                    </div>
-                  )}
-                </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-sm font-bold text-slate-900">
-                      선택된 참석자
-                    </span>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      총 {selectedAttendeeIds.length}명이 일정에 초대됩니다.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAttendeeIds([])}
-                    disabled={selectedAttendeeIds.length === 0}
-                    className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                  >
-                    전체 삭제
-                  </button>
-                </div>
-
-                <div className="mt-4 min-h-12 rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-3">
-                  {selectedAttendees.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {selectedAttendees.map((attendee) => (
-                        <span
-                          key={attendee.id}
-                          className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm"
-                        >
-                          <span
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none text-white"
-                            style={{ backgroundColor: attendee.avatarColor }}
-                          >
-                            {attendee.name.slice(0, 1)}
-                          </span>
-
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-bold text-slate-900">
-                              {attendee.name}
-                            </span>
-                            <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-400">
-                              {attendee.department} · {attendee.position}
-                            </span>
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => handleAttendeeToggle(attendee.id)}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                            aria-label={`${attendee.name} 참석자 제거`}
-                          >
-                            <X size={13} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex h-10 items-center text-sm text-slate-400">
-                      선택된 참석자가 없습니다.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <EmployeeSearchPicker
+              variant="detailed"
+              employees={[]}
+              selectedEmployeeIds={selectedAttendeeIds}
+              onChange={setSelectedAttendeeIds}
+            />
 
             <Select
               label="알림 시간"
@@ -661,14 +537,23 @@ const CalendarScheduleDrawer = ({
               options={alarmOptions}
               onChange={(event) => setAlarmMinutes(event.target.value)}
             />
+
           </div>
         </div>
 
+        {saveErrorMessage && (
+          <div className="mx-5 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {saveErrorMessage}
+          </div>
+        )}
+
         <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
             취소
           </Button>
-          <Button onClick={handleSubmit}>등록</Button>
+          <Button onClick={handleSubmit} loading={isEditMode ? updating : saving}>
+            {isEditMode ? '수정' : '등록'}
+          </Button>
         </footer>
       </div>
     </aside>

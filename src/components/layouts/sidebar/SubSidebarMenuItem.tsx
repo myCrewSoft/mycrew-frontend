@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 
 interface SubSidebarMenuItemProps {
-  icon: LucideIcon
+  icon?: LucideIcon
   label: string
   path: string
   active?: boolean
@@ -23,7 +23,7 @@ const SubSidebarMenuItem = ({
           : 'text-slate-600 hover:bg-blue-100 hover:text-slate-900'
       }`}
     >
-      <Icon size={18} />
+      {Icon && <Icon size={18} />}
       <span className="truncate">{label}</span>
     </Link>
   )
