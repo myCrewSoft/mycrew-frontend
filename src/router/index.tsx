@@ -9,6 +9,9 @@ import LoginPage from '../pages/auth/LoginPage';
 import CalendarPage from '../pages/calendar/CalendarPage';
 import { CalendarProvider } from '../pages/calendar/CalendarProvider';
 import { boardRoutes } from './routes/boardRoutes';
+import ReservationPage from '../pages/Reservation/ReservationPage';
+import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
+import ChatbotPage from '../pages/ai/Chatbotpage';
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +27,7 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      { path: '/chatbot', element: <ChatbotPage /> },
     ],
   },
   {
@@ -32,6 +36,14 @@ export const router = createBrowserRouter([
       { path: '/components', element: <CommonComponentsGuide /> },
       ...boardRoutes,
     ],
+  },
+  {
+    element: (
+      <ReservationProvider>
+        <MainLayout />
+      </ReservationProvider>
+    ),
+    children: [{ path: '/reservations', element: <ReservationPage /> }],
   },
   {
     element: (

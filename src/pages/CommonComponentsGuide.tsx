@@ -18,6 +18,9 @@ import Checkbox from '../components/common/form/checkbox/Checkbox'
 import ContentCard from '../components/common/dataDisplay/card/ContentCard'
 import DataTable from '../components/common/dataDisplay/dataTable/DataTable'
 import DatePickerField from '../components/common/form/datePicker/DatePickerField'
+import EmployeeSearchPicker, {
+  type EmployeeSearchItem,
+} from '../components/common/employeeSearch/EmployeeSearchPicker'
 import EmptyState from '../components/common/dataDisplay/emptyState/EmptyState'
 import FileUpload from '../components/common/form/fileUpload/FileUpload'
 import FilterBar from '../components/common/dataDisplay/filter/FilterBar'
@@ -51,6 +54,37 @@ const approvalRows: ApprovalRow[] = [
   { id: 'AP-003', title: '구매 요청서', writer: '이도윤', status: '완료' },
 ]
 
+const employeeSearchGuideItems: EmployeeSearchItem[] = [
+  {
+    id: 1,
+    name: '김민수',
+    department: '개발팀',
+    position: '대리',
+    avatarColor: '#14b8a6',
+  },
+  {
+    id: 2,
+    name: '최지훈',
+    department: '개발팀',
+    position: '팀장',
+    avatarColor: '#0ea5e9',
+  },
+  {
+    id: 3,
+    name: '박준호',
+    department: '기획팀',
+    position: '대리',
+    avatarColor: '#8b5cf6',
+  },
+  {
+    id: 4,
+    name: '한유진',
+    department: '기획팀',
+    position: '매니저',
+    avatarColor: '#22c55e',
+  },
+]
+
 const Source2323 = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [tab, setTab] = useState('all')
@@ -61,6 +95,13 @@ const Source2323 = () => {
   const [dateValue, setDateValue] = useState<Date | null>(new Date())
   const [dateTimeValue, setDateTimeValue] = useState<Date | null>(new Date())
   const [timeValue, setTimeValue] = useState<Date | null>(new Date())
+  const [detailedEmployeeIds, setDetailedEmployeeIds] = useState<
+    Array<string | number>
+  >([])
+  const [compactEmployeeIds, setCompactEmployeeIds] = useState<
+    Array<string | number>
+  >([])
+  const [compactEmployeeKeyword, setCompactEmployeeKeyword] = useState('')
 
   const { showToast } = useToast()
 
@@ -346,6 +387,50 @@ const Source2323 = () => {
                 value={timeValue}
                 onChange={setTimeValue}
               />
+            </div>
+          </ContentCard>
+
+          <ContentCard
+            title="사원 검색"
+            description="EmployeeSearchPicker는 variant 값에 따라 상세형과 간단형으로 사용할 수 있습니다. 일정 등록처럼 꼼꼼한 선택 UI가 필요하면 detailed, 메신저처럼 빠른 선택 UI가 필요하면 compact를 사용합니다."
+          >
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    detailed
+                  </h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    부서 필터와 선택된 사원 영역까지 보여주는 상세형입니다.
+                  </p>
+                </div>
+
+                <EmployeeSearchPicker
+                  variant="detailed"
+                  employees={employeeSearchGuideItems}
+                  departments={['개발팀', '기획팀']}
+                  selectedEmployeeIds={detailedEmployeeIds}
+                  onChange={setDetailedEmployeeIds}
+                />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">compact</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    검색과 결과 선택만 필요한 간단형입니다.
+                  </p>
+                </div>
+
+                <EmployeeSearchPicker
+                  variant="compact"
+                  employees={employeeSearchGuideItems}
+                  keyword={compactEmployeeKeyword}
+                  onKeywordChange={setCompactEmployeeKeyword}
+                  selectedEmployeeIds={compactEmployeeIds}
+                  onChange={setCompactEmployeeIds}
+                />
+              </div>
             </div>
           </ContentCard>
 
