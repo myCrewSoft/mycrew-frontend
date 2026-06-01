@@ -12,7 +12,7 @@ export const authApi = {
     axiosInstance.post<ApiResponse<LoginResponse>>('/api/v1/auth/login', request),
   getGoogleAuthorizeUrl: () =>
     axiosInstance.get<ApiResponse<GoogleAuthorizeResponse>>(
-      '/api/v1/mail/oauth/google/authorize',
+      '/api/mail/oauth/google/authorize',
     ),
   completeFirstLogin: (request: FirstLoginRequest) =>
     axiosInstance.patch<ApiResponse<string>>(
