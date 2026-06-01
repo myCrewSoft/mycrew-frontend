@@ -4,6 +4,7 @@ import MainLayout from '../components/layouts/MainLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 import CommonComponentsGuide from '../pages/CommonComponentsGuide';
 import AdminAccessGate from '../pages/admin/AdminAccessGate';
+import FirstLoginPage from '../pages/auth/FirstLoginPage';
 import LoginPage from '../pages/auth/LoginPage';
 import CalendarPage from '../pages/calendar/CalendarPage';
 import { CalendarProvider } from '../pages/calendar/CalendarProvider';
@@ -11,6 +12,10 @@ import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
 import { meetingRoutes } from './routes/meetingRoutes';
+import ChatbotPage from '../pages/ai/Chatbotpage';
+import MyPage from '../pages/mypage/MyPage';
+import { driveRoutes } from './routes/driveRoutes'
+
 
 export const router = createBrowserRouter([
   {
@@ -18,14 +23,25 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <LoginPage /> },
       { path: '/login', element: <LoginPage /> },
+      {
+        path: '/first-login',
+        element: (
+          <ProtectedRoute>
+            <FirstLoginPage />
+          </ProtectedRoute>
+        ),
+      },
+      { path: '/chatbot', element: <ChatbotPage /> },
     ],
   },
   {
     element: <MainLayout />,
     children: [
       { path: '/components', element: <CommonComponentsGuide /> },
+      { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
       ...meetingRoutes
+      ...driveRoutes,
     ],
   },
   {

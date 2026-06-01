@@ -5,7 +5,7 @@ import IconButton from '../../button/IconButton'
 
 interface ModalProps {
   open: boolean
-  title: string
+  title?: ReactNode
   description?: string
   children?: ReactNode
   footer?: ReactNode
@@ -15,6 +15,7 @@ interface ModalProps {
   confirmText?: string
   cancelText?: string
   onConfirm?: () => void
+  maxWidthClassName?: string
 }
 
 const modalSizeStyle: Record<NonNullable<ModalProps['size']>, string> = {
@@ -36,6 +37,7 @@ const Modal = ({
   confirmText = '확인',
   cancelText = '취소',
   onConfirm,
+  maxWidthClassName,
 }: ModalProps) => {
   if (!open) {
     return null
@@ -60,11 +62,13 @@ const Modal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <section
-        className={`max-h-[calc(100vh-2rem)] w-full overflow-hidden rounded-xl bg-white shadow-2xl ${modalSizeStyle[size]}`}
+        className={`w-full ${maxWidthClassName ?? modalSizeStyle[size]} rounded-xl bg-white shadow-2xl`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+            {title && (
+              <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+            )}
             {description && (
               <p className="mt-1 text-sm text-slate-500">{description}</p>
             )}

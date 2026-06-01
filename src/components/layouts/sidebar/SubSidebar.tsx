@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -9,6 +10,9 @@ import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
 import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
+import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
+import mergeBoardSections from '../../../utils/boardMenuUtil'
+import DriveSubSidebarContent from './DriveSubSidebarContent'
 
 interface SubSidebarProps {
   isOpen: boolean
@@ -22,6 +26,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   calendar: CalendarSubSidebarContent,
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
+  drive: DriveSubSidebarContent,
 }
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
@@ -39,6 +44,8 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   // 현재 경로에 맞는 전용 서브사이드바 컴포넌트가 있는지 확인합니다.
   const CustomSidebarContent = customSidebarContentMap[sidebarKey]
 
+ const {boardMenuItems} =useBoardSidebar(sidebarKey)
+
   const handleActionClick = (actionLabel: string) => {
     if (sidebarKey === 'board' && actionLabel.includes('글')) {
       navigate(`${location.pathname}?mode=create`)
@@ -49,7 +56,14 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   if (!CustomSidebarContent && !sidebarConfig) {
     return null
   }
+  const getMergedSections =()=>{
+    const baseSections = sidebarConfig ?[...sidebarConfig.sections] :[]
 
+   if (sidebarKey === 'board') {
+      return mergeBoardSections(baseSections, boardMenuItems )
+    }
+    return baseSections
+  }
   return (
     <div
       className={`relative h-full flex-shrink-0 transition-all duration-300 ease-in-out ${
@@ -87,14 +101,15 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
               ))}
             </div>
 
-            {sidebarConfig.sections.map((section) => (
+            {getMergedSections().map((section:any) => (
               <SubSidebarSection key={section.title} title={section.title}>
-                {section.items.map((item) => (
+                {section.items.map((item:any) => (
                   <SubSidebarMenuItem
                     key={item.path}
                     icon={item.icon}
                     label={item.label}
                     path={item.path}
+                    children={item.children}
                     active={location.pathname.startsWith(item.path)}
                   />
                 ))}

@@ -78,6 +78,11 @@ export default function LoginPage() {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('empId', String(data.empId));
       localStorage.setItem('authVersion', String(data.authVersion));
+      if (data.firstLoginRequired) {
+        localStorage.setItem('firstLoginRequired', 'true');
+      } else {
+        localStorage.removeItem('firstLoginRequired');
+      }
       refreshAuth();
 
       navigate(data.firstLoginRequired ? '/first-login' : redirectTo, {

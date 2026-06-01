@@ -86,7 +86,11 @@ const getDetailStatusName = (employee: AdminEmployeeDetail) =>
   '알 수 없음';
 
 const getRoleName = (role: AdminRoleAssignment) =>
-  role.roleName ?? role.roleCd ?? String(role.roleId ?? '-');
+  role.role?.roleNm ??
+  role.roleName ??
+  role.role?.roleCd ??
+  role.roleCd ??
+  String(role.roleId ?? '-');
 
 const getMailAddress = (mail: AdminMailAccount) =>
   mail.mailAddr ?? mail.emlAddr ?? mail.email ?? '-';
@@ -697,7 +701,7 @@ export default function AdminEmployeesPage() {
               </div>
 
               <div className="rounded-lg border border-slate-100 p-3">
-                <h3 className="text-xs font-bold text-slate-500">권한</h3>
+                <h3 className="text-xs font-bold text-slate-500">역할</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedDetail.roleAssignmentList?.length ? (
                     selectedDetail.roleAssignmentList.map((role, index) => (
