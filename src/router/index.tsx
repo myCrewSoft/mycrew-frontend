@@ -10,6 +10,7 @@ import { CalendarProvider } from '../pages/calendar/CalendarProvider';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
+import ChatbotPage from '../pages/ai/Chatbotpage';
 
 export const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <LoginPage /> },
       { path: '/login', element: <LoginPage /> },
+      { path: '/chatbot', element: <ChatbotPage /> },
     ],
   },
   {
