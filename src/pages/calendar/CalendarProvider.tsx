@@ -26,11 +26,9 @@ const defaultCheckedScheduleTypeCodes: ScheduleTypeCode[] = [
 ]
 
 export const CalendarProvider = ({ children }: CalendarProviderProps) => {
-  const today = formatDateKey(new Date())
-  const [scheduleRange, setScheduleRange] = useState<ScheduleListParams>({
-    beginDt: `${today}T00:00:00`,
-    endDt: `${today}T23:59:59`,
-  })
+  const [scheduleRange, setScheduleRange] = useState<ScheduleListParams | null>(
+    null,
+  )
 
   const {
     data: schedules,
@@ -46,6 +44,8 @@ export const CalendarProvider = ({ children }: CalendarProviderProps) => {
   )
 
   const refreshSchedules = useCallback(async () => {
+    if (!scheduleRange) return
+
     await fetchSchedules(scheduleRange)
   }, [fetchSchedules, scheduleRange])
 
