@@ -58,6 +58,12 @@ export interface CalendarEventItem {
   allDay?: boolean
   scheduleTypeCode: ScheduleTypeCode
   detail?: string
+  deptCd?: string
+  projId?: number
+  taskId?: number
+  repeat?: boolean
+  repeatTypeCode?: RepeatTypeCode
+  repeatEndDate?: string
   backgroundColor: string
   borderColor: string
   textColor: string
