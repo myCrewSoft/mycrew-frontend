@@ -49,5 +49,8 @@ export function computeAuthState(): AuthState {
 export function clearAuthState(): AuthState {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
+  localStorage.removeItem('empId');
+  localStorage.removeItem('authVersion');
+  localStorage.removeItem('firstLoginRequired');
   return { payload: null, isExpired: false };
 }

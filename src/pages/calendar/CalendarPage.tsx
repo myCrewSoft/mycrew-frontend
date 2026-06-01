@@ -1,19 +1,33 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type FullCalendarComponent from '@fullcalendar/react'
-import type { EventApi, EventContentArg, MoreLinkArg } from '@fullcalendar/core'
+import type {
+  EventApi,
+  EventClickArg,
+  EventContentArg,
+  MoreLinkArg,
+} from '@fullcalendar/core'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import listPlugin from '@fullcalendar/list'
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import {
+  AlertCircle,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Plus,
+} from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Tabs from '../../components/common/tabs/Tabs'
 import { formatDateKey, formatMonthTitle, formatTime } from '../../utils/date'
 import { useCalendar } from './CalendarContext'
+import CalendarScheduleDetailModal from './CalendarScheduleDetailModal'
 import CalendarScheduleDrawer from './CalendarScheduleDrawer'
 import './calendar.css'
+import type { CalendarEventItem } from '../../types/calendar'
 
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listMonth';
 
@@ -71,11 +85,30 @@ const formatPopoverDate = (date: Date) =>
     weekday: 'short',
   }).format(date)
 
+const padDateTimePart = (value: number) => String(value).padStart(2, '0')
+
+const formatApiLocalDateTime = (date: Date) => {
+  const year = date.getFullYear()
+  const month = padDateTimePart(date.getMonth() + 1)
+  const day = padDateTimePart(date.getDate())
+  const hours = padDateTimePart(date.getHours())
+  const minutes = padDateTimePart(date.getMinutes())
+  const seconds = padDateTimePart(date.getSeconds())
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
+}
+
 const CalendarPage = () => {
   // visibleCalendarEvents는 체크 필터가 적용된 일정 목록입니다.
   // selectedDate는 미니 캘린더와 큰 캘린더가 공유하는 선택 날짜입니다.
-  const { visibleCalendarEvents, selectedDate, setSelectedDate } = useCalendar();
-
+  const {
+    visibleCalendarEvents,
+    selectedDate,
+    setSelectedDate,
+    setScheduleRange,
+    calendarLoading,
+    calendarErrorMessage
+  } = useCalendar();
   // 큰 FullCalendar의 내부 API를 사용하기 위한 ref입니다.
   const calendarRef = useRef<FullCalendarComponent>(null);
   const calendarContainerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +120,9 @@ const CalendarPage = () => {
   const [calendarTitle, setCalendarTitle] = useState(() => formatMonthTitle(new Date()));
 
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState(false);
+  const [scheduleDetailOpen, setScheduleDetailOpen] = useState(false)
+  const [selectedSchedule, setSelectedSchedule] =
+    useState<CalendarEventItem | null>(null)
   const [morePopover, setMorePopover] =
     useState<CalendarMorePopoverState | null>(null);
 
@@ -108,6 +144,30 @@ const CalendarPage = () => {
 
     return () => window.clearTimeout(timerId);
   }, [scheduleDrawerOpen]);
+
+  useEffect(() => {
+    const containerElement = calendarContainerRef.current
+
+    if (!containerElement) return
+
+    let frameId = 0
+    const updateCalendarSize = () => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        calendarRef.current?.getApi().updateSize()
+        setMorePopover(null)
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(updateCalendarSize)
+    resizeObserver.observe(containerElement)
+    updateCalendarSize()
+
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      resizeObserver.disconnect()
+    }
+  }, []);
 
   const handleViewChange = (nextView: string) => {
     const view = nextView as CalendarView;
@@ -174,6 +234,41 @@ const CalendarPage = () => {
     return true as never;
   };
 
+  const handleScheduleClick = (info: EventClickArg) => {
+    const schedule = visibleCalendarEvents.find(
+      (event) => event.id === info.event.id,
+    )
+
+    if (!schedule) return
+
+    setSelectedDate(formatDateKey(info.event.start ?? new Date(schedule.start)))
+    setSelectedSchedule(schedule)
+    setScheduleDrawerOpen(false)
+    setScheduleDetailOpen(true)
+    setMorePopover(null)
+  }
+
+  const openCreateDrawer = () => {
+    setSelectedSchedule(null)
+    setScheduleDrawerOpen(true)
+  }
+
+  const closeScheduleDrawer = () => {
+    setScheduleDrawerOpen(false)
+    setSelectedSchedule(null)
+  }
+
+  const closeScheduleDetail = () => {
+    setScheduleDetailOpen(false)
+    setSelectedSchedule(null)
+  }
+
+  const openEditDrawer = (schedule: CalendarEventItem) => {
+    setScheduleDetailOpen(false)
+    setSelectedSchedule(schedule)
+    setScheduleDrawerOpen(true)
+  }
+
   return (
     <section className="flex h-full min-h-[720px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-col gap-4 border-b border-slate-200 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -228,12 +323,29 @@ const CalendarPage = () => {
 
           <Button
             leftIcon={<Plus size={18} />}
-            onClick={() => setScheduleDrawerOpen(true)}
+            onClick={openCreateDrawer}
           >
             일정 등록
           </Button>
         </div>
       </header>
+
+      {(calendarLoading || calendarErrorMessage) && (
+        <div
+          className={`flex min-h-11 shrink-0 items-center gap-2 border-b px-6 text-sm font-semibold ${
+            calendarErrorMessage
+              ? 'border-red-100 bg-red-50 text-red-700'
+              : 'border-blue-100 bg-blue-50 text-blue-700'
+          }`}
+        >
+          {calendarErrorMessage ? (
+            <AlertCircle size={16} className="shrink-0" />
+          ) : (
+            <Loader2 size={16} className="shrink-0 animate-spin" />
+          )}
+          <span>{calendarErrorMessage ?? '일정을 불러오는 중입니다.'}</span>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1">
@@ -269,9 +381,29 @@ const CalendarPage = () => {
               expandRows
               selectable
               events={visibleCalendarEvents}
+              eventClick={handleScheduleClick}
               dateClick={(info) => {
                 setSelectedDate(info.dateStr);
+                setSelectedSchedule(null)
                 setMorePopover(null);
+              }}
+              datesSet={(info) => {
+                const nextRange = {
+                  beginDt: formatApiLocalDateTime(info.start),
+                  endDt: formatApiLocalDateTime(info.end),
+                }
+
+                setScheduleRange((currentRange) => {
+                  if (
+                    currentRange?.beginDt === nextRange.beginDt &&
+                    currentRange.endDt === nextRange.endDt
+                  ) {
+                    return currentRange
+                  }
+
+                  return nextRange
+                })
+                setCalendarTitle(formatMonthTitle(info.view.currentStart))
               }}
               dayCellClassNames={(info) =>
                 formatDateKey(info.date) === selectedDate
@@ -310,12 +442,20 @@ const CalendarPage = () => {
         </div>
 
         <CalendarScheduleDrawer
-          key={`${selectedDate}-${scheduleDrawerOpen ? 'open' : 'closed'}`}
+          key={`${selectedDate}-${selectedSchedule?.id ?? 'create'}`}
           open={scheduleDrawerOpen}
           selectedDate={selectedDate}
-          onClose={() => setScheduleDrawerOpen(false)}
+          schedule={selectedSchedule}
+          onClose={closeScheduleDrawer}
         />
       </div>
+
+      <CalendarScheduleDetailModal
+        open={scheduleDetailOpen}
+        schedule={selectedSchedule}
+        onClose={closeScheduleDetail}
+        onEdit={openEditDrawer}
+      />
     </section>
   );
 }

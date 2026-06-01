@@ -11,6 +11,7 @@ import SubSidebarSection from './SubSidebarSection'
 import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
 import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
 import mergeBoardSections from '../../../utils/boardMenuUtil'
+import DriveSubSidebarContent from './DriveSubSidebarContent'
 
 interface SubSidebarProps {
   isOpen: boolean
@@ -23,6 +24,7 @@ interface SubSidebarProps {
 const customSidebarContentMap: Record<string, ComponentType> = {
   calendar: CalendarSubSidebarContent,
   reservations: ReservationSubSidebarContent,
+  drive: DriveSubSidebarContent,
 }
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {

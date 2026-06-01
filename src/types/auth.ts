@@ -17,3 +17,12 @@ export interface RefreshResponse {
   empId?: number;
   authVersion?: number;
 }
+
+export interface GoogleAuthorizeResponse {
+  authorizationUrl: string;
+}
+
+export interface FirstLoginRequest {
+  emailAddr: string;
+  newPassword: string;
+}

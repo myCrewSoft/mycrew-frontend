@@ -14,3 +14,9 @@ import type { components } from "./generated";
 // export type TokenResponseDto  = components['schemas']['TokenResponseDto'];
 // 게시판
 export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];
+// 일정 관리
+export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
+export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
+export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
+export type ScheduleTargetResponseDto = 
+                components['schemas']['ScheduleTargetResponseDto'];

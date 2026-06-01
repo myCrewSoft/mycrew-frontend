@@ -1,23 +1,31 @@
-import { X } from 'lucide-react'
+import { Building2, ClipboardList, FolderKanban, Globe2, X } from 'lucide-react'
 import { useState } from 'react'
+import { ApiError } from '../../api/axiosInstance'
+import { scheduleApi } from '../../api/scheduleApi'
 import Button from '../../components/common/button/Button'
-import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import IconButton from '../../components/common/button/IconButton'
+import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import DatePickerField from '../../components/common/form/datePicker/DatePickerField'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Textarea from '../../components/common/form/textarea/Textarea'
+import { useToast } from '../../components/common/toast/ToastProvider'
+import { useApi } from '../../hooks/useApi'
+import type { ScheduleRequestDto } from '../../types'
 import {
   scheduleTypeColorMap,
   scheduleTypeLabelMap,
+  type CalendarEventItem,
   type RepeatTypeCode,
   type ScheduleFormValues,
   type ScheduleTypeCode,
 } from '../../types/calendar'
+import { useCalendar } from './CalendarContext'
 
 interface CalendarScheduleDrawerProps {
   open: boolean
   selectedDate: string
+  schedule?: CalendarEventItem | null
   onClose: () => void
 }
 
@@ -51,27 +59,31 @@ const alarmOptions: OptionItem[] = [
   { value: '1440', label: '1일 전' },
 ]
 
-// 프로젝트/업무/참석자는 임의 데이터를 넣지 않습니다.
-// 백엔드 연동 후 API 응답을 아래 배열 대신 내려받아 연결하면 됩니다.
 const projectOptions: OptionItem[] = []
 const taskOptions: OptionItem[] = []
 
 const createInitialFormValues = (
   selectedDate: string,
+  schedule?: CalendarEventItem | null,
 ): ScheduleFormValues => ({
-  title: '',
-  detail: '',
-  scheduleTypeCode: 'C002',
-  color: scheduleTypeColorMap.C002,
-  beginDate: `${selectedDate}T09:00`,
-  endDate: `${selectedDate}T10:00`,
-  allDay: false,
-  repeatYn: false,
+  title: schedule?.title ?? '',
+  detail: schedule?.detail ?? '',
+  scheduleTypeCode: schedule?.scheduleTypeCode ?? 'C002',
+  color: schedule
+    ? scheduleTypeColorMap[schedule.scheduleTypeCode]
+    : scheduleTypeColorMap.C002,
+  beginDate: schedule?.start ?? `${selectedDate}T09:00`,
+  endDate: schedule?.end ?? `${selectedDate}T10:00`,
+  allDay: schedule?.allDay ?? false,
+  deptCd: schedule?.deptCd,
+  projId: schedule?.projId,
+  repeatYn: schedule?.repeat ?? false,
+  repeatTypeCode: schedule?.repeatTypeCode,
+  repeatEndDate: schedule?.repeatEndDate,
 })
 
 const padTimeValue = (value: number) => String(value).padStart(2, '0')
 
-// DatePickerField는 Date 객체를 쓰고, 폼 상태는 백엔드 DTO에 맞추기 좋게 문자열로 보관합니다.
 const parseLocalDateTime = (value?: string) => {
   if (!value) return null
 
@@ -119,28 +131,116 @@ const getOneHourLater = (date: Date | null) => {
   if (!date) return null
 
   const nextDate = new Date(date)
-
   nextDate.setHours(nextDate.getHours() + 1)
 
   return nextDate
 }
 
+const getScheduleScopeNotice = (
+  scheduleTypeCode: ScheduleTypeCode,
+  options: {
+    deptCd?: string
+    projectId?: string
+    taskId?: string
+  },
+) => {
+  if (scheduleTypeCode === 'C001') {
+    return {
+      icon: <Globe2 size={18} />,
+      title: '전사 전체 일정',
+      description: '모든 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-blue-100 bg-blue-50 text-blue-700',
+      titleClassName: 'text-blue-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C003') {
+    return {
+      icon: <Building2 size={18} />,
+      title: `${options.deptCd ?? '선택한 부서'} 일정`,
+      description: '해당 부서 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      titleClassName: 'text-emerald-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C005') {
+    const projectName = options.projectId
+      ? `프로젝트 #${options.projectId}`
+      : '선택한 프로젝트'
+
+    return {
+      icon: <FolderKanban size={18} />,
+      title: `${projectName} 일정`,
+      description: '해당 프로젝트 참여자에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+      titleClassName: 'text-cyan-950',
+    }
+  }
+
+  if (scheduleTypeCode === 'C006') {
+    const taskName = options.taskId ? `업무 #${options.taskId}` : '선택한 업무'
+
+    return {
+      icon: <ClipboardList size={18} />,
+      title: `${taskName} 일정`,
+      description: '해당 업무 담당자와 관련 구성원에게 공유되는 일정으로 등록됩니다.',
+      className: 'border-slate-200 bg-slate-50 text-slate-600',
+      titleClassName: 'text-slate-950',
+    }
+  }
+
+  return null
+}
+
 const CalendarScheduleDrawer = ({
   open,
   selectedDate,
+  schedule,
   onClose,
 }: CalendarScheduleDrawerProps) => {
+  const isEditMode = !!schedule
   const [formValues, setFormValues] = useState<ScheduleFormValues>(() =>
-    createInitialFormValues(selectedDate),
+    createInitialFormValues(selectedDate, schedule),
   )
   const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<
     Array<string | number>
   >([])
   const [alarmMinutes, setAlarmMinutes] = useState('30')
-  const [relatedProjectId, setRelatedProjectId] = useState('')
-  const [relatedTaskId, setRelatedTaskId] = useState('')
+  const [relatedProjectId, setRelatedProjectId] = useState(
+    schedule?.projId ? String(schedule.projId) : '',
+  )
+  const [relatedTaskId, setRelatedTaskId] = useState(
+    schedule?.taskId ? String(schedule.taskId) : '',
+  )
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
 
-  // 일정 구분을 바꾸면 해당 구분의 기본 색상으로 같이 맞춥니다.
+  const { refreshSchedules } = useCalendar()
+  const { showToast } = useToast()
+
+  const { loading: saving, execute: createSchedule } = useApi<
+    number,
+    [ScheduleRequestDto]
+  >(scheduleApi.createSchedule, {
+    immediate: false,
+  })
+  const { loading: updating, execute: updateSchedule } = useApi<
+    null,
+    [string | number, ScheduleRequestDto]
+  >(scheduleApi.updateSchedule, {
+    immediate: false,
+  })
+
+  const submitting = saving || updating
+  const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
+  const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
+  const shouldShowAttendeePicker = formValues.scheduleTypeCode !== 'C001'
+  const scheduleScopeNotice = getScheduleScopeNotice(formValues.scheduleTypeCode, {
+    deptCd: formValues.deptCd,
+    projectId: relatedProjectId,
+    taskId: relatedTaskId,
+  })
+
   const handleScheduleTypeChange = (nextTypeCode: ScheduleTypeCode) => {
     setFormValues((current) => ({
       ...current,
@@ -150,9 +250,6 @@ const CalendarScheduleDrawer = ({
     setRelatedProjectId('')
     setRelatedTaskId('')
   }
-
-  const shouldShowProjectSelect = formValues.scheduleTypeCode === 'C005'
-  const shouldShowTaskSelect = formValues.scheduleTypeCode === 'C006'
 
   const handleAllDayChange = (checked: boolean) => {
     setFormValues((current) => {
@@ -218,33 +315,120 @@ const CalendarScheduleDrawer = ({
     }))
   }
 
-  const handleSubmit = () => {
-    // 아직 API가 없으므로, 백엔드로 보낼 데이터를 콘솔에서 먼저 확인합니다.
-    console.log({
-      ...formValues,
-      projectId: shouldShowProjectSelect ? relatedProjectId : undefined,
-      taskId: shouldShowTaskSelect ? relatedTaskId : undefined,
-      attendeeIds: selectedAttendeeIds,
-      alarmMinutes,
-    })
+  const validateScheduleForm = () => {
+    const title = formValues.title.trim()
+    const beginDate = parseLocalDateTime(formValues.beginDate)
+    const endDate = parseLocalDateTime(formValues.endDate)
+    const repeatEndDate = formValues.repeatYn
+      ? parseLocalDate(formValues.repeatEndDate)
+      : null
 
-    onClose()
+    if (!title) return '일정명을 입력해 주세요.'
+    if (!beginDate || !endDate) {
+      return '시작 일시와 종료 일시를 모두 입력해 주세요.'
+    }
+    if (endDate.getTime() < beginDate.getTime()) {
+      return '종료 일시는 시작 일시보다 빠를 수 없습니다.'
+    }
+    if (shouldShowProjectSelect && !relatedProjectId) {
+      return '프로젝트 일정을 등록하려면 프로젝트를 선택해 주세요.'
+    }
+    if (shouldShowTaskSelect && !relatedTaskId) {
+      return '업무 일정을 등록하려면 업무를 선택해 주세요.'
+    }
+    if (formValues.repeatYn && !formValues.repeatTypeCode) {
+      return '반복 유형을 선택해 주세요.'
+    }
+    if (formValues.repeatYn && !repeatEndDate) {
+      return '반복 종료일을 선택해 주세요.'
+    }
+
+    return null
+  }
+
+  const createSchedulePayload = (): ScheduleRequestDto => ({
+    schdClsfCd: formValues.scheduleTypeCode,
+    schdNm: formValues.title.trim(),
+    deptCd: formValues.deptCd,
+    projId:
+      shouldShowProjectSelect && relatedProjectId
+        ? Number(relatedProjectId)
+        : undefined,
+    taskId:
+      shouldShowTaskSelect && relatedTaskId
+        ? Number(relatedTaskId)
+        : undefined,
+    schdDetailCn: formValues.detail,
+    beginDt: formValues.beginDate,
+    endDt: formValues.endDate,
+    allDayYn: formValues.allDay ? 'Y' : 'N',
+    reptYn: formValues.repeatYn ? 'Y' : 'N',
+    reptTypeCd: formValues.repeatYn ? formValues.repeatTypeCode : undefined,
+    reptEndDt: formValues.repeatYn ? formValues.repeatEndDate : undefined,
+    targets: shouldShowAttendeePicker
+      ? selectedAttendeeIds.map((id) => ({
+          targetTypeCd: '01',
+          targetId: String(id),
+        }))
+      : [],
+  })
+
+  const handleSubmit = async () => {
+    const validationMessage = validateScheduleForm()
+    setSaveErrorMessage(validationMessage)
+
+    if (validationMessage) return
+
+    try {
+      if (isEditMode) {
+        await updateSchedule(schedule.id, createSchedulePayload())
+      } else {
+        await createSchedule(createSchedulePayload())
+      }
+
+      await refreshSchedules()
+      showToast({
+        title: isEditMode
+          ? '일정이 수정되었습니다.'
+          : '일정이 등록되었습니다.',
+        description: '캘린더에 변경 사항이 반영되었습니다.',
+        variant: 'success',
+      })
+      onClose()
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setSaveErrorMessage(error.message)
+        return
+      }
+
+      setSaveErrorMessage(
+        isEditMode
+          ? '일정 수정 중 오류가 발생했습니다.'
+          : '일정 등록 중 오류가 발생했습니다.',
+      )
+    }
   }
 
   return (
     <aside
-      className={`h-full shrink-0 overflow-hidden border-slate-200 bg-white transition-[width,border-color] duration-300 ${
-        open ? 'w-[420px] border-l' : 'w-0 border-l-0'
+      className={`h-full shrink-0 overflow-hidden border-slate-200 bg-white transition-[width,border-color] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        open ? 'w-[420px] border-l' : 'w-0 border-l border-transparent'
       }`}
       aria-hidden={!open}
     >
-      <div className="flex h-full w-[420px] flex-col">
+      <div
+        className={`flex h-full w-[420px] flex-col shadow-[-16px_0_32px_rgba(15,23,42,0.06)] transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          open ? 'translate-x-0 opacity-100' : 'translate-x-10 opacity-0'
+        }`}
+      >
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-950">일정 등록</h2>
+            <h2 className="text-lg font-bold text-slate-950">
+              {isEditMode ? '일정 수정' : '일정 등록'}
+            </h2>
           </div>
 
-          <IconButton aria-label="일정 등록 닫기" size="sm" onClick={onClose}>
+          <IconButton aria-label="일정 창 닫기" size="sm" onClick={onClose}>
             <X size={18} />
           </IconButton>
         </header>
@@ -272,6 +456,28 @@ const CalendarScheduleDrawer = ({
                 handleScheduleTypeChange(event.target.value as ScheduleTypeCode)
               }
             />
+
+            {scheduleScopeNotice && (
+              <div
+                className={`rounded-2xl border px-4 py-4 ${scheduleScopeNotice.className}`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+                    {scheduleScopeNotice.icon}
+                  </span>
+                  <div>
+                    <p
+                      className={`text-sm font-extrabold ${scheduleScopeNotice.titleClassName}`}
+                    >
+                      {scheduleScopeNotice.title}
+                    </p>
+                    <p className="mt-1 text-sm font-medium leading-5">
+                      {scheduleScopeNotice.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -340,7 +546,6 @@ const CalendarScheduleDrawer = ({
               />
             )}
 
-            
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-700">
@@ -410,12 +615,14 @@ const CalendarScheduleDrawer = ({
               }
             />
 
-            <EmployeeSearchPicker
-              variant="detailed"
-              employees={[]}
-              selectedEmployeeIds={selectedAttendeeIds}
-              onChange={setSelectedAttendeeIds}
-            />
+            {shouldShowAttendeePicker && (
+              <EmployeeSearchPicker
+                variant="detailed"
+                employees={[]}
+                selectedEmployeeIds={selectedAttendeeIds}
+                onChange={setSelectedAttendeeIds}
+              />
+            )}
 
             <Select
               label="알림 시간"
@@ -423,14 +630,23 @@ const CalendarScheduleDrawer = ({
               options={alarmOptions}
               onChange={(event) => setAlarmMinutes(event.target.value)}
             />
+
           </div>
         </div>
 
+        {saveErrorMessage && (
+          <div className="mx-5 mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {saveErrorMessage}
+          </div>
+        )}
+
         <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
             취소
           </Button>
-          <Button onClick={handleSubmit}>등록</Button>
+          <Button onClick={handleSubmit} loading={isEditMode ? updating : saving}>
+            {isEditMode ? '수정' : '등록'}
+          </Button>
         </footer>
       </div>
     </aside>

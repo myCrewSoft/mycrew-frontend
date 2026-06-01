@@ -1,0 +1,38 @@
+import type { AxiosResponse } from 'axios';
+import axiosInstance from './axiosInstance';
+import type { ApiResponse } from './axiosInstance';
+import type { AdminAccessResponse } from '../types/admin';
+import type {
+  AdminEmployeeDetail,
+  AdminEmployeeListItem,
+  AdminEmployeeRegisterRequest,
+  AdminEmployeeSearchParams,
+  AdminEmployeeStatusUpdateRequest,
+} from '../types/adminEmployee';
+
+export const adminApi = {
+  getAccess: (): Promise<AxiosResponse<ApiResponse<AdminAccessResponse>>> => {
+    return axiosInstance.get('/api/admin/access');
+  },
+  getEmployees: (
+    params: AdminEmployeeSearchParams = {},
+  ): Promise<AxiosResponse<ApiResponse<AdminEmployeeListItem[]>>> => {
+    return axiosInstance.get('/api/admin/members', { params });
+  },
+  registerEmployee: (
+    request: AdminEmployeeRegisterRequest,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.post('/api/admin/members', request);
+  },
+  getEmployeeDetail: (
+    empId: number,
+  ): Promise<AxiosResponse<ApiResponse<AdminEmployeeDetail>>> => {
+    return axiosInstance.get(`/api/admin/members/${empId}`);
+  },
+  updateEmployeeStatus: (
+    empId: number,
+    request: AdminEmployeeStatusUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.put(`/api/admin/members/${empId}/status`, request);
+  },
+};
