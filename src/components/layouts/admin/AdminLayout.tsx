@@ -23,6 +23,7 @@ import Button from '../../common/button/Button';
 import Badge from '../../common/dataDisplay/badge/Badge';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
+import { authApi } from '../../../api/authApi';
 import type { AdminAccessResponse } from '../../../types/admin';
 
 interface AdminLayoutProps {
@@ -66,9 +67,13 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const isEmployeesPage = location.pathname.startsWith('/admin/users');
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
 
-  const handleLogout = () => {
-    clearAuth();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearAuth();
+      navigate('/login', { replace: true });
+    }
   };
 
   const openEmployeeRegister = () => {

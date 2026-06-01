@@ -19,4 +19,5 @@ export const authApi = {
       '/api/v1/auth/first-login',
       request,
     ),
+  logout: () => axiosInstance.post<ApiResponse<string>>('/api/v1/auth/logout'),
 };
