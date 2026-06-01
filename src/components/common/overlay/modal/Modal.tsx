@@ -37,7 +37,7 @@ const Modal = ({
   confirmText = '확인',
   cancelText = '취소',
   onConfirm,
-  maxWidthClassName = 'max-w-lg',
+  maxWidthClassName,
 }: ModalProps) => {
   if (!open) {
     return null
@@ -62,7 +62,7 @@ const Modal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <section
-        className={`w-full ${maxWidthClassName} rounded-xl bg-white shadow-2xl`}
+        className={`w-full ${maxWidthClassName ?? modalSizeStyle[size]} rounded-xl bg-white shadow-2xl`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
