@@ -17,6 +17,13 @@ export interface PermissionStatusUpdateRequest {
   enabled: 'Y' | 'N';
 }
 
+export interface ScopeOptionResponse {
+  scopeId: string;
+  scopeCode: string;
+  scopeName: string;
+  label: string;
+}
+
 export interface RoleListResponse {
   roleId: number;
   roleCode: string;

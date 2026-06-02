@@ -26,12 +26,13 @@ import Pagination from '../../components/common/dataDisplay/pagination/Paginatio
 import SearchInput from '../../components/common/form/searchInput/SearchInput';
 import Select from '../../components/common/form/select/Select';
 import Textarea from '../../components/common/form/textarea/Textarea';
-import { useAdminRoles } from './adminRolesContext';
+import { useAdminRoles } from './adminRolesHooks';
 import type {
   PermissionResponse,
   RoleDetailResponse,
   RoleEmployeeResponse,
   RoleScopeType,
+  ScopeOptionResponse,
 } from '../../types/admin';
 import type { AdminEmployeeListItem } from '../../types/adminEmployee';
 
@@ -45,6 +46,30 @@ const scopeOptions: Array<{ value: RoleScopeType; label: string }> = [
   { value: 'PROJECT', label: '프로젝트' },
   { value: 'TASK', label: '업무' },
   { value: 'SELF', label: '본인' },
+];
+
+type ScopedOptionType = Extract<RoleScopeType, 'DEPT' | 'PROJECT' | 'TASK'>;
+
+type PermissionCategory =
+  | 'ALL'
+  | 'ADMIN'
+  | 'DEPT'
+  | 'BOARD'
+  | 'PROJECT'
+  | 'TASK'
+  | 'OTHER';
+
+const permissionCategoryOptions: Array<{
+  value: PermissionCategory;
+  label: string;
+}> = [
+  { value: 'ALL', label: '전체' },
+  { value: 'ADMIN', label: '관리자' },
+  { value: 'DEPT', label: '부서' },
+  { value: 'BOARD', label: '게시판' },
+  { value: 'PROJECT', label: '프로젝트' },
+  { value: 'TASK', label: '업무' },
+  { value: 'OTHER', label: '기타' },
 ];
 
 const roleErrorMessages: Record<string, string> = {
@@ -66,6 +91,23 @@ interface AssignFormState {
   empIds: number[];
   scopeTypeCd: RoleScopeType;
   scopeId: string;
+}
+
+interface ConfirmAction {
+  title: string;
+  description: string;
+  confirmText: string;
+  variant?: 'confirm' | 'danger';
+  onConfirm: () => Promise<void> | void;
+}
+
+interface GroupedRoleEmployee {
+  empId: number;
+  employeeName: string;
+  deptCd: string | null;
+  deptName: string | null;
+  enabled: 'Y' | 'N';
+  assignments: RoleEmployeeResponse[];
 }
 
 const createEmptyRoleForm = (): RoleFormState => ({
@@ -115,12 +157,59 @@ const requiresScopeId = (scopeTypeCd: RoleScopeType) =>
   scopeTypeCd === 'PROJECT' ||
   scopeTypeCd === 'TASK';
 
+const inferPermissionCategory = (
+  permission: PermissionResponse,
+): PermissionCategory => {
+  const prefix = permission.permissionCode.split('_')[0]?.toUpperCase();
+
+  return permissionCategoryOptions.some(
+    (category) => category.value === prefix && category.value !== 'ALL',
+  )
+    ? (prefix as PermissionCategory)
+    : 'OTHER';
+};
+
 const buildRoleForm = (role: RoleDetailResponse): RoleFormState => ({
   roleCode: role.roleCode,
   roleName: role.roleName,
   description: role.description ?? '',
   permissionIds: role.permissions.map((permission) => permission.permissionId),
 });
+
+const groupRoleEmployees = (
+  employees: RoleEmployeeResponse[],
+): GroupedRoleEmployee[] => {
+  const grouped = new Map<number, GroupedRoleEmployee>();
+
+  for (const employee of employees) {
+    const current = grouped.get(employee.empId);
+
+    if (current) {
+      current.assignments.push(employee);
+      current.enabled =
+        current.enabled === 'Y' || employee.enabled === 'Y' ? 'Y' : 'N';
+      current.deptCd = current.deptCd ?? employee.deptCd;
+      current.deptName = current.deptName ?? employee.deptName;
+      continue;
+    }
+
+    grouped.set(employee.empId, {
+      empId: employee.empId,
+      employeeName: employee.employeeName,
+      deptCd: employee.deptCd,
+      deptName: employee.deptName,
+      enabled: employee.enabled,
+      assignments: [employee],
+    });
+  }
+
+  return Array.from(grouped.values());
+};
+
+const formatAssignmentScope = (assignment: RoleEmployeeResponse) =>
+  assignment.scopeId
+    ? `${assignment.scopeTypeCd} ${assignment.scopeId}`
+    : assignment.scopeTypeCd;
 
 export default function AdminRolesPage() {
   const {
@@ -141,6 +230,24 @@ export default function AdminRolesPage() {
   const [permissionStatusError, setPermissionStatusError] = useState<
     string | null
   >(null);
+  const [permissionKeyword, setPermissionKeyword] = useState('');
+  const [submittedPermissionKeyword, setSubmittedPermissionKeyword] =
+    useState('');
+  const [permissionListCategory, setPermissionListCategory] =
+    useState<PermissionCategory>('ALL');
+  const [rolePermissionCategory, setRolePermissionCategory] =
+    useState<PermissionCategory>('ALL');
+  const [scopeOptionMap, setScopeOptionMap] = useState<
+    Record<ScopedOptionType, ScopeOptionResponse[]>
+  >({
+    DEPT: [],
+    PROJECT: [],
+    TASK: [],
+  });
+  const [scopeOptionsLoading, setScopeOptionsLoading] = useState(true);
+  const [scopeOptionsError, setScopeOptionsError] = useState<string | null>(
+    null,
+  );
   const [roleDetail, setRoleDetail] = useState<RoleDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -172,6 +279,9 @@ export default function AdminRolesPage() {
   );
   const [revokeSubmitting, setRevokeSubmitting] = useState(false);
   const [revokeError, setRevokeError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
+    null,
+  );
 
   const selectedRoleSummary = useMemo(
     () => roles.find((role) => role.roleId === selectedRoleId) ?? null,
@@ -189,6 +299,58 @@ export default function AdminRolesPage() {
       ) ?? [],
     [roleDetail, selectedAssignmentIds],
   );
+
+  const groupedRoleEmployees = useMemo(
+    () => groupRoleEmployees(roleDetail?.employees ?? []),
+    [roleDetail],
+  );
+
+  const filteredPermissions = useMemo(() => {
+    const keyword = submittedPermissionKeyword.trim().toLowerCase();
+
+    return permissions.filter((permission) => {
+      const matchesCategory =
+        permissionListCategory === 'ALL' ||
+        inferPermissionCategory(permission) === permissionListCategory;
+
+      if (!matchesCategory) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      return [
+        permission.permissionCode,
+        permission.permissionName,
+        permission.description ?? '',
+        permission.enabled === 'Y' ? '사용' : '비활성',
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [permissionListCategory, permissions, submittedPermissionKeyword]);
+
+  const filteredRoleFormPermissions = useMemo(() => {
+    if (rolePermissionCategory === 'ALL') {
+      return permissions;
+    }
+
+    return permissions.filter(
+      (permission) =>
+        inferPermissionCategory(permission) === rolePermissionCategory,
+    );
+  }, [permissions, rolePermissionCategory]);
+
+  const currentScopeOptions = useMemo(() => {
+    if (!requiresScopeId(assignForm.scopeTypeCd)) {
+      return [];
+    }
+
+    return scopeOptionMap[assignForm.scopeTypeCd as ScopedOptionType];
+  }, [assignForm.scopeTypeCd, scopeOptionMap]);
 
   const fetchSelectedRoleDetail = useCallback(async () => {
     if (!selectedRoleId) {
@@ -237,11 +399,60 @@ export default function AdminRolesPage() {
   }, []);
 
   useEffect(() => {
-    void fetchPermissions();
+    queueMicrotask(() => {
+      void fetchPermissions();
+    });
   }, [fetchPermissions]);
 
   useEffect(() => {
-    void fetchSelectedRoleDetail();
+    let active = true;
+
+    const loadScopeOptions = async () => {
+      setScopeOptionsLoading(true);
+      setScopeOptionsError(null);
+
+      try {
+        const [departmentResponse, projectResponse, taskResponse] =
+          await Promise.all([
+            adminApi.getDepartmentScopeOptions(),
+            adminApi.getProjectScopeOptions(),
+            adminApi.getTaskScopeOptions(),
+          ]);
+
+        if (active) {
+          setScopeOptionMap({
+            DEPT: departmentResponse.data.data ?? [],
+            PROJECT: projectResponse.data.data ?? [],
+            TASK: taskResponse.data.data ?? [],
+          });
+        }
+      } catch (err) {
+        if (active) {
+          setScopeOptionMap({
+            DEPT: [],
+            PROJECT: [],
+            TASK: [],
+          });
+          setScopeOptionsError(getErrorMessage(err));
+        }
+      } finally {
+        if (active) {
+          setScopeOptionsLoading(false);
+        }
+      }
+    };
+
+    void loadScopeOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchSelectedRoleDetail();
+    });
   }, [fetchSelectedRoleDetail]);
 
   useEffect(() => {
@@ -356,6 +567,20 @@ export default function AdminRolesPage() {
       return;
     }
 
+    if (roleModalMode === 'edit') {
+      setConfirmAction({
+        title: '역할 수정을 저장할까요?',
+        description: `${roleForm.roleName.trim()} 역할의 이름, 설명, 권한 구성이 변경됩니다.`,
+        confirmText: '수정',
+        onConfirm: submitRoleForm,
+      });
+      return;
+    }
+
+    await submitRoleForm();
+  };
+
+  const submitRoleForm = async () => {
     setRoleSubmitting(true);
     setRoleSubmitError(null);
 
@@ -407,7 +632,7 @@ export default function AdminRolesPage() {
     setDeleteError(null);
   };
 
-  const handleDeleteRole = async () => {
+  const requestDeleteConfirmation = () => {
     if (!roleDetail) {
       return;
     }
@@ -427,6 +652,20 @@ export default function AdminRolesPage() {
 
     if (replacement === roleDetail.roleId) {
       setDeleteError('삭제 대상 역할은 대체 역할로 선택할 수 없습니다.');
+      return;
+    }
+
+    setConfirmAction({
+      title: '역할을 삭제할까요?',
+      description: `${roleDetail.roleName} 역할이 삭제됩니다. 배정 사원이 있으면 선택한 대체 역할로 이관됩니다.`,
+      confirmText: '삭제',
+      variant: 'danger',
+      onConfirm: () => deleteRole(replacement),
+    });
+  };
+
+  const deleteRole = async (replacement: number | null) => {
+    if (!roleDetail) {
       return;
     }
 
@@ -475,7 +714,7 @@ export default function AdminRolesPage() {
     setAssignForm((current) => ({
       ...current,
       scopeTypeCd,
-      scopeId: requiresScopeId(scopeTypeCd) ? current.scopeId : '',
+      scopeId: '',
     }));
   };
 
@@ -499,6 +738,22 @@ export default function AdminRolesPage() {
       return;
     }
 
+    setConfirmAction({
+      title: '역할을 배정할까요?',
+      description: `${assignForm.empIds.length}명의 사원에게 ${roleDetail?.roleName ?? '선택한'} 역할을 배정합니다.`,
+      confirmText: '배정',
+      onConfirm: assignRole,
+    });
+  };
+
+  const assignRole = async () => {
+    if (!selectedRoleId) {
+      return;
+    }
+
+    const needsScopeId = requiresScopeId(assignForm.scopeTypeCd);
+    const scopeId = assignForm.scopeId.trim();
+
     setAssignSubmitting(true);
     setAssignError(null);
 
@@ -519,12 +774,18 @@ export default function AdminRolesPage() {
     }
   };
 
-  const toggleAssignmentSelection = (roleAssignmentId: number) => {
-    setSelectedAssignmentIds((current) =>
-      current.includes(roleAssignmentId)
-        ? current.filter((id) => id !== roleAssignmentId)
-        : [...current, roleAssignmentId],
+  const toggleAssignmentSelection = (employee: GroupedRoleEmployee) => {
+    const assignmentIds = employee.assignments.map(
+      (assignment) => assignment.roleAssignmentId,
     );
+
+    setSelectedAssignmentIds((current) => {
+      const selected = assignmentIds.every((id) => current.includes(id));
+
+      return selected
+        ? current.filter((id) => !assignmentIds.includes(id))
+        : Array.from(new Set([...current, ...assignmentIds]));
+    });
   };
 
   const handleRevokeAssignments = async () => {
@@ -578,6 +839,11 @@ export default function AdminRolesPage() {
     setSubmittedEmployeeKeyword(employeeKeyword.trim());
   };
 
+  const handlePermissionSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmittedPermissionKeyword(permissionKeyword.trim());
+  };
+
   const updatePermissionStatus = async (
     permission: PermissionResponse,
     enabled: 'Y' | 'N',
@@ -618,6 +884,33 @@ export default function AdminRolesPage() {
     } finally {
       setPermissionUpdatingId(null);
     }
+  };
+
+  const requestPermissionStatusConfirmation = (
+    permission: PermissionResponse,
+    enabled: 'Y' | 'N',
+  ) => {
+    setConfirmAction({
+      title:
+        enabled === 'Y'
+          ? '권한을 사용 상태로 변경할까요?'
+          : '권한을 비활성화할까요?',
+      description: `${permission.permissionName} 권한의 사용 여부가 변경됩니다.`,
+      confirmText: enabled === 'Y' ? '사용' : '비활성화',
+      variant: enabled === 'Y' ? 'confirm' : 'danger',
+      onConfirm: () => updatePermissionStatus(permission, enabled),
+    });
+  };
+
+  const runConfirmedAction = async () => {
+    const action = confirmAction;
+
+    if (!action) {
+      return;
+    }
+
+    await action.onConfirm();
+    setConfirmAction(null);
   };
 
   const replacementOptions = roles.filter(
@@ -664,15 +957,29 @@ export default function AdminRolesPage() {
           title="전체 권한"
           description="시스템에서 제공하는 모든 권한과 사용 여부를 관리합니다."
           actions={
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<RefreshCw size={15} />}
-              loading={permissionsLoading}
-              onClick={() => void fetchPermissions()}
-            >
-              새로고침
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <form onSubmit={handlePermissionSearch} className="flex gap-2">
+                <SearchInput
+                  value={permissionKeyword}
+                  onChange={(event) => setPermissionKeyword(event.target.value)}
+                  placeholder="권한명, 코드, 설명 검색"
+                  aria-label="권한 검색"
+                  wrapperClassName="min-w-72"
+                />
+                <Button type="submit" variant="outline" size="sm">
+                  검색
+                </Button>
+              </form>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<RefreshCw size={15} />}
+                loading={permissionsLoading}
+                onClick={() => void fetchPermissions()}
+              >
+                새로고침
+              </Button>
+            </div>
           }
         >
           {permissionStatusError && (
@@ -680,6 +987,28 @@ export default function AdminRolesPage() {
               {permissionStatusError}
             </p>
           )}
+          <div className="mb-4 flex flex-wrap gap-2">
+            {permissionCategoryOptions.map((category) => (
+              <label
+                key={category.value}
+                className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-bold transition ${
+                  permissionListCategory === category.value
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="permission-list-category"
+                  value={category.value}
+                  checked={permissionListCategory === category.value}
+                  onChange={() => setPermissionListCategory(category.value)}
+                  className="sr-only"
+                />
+                {category.label}
+              </label>
+            ))}
+          </div>
           {permissionsError ? (
             <EmptyState
               title="권한 목록을 불러오지 못했습니다."
@@ -691,74 +1020,83 @@ export default function AdminRolesPage() {
               }
             />
           ) : (
-            <DataTable
-              data={permissions}
-              getRowKey={(permission) => String(permission.permissionId)}
-              emptyText={
-                permissionsLoading
-                  ? '권한 목록을 불러오는 중입니다.'
-                  : '등록된 권한이 없습니다.'
-              }
-              columns={[
-                {
-                  key: 'permission',
-                  header: '권한',
-                  render: (permission) => (
-                    <div>
-                      <div className="font-bold text-slate-950">
-                        {permission.permissionName}
+            <div className="max-h-[32rem] overflow-y-auto pr-1">
+              <DataTable
+                data={filteredPermissions}
+                getRowKey={(permission) => String(permission.permissionId)}
+                emptyText={
+                  permissionsLoading
+                    ? '권한 목록을 불러오는 중입니다.'
+                    : submittedPermissionKeyword
+                      ? '검색 결과가 없습니다.'
+                      : '등록된 권한이 없습니다.'
+                }
+                columns={[
+                  {
+                    key: 'permission',
+                    header: '권한',
+                    render: (permission) => (
+                      <div>
+                        <div className="font-bold text-slate-950">
+                          {permission.permissionName}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-400">
+                          {permission.permissionCode}
+                        </div>
                       </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        {permission.permissionCode}
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'description',
-                  header: '설명',
-                  render: (permission) =>
-                    formatCode(permission.description, '-'),
-                },
-                {
-                  key: 'enabled',
-                  header: '사용 여부',
-                  render: (permission) => (
-                    <Badge
-                      variant={
-                        permission.enabled === 'Y' ? 'success' : 'neutral'
-                      }
-                    >
-                      {permission.enabled === 'Y' ? '사용' : '비활성'}
-                    </Badge>
-                  ),
-                },
-                {
-                  key: 'actions',
-                  header: '관리',
-                  className: 'text-right',
-                  render: (permission) => {
-                    const nextEnabled =
-                      permission.enabled === 'Y' ? 'N' : 'Y';
-
-                    return (
-                      <Button
+                    ),
+                  },
+                  {
+                    key: 'description',
+                    header: '설명',
+                    render: (permission) =>
+                      formatCode(permission.description, '-'),
+                  },
+                  {
+                    key: 'enabled',
+                    header: '사용 여부',
+                    render: (permission) => (
+                      <Badge
                         variant={
-                          permission.enabled === 'Y' ? 'outline' : 'primary'
-                        }
-                        size="sm"
-                        loading={permissionUpdatingId === permission.permissionId}
-                        onClick={() =>
-                          void updatePermissionStatus(permission, nextEnabled)
+                          permission.enabled === 'Y' ? 'success' : 'neutral'
                         }
                       >
-                        {permission.enabled === 'Y' ? '비활성화' : '사용'}
-                      </Button>
-                    );
+                        {permission.enabled === 'Y' ? '사용' : '비활성'}
+                      </Badge>
+                    ),
                   },
-                },
-              ]}
-            />
+                  {
+                    key: 'actions',
+                    header: '관리',
+                    className: 'text-right',
+                    render: (permission) => {
+                      const nextEnabled =
+                        permission.enabled === 'Y' ? 'N' : 'Y';
+
+                      return (
+                        <Button
+                          variant={
+                            permission.enabled === 'Y' ? 'outline' : 'primary'
+                          }
+                          size="sm"
+                          loading={
+                            permissionUpdatingId === permission.permissionId
+                          }
+                          onClick={() =>
+                            requestPermissionStatusConfirmation(
+                              permission,
+                              nextEnabled,
+                            )
+                          }
+                        >
+                          {permission.enabled === 'Y' ? '비활성화' : '사용'}
+                        </Button>
+                      );
+                    },
+                  },
+                ]}
+              />
+            </div>
           )}
         </ContentCard>
       ) : rolesError ? (
@@ -808,9 +1146,9 @@ export default function AdminRolesPage() {
             <ContentCard title="배정 사원">
               <div className="flex items-end justify-between gap-4">
                 <div className="text-3xl font-bold tracking-tight text-slate-950">
-                  {roleDetail?.employees.length ??
-                    selectedRoleSummary?.assignedEmployeeCount ??
-                    0}
+                  {roleDetail
+                    ? groupedRoleEmployees.length
+                    : (selectedRoleSummary?.assignedEmployeeCount ?? 0)}
                 </div>
                 <Users size={26} className="text-emerald-600" />
               </div>
@@ -934,7 +1272,7 @@ export default function AdminRolesPage() {
                       loading={revokeSubmitting}
                       onClick={() => void handleRevokeAssignments()}
                     >
-                      선택 해제
+                      역할 회수
                     </Button>
                   </div>
                   {revokeError && (
@@ -943,10 +1281,8 @@ export default function AdminRolesPage() {
                     </p>
                   )}
                   <DataTable
-                    data={roleDetail.employees}
-                    getRowKey={(employee) =>
-                      String(employee.roleAssignmentId)
-                    }
+                    data={groupedRoleEmployees}
+                    getRowKey={(employee) => String(employee.empId)}
                     emptyText="이 역할에 배정된 사원이 없습니다."
                     columns={[
                       {
@@ -955,14 +1291,12 @@ export default function AdminRolesPage() {
                         render: (employee) => (
                           <input
                             type="checkbox"
-                            checked={selectedAssignmentIds.includes(
-                              employee.roleAssignmentId,
+                            checked={employee.assignments.every((assignment) =>
+                              selectedAssignmentIds.includes(
+                                assignment.roleAssignmentId,
+                              ),
                             )}
-                            onChange={() =>
-                              toggleAssignmentSelection(
-                                employee.roleAssignmentId,
-                              )
-                            }
+                            onChange={() => toggleAssignmentSelection(employee)}
                             className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             aria-label={`${employee.employeeName} 배정 선택`}
                           />
@@ -992,13 +1326,15 @@ export default function AdminRolesPage() {
                         key: 'scope',
                         header: '범위',
                         render: (employee) => (
-                          <div>
-                            <Badge variant="outline">
-                              {employee.scopeTypeCd}
-                            </Badge>
-                            <p className="mt-1 text-xs font-semibold text-slate-400">
-                              {formatCode(employee.scopeId)}
-                            </p>
+                          <div className="flex max-w-md flex-wrap gap-1.5">
+                            {employee.assignments.map((assignment) => (
+                              <Badge
+                                key={assignment.roleAssignmentId}
+                                variant="outline"
+                              >
+                                {formatAssignmentScope(assignment)}
+                              </Badge>
+                            ))}
                           </div>
                         ),
                       },
@@ -1192,6 +1528,28 @@ export default function AdminRolesPage() {
               <h3 className="text-sm font-bold text-slate-900">권한 목록</h3>
               <Badge variant="outline">{roleForm.permissionIds.length}개 선택</Badge>
             </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {permissionCategoryOptions.map((category) => (
+                <label
+                  key={category.value}
+                  className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-bold transition ${
+                    rolePermissionCategory === category.value
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role-permission-category"
+                    value={category.value}
+                    checked={rolePermissionCategory === category.value}
+                    onChange={() => setRolePermissionCategory(category.value)}
+                    className="sr-only"
+                  />
+                  {category.label}
+                </label>
+              ))}
+            </div>
             {permissionsLoading ? (
               <div className="mt-3 rounded-xl border border-slate-200 px-4 py-8 text-center text-sm font-semibold text-slate-500">
                 권한 목록을 불러오는 중입니다.
@@ -1202,7 +1560,7 @@ export default function AdminRolesPage() {
               </p>
             ) : (
               <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto rounded-xl border border-slate-200 p-3 md:grid-cols-2">
-                {permissions.map((permission) => {
+                {filteredRoleFormPermissions.map((permission) => {
                   const disabled = permission.enabled !== 'Y';
 
                   return (
@@ -1225,9 +1583,9 @@ export default function AdminRolesPage() {
                     />
                   );
                 })}
-                {permissions.length === 0 && (
+                {filteredRoleFormPermissions.length === 0 && (
                   <div className="col-span-full py-8 text-center text-sm font-semibold text-slate-400">
-                    등록된 권한이 없습니다.
+                    해당 분류의 권한이 없습니다.
                   </div>
                 )}
               </div>
@@ -1260,7 +1618,7 @@ export default function AdminRolesPage() {
               variant="danger"
               loading={deleteSubmitting}
               disabled={isProtectedRole}
-              onClick={() => void handleDeleteRole()}
+              onClick={requestDeleteConfirmation}
             >
               삭제
             </Button>
@@ -1279,7 +1637,7 @@ export default function AdminRolesPage() {
               {roleDetail?.roleName}
             </p>
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              배정 사원 {roleDetail?.employees.length ?? 0}명
+              배정 사원 {groupedRoleEmployees.length}명
             </p>
           </div>
 
@@ -1346,24 +1704,48 @@ export default function AdminRolesPage() {
               }
               options={scopeOptions}
             />
-            <FormField
-              label="scopeId"
-              value={assignForm.scopeId}
-              disabled={!requiresScopeId(assignForm.scopeTypeCd)}
-              required={requiresScopeId(assignForm.scopeTypeCd)}
-              placeholder={
-                requiresScopeId(assignForm.scopeTypeCd)
-                  ? '범위 ID를 입력해 주세요.'
-                  : '전체/본인은 scopeId를 보내지 않습니다.'
-              }
-              onChange={(event) =>
-                setAssignForm((current) => ({
-                  ...current,
-                  scopeId: event.target.value,
-                }))
-              }
-            />
+            {!requiresScopeId(assignForm.scopeTypeCd) && (
+              <FormField
+                label="scopeId"
+                value=""
+                disabled
+                placeholder="전체/본인은 scopeId를 보내지 않습니다."
+              />
+            )}
           </div>
+
+          {requiresScopeId(assignForm.scopeTypeCd) && (
+            <div className="md:col-span-2">
+              <Select
+                label="scopeId"
+                required
+                value={assignForm.scopeId}
+                onChange={(event) =>
+                  setAssignForm((current) => ({
+                    ...current,
+                    scopeId: event.target.value,
+                  }))
+                }
+                options={[
+                  {
+                    value: '',
+                    label: scopeOptionsLoading
+                      ? '옵션을 불러오는 중'
+                      : '연결 대상 선택',
+                  },
+                  ...currentScopeOptions.map((option) => ({
+                    value: option.scopeId,
+                    label: option.label,
+                  })),
+                ]}
+              />
+              {scopeOptionsError && (
+                <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                  {scopeOptionsError}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between gap-3">
@@ -1429,6 +1811,55 @@ export default function AdminRolesPage() {
           )}
         </form>
       </Modal>
+
+      <Modal
+        open={confirmAction !== null}
+        title={confirmAction?.title}
+        description={confirmAction?.description}
+        variant={confirmAction?.variant ?? 'confirm'}
+        onClose={() => {
+          if (
+            roleSubmitting ||
+            deleteSubmitting ||
+            assignSubmitting ||
+            permissionUpdatingId
+          ) {
+            return;
+          }
+
+          setConfirmAction(null);
+        }}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              disabled={
+                roleSubmitting ||
+                deleteSubmitting ||
+                assignSubmitting ||
+                Boolean(permissionUpdatingId)
+              }
+              onClick={() => setConfirmAction(null)}
+            >
+              취소
+            </Button>
+            <Button
+              variant={
+                confirmAction?.variant === 'danger' ? 'danger' : 'primary'
+              }
+              loading={
+                roleSubmitting ||
+                deleteSubmitting ||
+                assignSubmitting ||
+                Boolean(permissionUpdatingId)
+              }
+              onClick={() => void runConfirmedAction()}
+            >
+              {confirmAction?.confirmText ?? '확인'}
+            </Button>
+          </>
+        }
+      />
     </section>
   );
 }

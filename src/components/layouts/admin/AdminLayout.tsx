@@ -25,7 +25,7 @@ import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
 import type { AdminAccessResponse } from '../../../types/admin';
-import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesContext';
+import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesHooks';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;

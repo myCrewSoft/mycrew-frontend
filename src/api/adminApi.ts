@@ -12,6 +12,7 @@ import type {
   RoleListResponse,
   RoleRevokeRequest,
   RoleUpdateRequest,
+  ScopeOptionResponse,
 } from '../types/admin';
 import type {
   AdminEmployeeDetail,
@@ -59,6 +60,21 @@ export const adminApi = {
       `/api/admin/permissions/${permissionId}/status`,
       request,
     );
+  },
+  getDepartmentScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/departments/scope-options');
+  },
+  getProjectScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/projects/scope-options');
+  },
+  getTaskScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/tasks/scope-options');
   },
   getRoles: (): Promise<AxiosResponse<ApiResponse<RoleListResponse[]>>> => {
     return axiosInstance.get('/api/admin/roles');

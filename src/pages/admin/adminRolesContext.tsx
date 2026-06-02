@@ -1,29 +1,10 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import type { RoleListResponse } from '../../types/admin';
-
-interface AdminRolesContextValue {
-  roles: RoleListResponse[];
-  rolesLoading: boolean;
-  rolesError: ApiError | null;
-  selectedRoleId: number | null;
-  isPermissionsView: boolean;
-  selectRole: (roleId: number) => void;
-  selectPermissionsView: () => void;
-  reloadRoles: () => void;
-}
-
-const AdminRolesContext = createContext<AdminRolesContextValue | null>(null);
+import { AdminRolesContext } from './adminRolesHooks';
 
 const toApiError = (err: unknown) =>
   err instanceof ApiError
@@ -138,15 +119,3 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
     </AdminRolesContext.Provider>
   );
 }
-
-export const useAdminRoles = () => {
-  const context = useContext(AdminRolesContext);
-
-  if (!context) {
-    throw new Error('useAdminRoles must be used inside AdminRolesProvider.');
-  }
-
-  return context;
-};
-
-export const useOptionalAdminRoles = () => useContext(AdminRolesContext);
