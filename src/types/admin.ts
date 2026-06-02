@@ -81,3 +81,35 @@ export interface RoleRevokeRequest {
   scopeTypeCd?: RoleScopeType | null;
   scopeId?: string | null;
 }
+
+export interface RankResponse {
+  rankId: string;
+  rankName: string;
+  sortOrder: number;
+  enabled: 'Y' | 'N';
+  assignedEmployeeCount?: number;
+}
+
+export interface RankCreateRequest {
+  rankId: string;
+  rankName: string;
+  sortOrder: number;
+}
+
+export interface RankUpdateRequest {
+  rankName: string;
+  sortOrder: number;
+  enabled?: 'Y' | 'N';
+}
+
+export interface RankDeleteRequest {
+  replacementRankId?: string | null;
+}
+
+export interface RankAssignRequest {
+  empIds: number[];
+}
+
+export interface RankRevokeRequest {
+  empIds: number[];
+}

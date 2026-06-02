@@ -8,7 +8,9 @@ import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import AdminEmployeesPage from './AdminEmployeesPage';
 import AdminPage from './AdminPage';
+import AdminRanksPage from './AdminRanksPage';
 import AdminRolesPage from './AdminRolesPage';
+import { AdminRanksProvider } from './adminRanksContext';
 import { AdminRolesProvider } from './adminRolesContext';
 import type { AdminAccessResponse } from '../../types/admin';
 
@@ -122,6 +124,16 @@ export default function AdminAccessGate() {
           <AdminRolesPage />
         </AdminLayout>
       </AdminRolesProvider>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/ranks')) {
+    return (
+      <AdminRanksProvider>
+        <AdminLayout access={access}>
+          <AdminRanksPage />
+        </AdminLayout>
+      </AdminRanksProvider>
     );
   }
 
