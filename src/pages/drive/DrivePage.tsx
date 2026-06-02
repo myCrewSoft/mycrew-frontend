@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, Upload, FolderPlus, ChevronDown } from 'lucide-react'
+import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, Upload, FolderPlus } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Checkbox from '../../components/common/form/checkbox/Checkbox'

@@ -1,7 +1,19 @@
 import type { AxiosResponse } from 'axios';
 import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
-import type { AdminAccessResponse } from '../types/admin';
+import type {
+  AdminAccessResponse,
+  PermissionResponse,
+  PermissionStatusUpdateRequest,
+  RoleAssignRequest,
+  RoleCreateRequest,
+  RoleDeleteRequest,
+  RoleDetailResponse,
+  RoleListResponse,
+  RoleRevokeRequest,
+  RoleUpdateRequest,
+  ScopeOptionResponse,
+} from '../types/admin';
 import type {
   AdminEmployeeDetail,
   AdminEmployeeListItem,
@@ -34,5 +46,75 @@ export const adminApi = {
     request: AdminEmployeeStatusUpdateRequest,
   ): Promise<AxiosResponse<ApiResponse<string>>> => {
     return axiosInstance.put(`/api/admin/members/${empId}/status`, request);
+  },
+  getPermissions: (): Promise<
+    AxiosResponse<ApiResponse<PermissionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/permissions');
+  },
+  updatePermissionStatus: (
+    permissionId: number,
+    request: PermissionStatusUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<PermissionResponse>>> => {
+    return axiosInstance.put(
+      `/api/admin/permissions/${permissionId}/status`,
+      request,
+    );
+  },
+  getDepartmentScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/departments/scope-options');
+  },
+  getProjectScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/projects/scope-options');
+  },
+  getTaskScopeOptions: (): Promise<
+    AxiosResponse<ApiResponse<ScopeOptionResponse[]>>
+  > => {
+    return axiosInstance.get('/api/admin/tasks/scope-options');
+  },
+  getRoles: (): Promise<AxiosResponse<ApiResponse<RoleListResponse[]>>> => {
+    return axiosInstance.get('/api/admin/roles');
+  },
+  getRoleDetail: (
+    roleId: number,
+  ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
+    return axiosInstance.get(`/api/admin/roles/${roleId}`);
+  },
+  createRole: (
+    request: RoleCreateRequest,
+  ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
+    return axiosInstance.post('/api/admin/roles', request);
+  },
+  updateRole: (
+    roleId: number,
+    request: RoleUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
+    return axiosInstance.put(`/api/admin/roles/${roleId}`, request);
+  },
+  deleteRole: (
+    roleId: number,
+    request: RoleDeleteRequest,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.delete(`/api/admin/roles/${roleId}`, {
+      data: request,
+    });
+  },
+  assignRole: (
+    roleId: number,
+    request: RoleAssignRequest,
+  ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
+    return axiosInstance.post(`/api/admin/roles/${roleId}/assignments`, request);
+  },
+  revokeRole: (
+    roleId: number,
+    request: RoleRevokeRequest,
+  ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
+    return axiosInstance.delete(`/api/admin/roles/${roleId}/assignments`, {
+      data: request,
+    });
   },
 };
