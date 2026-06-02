@@ -9,7 +9,7 @@ import DatePickerField from '../../components/common/form/datePicker/DatePickerF
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Textarea from '../../components/common/form/textarea/Textarea'
-import { useToast } from '../../components/common/toast/ToastProvider'
+import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
 import type { ScheduleRequestDto } from '../../types'
 import {
