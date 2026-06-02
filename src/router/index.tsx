@@ -40,8 +40,8 @@ export const router = createBrowserRouter([
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
-      ...meetingRoutes
-      ...driveRoutes,
+      ...meetingRoutes,
+      ...driveRoutes
     ],
   },
   {
