@@ -5,6 +5,12 @@ import type {
   AdminAccessResponse,
   PermissionResponse,
   PermissionStatusUpdateRequest,
+  RankAssignRequest,
+  RankCreateRequest,
+  RankDeleteRequest,
+  RankResponse,
+  RankRevokeRequest,
+  RankUpdateRequest,
   RoleAssignRequest,
   RoleCreateRequest,
   RoleDeleteRequest,
@@ -114,6 +120,45 @@ export const adminApi = {
     request: RoleRevokeRequest,
   ): Promise<AxiosResponse<ApiResponse<RoleDetailResponse>>> => {
     return axiosInstance.delete(`/api/admin/roles/${roleId}/assignments`, {
+      data: request,
+    });
+  },
+  getRanks: (): Promise<AxiosResponse<ApiResponse<RankResponse[]>>> => {
+    return axiosInstance.get('/api/admin/ranks');
+  },
+  createRank: (
+    request: RankCreateRequest,
+  ): Promise<AxiosResponse<ApiResponse<RankResponse>>> => {
+    return axiosInstance.post('/api/admin/ranks', request);
+  },
+  updateRank: (
+    rankId: string,
+    request: RankUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<RankResponse>>> => {
+    return axiosInstance.put(`/api/admin/ranks/${rankId}`, request);
+  },
+  deleteRank: (
+    rankId: string,
+    request: RankDeleteRequest,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.delete(`/api/admin/ranks/${rankId}`, {
+      data: request,
+    });
+  },
+  assignRank: (
+    rankId: string,
+    request: RankAssignRequest,
+  ): Promise<AxiosResponse<ApiResponse<RankResponse>>> => {
+    return axiosInstance.post(
+      `/api/admin/ranks/${rankId}/assignments`,
+      request,
+    );
+  },
+  revokeRank: (
+    rankId: string,
+    request: RankRevokeRequest,
+  ): Promise<AxiosResponse<ApiResponse<RankResponse>>> => {
+    return axiosInstance.delete(`/api/admin/ranks/${rankId}/assignments`, {
       data: request,
     });
   },
