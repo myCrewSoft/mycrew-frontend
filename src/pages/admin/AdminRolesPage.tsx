@@ -1413,7 +1413,7 @@ export default function AdminRolesPage() {
                     },
                     {
                       key: 'position',
-                      header: '직위/직급',
+                      header: '직급',
                       render: (employee) => getEmployeePosition(employee),
                     },
                     {
