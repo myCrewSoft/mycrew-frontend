@@ -17,7 +17,9 @@ interface AdminRolesContextValue {
   rolesLoading: boolean;
   rolesError: ApiError | null;
   selectedRoleId: number | null;
+  isPermissionsView: boolean;
   selectRole: (roleId: number) => void;
+  selectPermissionsView: () => void;
   reloadRoles: () => void;
 }
 
@@ -37,6 +39,7 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedRoleId = readRoleId(searchParams.get('roleId'));
+  const isPermissionsView = searchParams.get('view') === 'permissions';
   const [roles, setRoles] = useState<RoleListResponse[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState<ApiError | null>(null);
@@ -48,6 +51,10 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
     },
     [navigate],
   );
+
+  const selectPermissionsView = useCallback(() => {
+    navigate('/admin/roles?view=permissions');
+  }, [navigate]);
 
   const reloadRoles = useCallback(() => {
     setReloadKey((current) => current + 1);
@@ -74,7 +81,7 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
           (role) => role.roleId === selectedRoleId,
         );
 
-        if (nextRoles.length > 0 && !hasSelectedRole) {
+        if (nextRoles.length > 0 && !hasSelectedRole && !isPermissionsView) {
           navigate(`/admin/roles?roleId=${nextRoles[0].roleId}`, {
             replace: true,
           });
@@ -100,7 +107,7 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [navigate, reloadKey, selectedRoleId]);
+  }, [isPermissionsView, navigate, reloadKey, selectedRoleId]);
 
   const value = useMemo(
     () => ({
@@ -108,10 +115,21 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
       rolesLoading,
       rolesError,
       selectedRoleId,
+      isPermissionsView,
       selectRole,
+      selectPermissionsView,
       reloadRoles,
     }),
-    [reloadRoles, roles, rolesError, rolesLoading, selectRole, selectedRoleId],
+    [
+      isPermissionsView,
+      reloadRoles,
+      roles,
+      rolesError,
+      rolesLoading,
+      selectPermissionsView,
+      selectRole,
+      selectedRoleId,
+    ],
   );
 
   return (

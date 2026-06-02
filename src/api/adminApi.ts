@@ -4,6 +4,7 @@ import type { ApiResponse } from './axiosInstance';
 import type {
   AdminAccessResponse,
   PermissionResponse,
+  PermissionStatusUpdateRequest,
   RoleAssignRequest,
   RoleCreateRequest,
   RoleDeleteRequest,
@@ -49,6 +50,15 @@ export const adminApi = {
     AxiosResponse<ApiResponse<PermissionResponse[]>>
   > => {
     return axiosInstance.get('/api/admin/permissions');
+  },
+  updatePermissionStatus: (
+    permissionId: number,
+    request: PermissionStatusUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<PermissionResponse>>> => {
+    return axiosInstance.put(
+      `/api/admin/permissions/${permissionId}/status`,
+      request,
+    );
   },
   getRoles: (): Promise<AxiosResponse<ApiResponse<RoleListResponse[]>>> => {
     return axiosInstance.get('/api/admin/roles');

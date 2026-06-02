@@ -13,6 +13,10 @@ export interface PermissionResponse {
   enabled: 'Y' | 'N';
 }
 
+export interface PermissionStatusUpdateRequest {
+  enabled: 'Y' | 'N';
+}
+
 export interface RoleListResponse {
   roleId: number;
   roleCode: string;

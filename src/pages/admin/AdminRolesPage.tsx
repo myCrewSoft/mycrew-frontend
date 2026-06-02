@@ -128,12 +128,19 @@ export default function AdminRolesPage() {
     rolesLoading,
     rolesError,
     selectedRoleId,
+    isPermissionsView,
     selectRole,
     reloadRoles,
   } = useAdminRoles();
   const [permissions, setPermissions] = useState<PermissionResponse[]>([]);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [permissionsError, setPermissionsError] = useState<string | null>(null);
+  const [permissionUpdatingId, setPermissionUpdatingId] = useState<
+    number | null
+  >(null);
+  const [permissionStatusError, setPermissionStatusError] = useState<
+    string | null
+  >(null);
   const [roleDetail, setRoleDetail] = useState<RoleDetailResponse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -214,37 +221,24 @@ export default function AdminRolesPage() {
     }
   }, [selectedRoleId]);
 
-  useEffect(() => {
-    let active = true;
+  const fetchPermissions = useCallback(async () => {
+    setPermissionsLoading(true);
+    setPermissionsError(null);
 
-    const loadPermissions = async () => {
-      setPermissionsLoading(true);
-      setPermissionsError(null);
-
-      try {
-        const response = await adminApi.getPermissions();
-
-        if (active) {
-          setPermissions(response.data.data ?? []);
-        }
-      } catch (err) {
-        if (active) {
-          setPermissions([]);
-          setPermissionsError(getErrorMessage(err));
-        }
-      } finally {
-        if (active) {
-          setPermissionsLoading(false);
-        }
-      }
-    };
-
-    void loadPermissions();
-
-    return () => {
-      active = false;
-    };
+    try {
+      const response = await adminApi.getPermissions();
+      setPermissions(response.data.data ?? []);
+    } catch (err) {
+      setPermissions([]);
+      setPermissionsError(getErrorMessage(err));
+    } finally {
+      setPermissionsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchPermissions();
+  }, [fetchPermissions]);
 
   useEffect(() => {
     void fetchSelectedRoleDetail();
@@ -584,6 +578,48 @@ export default function AdminRolesPage() {
     setSubmittedEmployeeKeyword(employeeKeyword.trim());
   };
 
+  const updatePermissionStatus = async (
+    permission: PermissionResponse,
+    enabled: 'Y' | 'N',
+  ) => {
+    setPermissionUpdatingId(permission.permissionId);
+    setPermissionStatusError(null);
+
+    try {
+      const response = await adminApi.updatePermissionStatus(
+        permission.permissionId,
+        { enabled },
+      );
+      const updatedPermission = response.data.data;
+
+      if (updatedPermission) {
+        setPermissions((current) =>
+          current.map((item) =>
+            item.permissionId === updatedPermission.permissionId
+              ? updatedPermission
+              : item,
+          ),
+        );
+        setRoleDetail((current) =>
+          current
+            ? {
+                ...current,
+                permissions: current.permissions.map((item) =>
+                  item.permissionId === updatedPermission.permissionId
+                    ? updatedPermission
+                    : item,
+                ),
+              }
+            : current,
+        );
+      }
+    } catch (err) {
+      setPermissionStatusError(getErrorMessage(err));
+    } finally {
+      setPermissionUpdatingId(null);
+    }
+  };
+
   const replacementOptions = roles.filter(
     (role) => role.roleId !== roleDetail?.roleId,
   );
@@ -623,7 +659,109 @@ export default function AdminRolesPage() {
         </div>
       </div>
 
-      {rolesError ? (
+      {isPermissionsView ? (
+        <ContentCard
+          title="전체 권한"
+          description="시스템에서 제공하는 모든 권한과 사용 여부를 관리합니다."
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<RefreshCw size={15} />}
+              loading={permissionsLoading}
+              onClick={() => void fetchPermissions()}
+            >
+              새로고침
+            </Button>
+          }
+        >
+          {permissionStatusError && (
+            <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+              {permissionStatusError}
+            </p>
+          )}
+          {permissionsError ? (
+            <EmptyState
+              title="권한 목록을 불러오지 못했습니다."
+              description={permissionsError}
+              actions={
+                <Button variant="outline" onClick={() => void fetchPermissions()}>
+                  다시 시도
+                </Button>
+              }
+            />
+          ) : (
+            <DataTable
+              data={permissions}
+              getRowKey={(permission) => String(permission.permissionId)}
+              emptyText={
+                permissionsLoading
+                  ? '권한 목록을 불러오는 중입니다.'
+                  : '등록된 권한이 없습니다.'
+              }
+              columns={[
+                {
+                  key: 'permission',
+                  header: '권한',
+                  render: (permission) => (
+                    <div>
+                      <div className="font-bold text-slate-950">
+                        {permission.permissionName}
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-400">
+                        {permission.permissionCode}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'description',
+                  header: '설명',
+                  render: (permission) =>
+                    formatCode(permission.description, '-'),
+                },
+                {
+                  key: 'enabled',
+                  header: '사용 여부',
+                  render: (permission) => (
+                    <Badge
+                      variant={
+                        permission.enabled === 'Y' ? 'success' : 'neutral'
+                      }
+                    >
+                      {permission.enabled === 'Y' ? '사용' : '비활성'}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: '관리',
+                  className: 'text-right',
+                  render: (permission) => {
+                    const nextEnabled =
+                      permission.enabled === 'Y' ? 'N' : 'Y';
+
+                    return (
+                      <Button
+                        variant={
+                          permission.enabled === 'Y' ? 'outline' : 'primary'
+                        }
+                        size="sm"
+                        loading={permissionUpdatingId === permission.permissionId}
+                        onClick={() =>
+                          void updatePermissionStatus(permission, nextEnabled)
+                        }
+                      >
+                        {permission.enabled === 'Y' ? '비활성화' : '사용'}
+                      </Button>
+                    );
+                  },
+                },
+              ]}
+            />
+          )}
+        </ContentCard>
+      ) : rolesError ? (
         <EmptyState
           title="역할 목록을 불러오지 못했습니다."
           description={rolesError.message}
@@ -742,7 +880,7 @@ export default function AdminRolesPage() {
                       {roleDetail.permissions.length}개
                     </Badge>
                   </div>
-                  <div className="mt-4 flex flex-col gap-2">
+                  <div className="mt-4 flex max-h-96 flex-col gap-2 overflow-y-auto pr-1">
                     {roleDetail.permissions.length > 0 ? (
                       roleDetail.permissions.map((permission) => (
                         <div

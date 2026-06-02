@@ -219,6 +219,25 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
               <p className="text-xs font-black text-slate-500">권한 메뉴</p>
 
               <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                <button
+                  type="button"
+                  onClick={adminRoles.selectPermissionsView}
+                  className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+                    adminRoles.isPermissionsView
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-800 hover:bg-white'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {adminRoles.isPermissionsView ? (
+                      <CheckCircle2 size={17} />
+                    ) : (
+                      <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+                    )}
+                    <span className="truncate">전체 권한</span>
+                  </span>
+                </button>
+
                 {adminRoles.rolesLoading ? (
                   <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
                     역할을 불러오는 중
@@ -229,7 +248,9 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
                   </div>
                 ) : adminRoles.roles.length > 0 ? (
                   adminRoles.roles.map((role) => {
-                    const active = adminRoles.selectedRoleId === role.roleId;
+                    const active =
+                      !adminRoles.isPermissionsView &&
+                      adminRoles.selectedRoleId === role.roleId;
 
                     return (
                       <button
