@@ -8,6 +8,8 @@ import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import AdminEmployeesPage from './AdminEmployeesPage';
 import AdminPage from './AdminPage';
+import AdminRolesPage from './AdminRolesPage';
+import { AdminRolesProvider } from './adminRolesContext';
 import type { AdminAccessResponse } from '../../types/admin';
 
 export default function AdminAccessGate() {
@@ -111,6 +113,16 @@ export default function AdminAccessGate() {
 
   if (!access) {
     return null;
+  }
+
+  if (location.pathname.startsWith('/admin/roles')) {
+    return (
+      <AdminRolesProvider>
+        <AdminLayout access={access}>
+          <AdminRolesPage />
+        </AdminLayout>
+      </AdminRolesProvider>
+    );
   }
 
   return (

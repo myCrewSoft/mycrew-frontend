@@ -25,6 +25,7 @@ import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
 import type { AdminAccessResponse } from '../../../types/admin';
+import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesContext';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;
@@ -65,7 +66,9 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isEmployeesPage = location.pathname.startsWith('/admin/users');
+  const isRolesPage = location.pathname.startsWith('/admin/roles');
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
+  const adminRoles = useOptionalAdminRoles();
 
   const handleLogout = async () => {
     try {
@@ -78,6 +81,10 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
 
   const openEmployeeRegister = () => {
     window.dispatchEvent(new Event('admin:open-employee-register'));
+  };
+
+  const openRoleCreate = () => {
+    window.dispatchEvent(new Event('admin:open-role-create'));
   };
 
   return (
@@ -189,6 +196,77 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
                     </Link>
                   );
                 })}
+              </div>
+            </div>
+          </>
+        ) : isRolesPage && adminRoles ? (
+          <>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+              권한
+            </h2>
+
+            <Button
+              variant="primary"
+              leftIcon={<PlusCircle size={16} />}
+              onClick={openRoleCreate}
+              className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+              fullWidth
+            >
+              역할 생성
+            </Button>
+
+            <div className="mt-9 flex min-h-0 flex-1 flex-col gap-3">
+              <p className="text-xs font-black text-slate-500">권한 메뉴</p>
+
+              <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                {adminRoles.rolesLoading ? (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    역할을 불러오는 중
+                  </div>
+                ) : adminRoles.rolesError ? (
+                  <div className="rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600">
+                    {adminRoles.rolesError.message}
+                  </div>
+                ) : adminRoles.roles.length > 0 ? (
+                  adminRoles.roles.map((role) => {
+                    const active = adminRoles.selectedRoleId === role.roleId;
+
+                    return (
+                      <button
+                        key={role.roleId}
+                        type="button"
+                        onClick={() => adminRoles.selectRole(role.roleId)}
+                        className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+                          active
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-800 hover:bg-white'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          {active ? (
+                            <CheckCircle2 size={17} />
+                          ) : (
+                            <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+                          )}
+                          <span className="truncate">{role.roleName}</span>
+                        </span>
+                        <span
+                          className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
+                            active
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {role.assignedEmployeeCount}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    등록된 역할이 없습니다.
+                  </div>
+                )}
               </div>
             </div>
           </>
