@@ -7,7 +7,6 @@ import {
   FolderKanban,
   Globe2,
   Trash2,
-  UserRound,
   Users,
 } from 'lucide-react'
 import { ApiError } from '../../api/axiosInstance'
@@ -75,6 +74,12 @@ const formatDate = (value?: string) => {
     day: 'numeric',
     weekday: 'short',
   }).format(date)
+}
+
+const hasUsableProfileImageUrl = (profileImageUrl?: string) => {
+  if (!profileImageUrl) return false
+  const normalizedUrl = profileImageUrl.trim().toLowerCase()
+  return normalizedUrl !== 'null' && normalizedUrl !== 'undefined'
 }
 
 const formatDateTime = (value?: string) => {
@@ -430,17 +435,18 @@ const CalendarScheduleDetailModal = ({
                           key={`${target.targetTypeCd}-${target.targetId}`}
                           className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
                         >
-                          {target.profileImgUrl ? (
-                            <img
-                              src={target.profileImgUrl}
-                              alt=""
-                              className="h-8 w-8 shrink-0 rounded-full object-cover"
-                            />
-                          ) : (
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                              <UserRound size={15} />
-                            </span>
-                          )}
+                          <img
+                            src={
+                              hasUsableProfileImageUrl(target.profileImgUrl)
+                                ? target.profileImgUrl
+                                : '/avatar-default.svg'
+                            }
+                            alt=""
+                            className="h-8 w-8 shrink-0 rounded-full object-cover"
+                            onError={(event) => {
+                              event.currentTarget.src = '/avatar-default.svg'
+                            }}
+                          />
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-bold text-slate-800">
                               {getTargetName(target)}
