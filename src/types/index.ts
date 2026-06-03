@@ -20,3 +20,9 @@ export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequ
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = 
                 components['schemas']['ScheduleTargetResponseDto'];
+// 사원 검색
+export type EmployeeLookupRequest = components['schemas']['EmployeeLookupRequest'];
+export type EmployeeLookupResponse = components['schemas']['EmployeeLookupResponse'];
+
+// 부서 필터
+export type DepartmentLookupResponse = components['schemas']['DepartmentLookupResponse'];
