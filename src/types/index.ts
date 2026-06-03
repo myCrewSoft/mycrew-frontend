@@ -19,4 +19,9 @@ export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = 
-                components['schemas']['ScheduleTargetResponseDto'];
+components['schemas']['ScheduleTargetResponseDto'];
+// 메신저
+export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
+export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type ChatRoomResponse = components['schemas']['ChatRoomResponse'];
+

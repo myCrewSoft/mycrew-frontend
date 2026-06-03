@@ -9,8 +9,8 @@ export const useMessengerData = () => {
   // 화면을 열 때, 채팅방을 선택할 때처럼 원하는 시점에 execute 함수를 호출할 수 있습니다.
   const roomsApi = useApi(messengerApi.getChats, { immediate: false })
   const messagesApi = useApi(messengerApi.getMessages, { immediate: false })
-  const membersApi = useApi(messengerApi.searchMembers, { immediate: false })
   const createChatApi = useApi(messengerApi.createChat, { immediate: false })
+  const markAsReadApi = useApi(messengerApi.markAsRead, { immediate: false })
 
   const createChat = (payload: CreateChatRoomRequestDto) =>
     createChatApi.execute(payload)
@@ -19,20 +19,19 @@ export const useMessengerData = () => {
     // 백엔드 DTO가 프론트 화면 필드에 맞춰 내려온다는 전제이므로 별도 mapper 없이 그대로 사용합니다.
     rooms: roomsApi.data ?? null,
     messages: messagesApi.data ?? null,
-    members: membersApi.data ?? null,
     loadRooms: roomsApi.execute,
     loadMessages: messagesApi.execute,
-    searchMembers: membersApi.execute,
+    markAsRead: markAsReadApi.execute,
     createChat,
     loading:
       roomsApi.loading ||
       messagesApi.loading ||
-      membersApi.loading ||
-      createChatApi.loading,
+      createChatApi.loading ||
+      markAsReadApi.loading,
     error:
       roomsApi.error ??
       messagesApi.error ??
-      membersApi.error ??
-      createChatApi.error,
+      createChatApi.error ??
+      markAsReadApi.error,
   }
 }
