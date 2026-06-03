@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from './Header'
+import { MessengerSocketProvider } from './headerPopover/messenger/MessengerSocketProvider'
 import MainSidebar from './sidebar/MainSidebar'
 import SubSidebar from './sidebar/SubSidebar'
 
@@ -8,23 +9,25 @@ export default function MainLayout() {
   const [isSubOpen, setIsSubOpen] = useState(true)
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50">
-      <MainSidebar />
+    <MessengerSocketProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-slate-50">
+        <MainSidebar />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Header />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Header />
 
-        <div className="flex min-h-0 flex-1">
-          <SubSidebar
-            isOpen={isSubOpen}
-            onToggle={() => setIsSubOpen((current) => !current)}
-          />
+          <div className="flex min-h-0 flex-1">
+            <SubSidebar
+              isOpen={isSubOpen}
+              onToggle={() => setIsSubOpen((current) => !current)}
+            />
 
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6">
-            <Outlet />
-          </main>
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6">
+              <Outlet />
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </MessengerSocketProvider>
   )
 }
