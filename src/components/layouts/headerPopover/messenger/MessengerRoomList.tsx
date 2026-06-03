@@ -2,7 +2,7 @@ import { PencilLine } from 'lucide-react'
 import Badge from '../../../common/dataDisplay/badge/Badge'
 import SearchInput from '../../../common/form/searchInput/SearchInput'
 import type { ChatRoom, ChatTab } from './messenger.types'
-import { getRoomListDepartment, statusDotClassName } from './messenger.utils'
+import { getRoomListDepartment, getStatusDotClassName } from './messenger.utils'
 
 // 왼쪽 목록 상단에 표시할 탭입니다.
 // '전체'는 필터 없이 모두 보여주고, '그룹'과 '프로젝트'는 채팅방 type으로 필터링합니다.
@@ -85,7 +85,7 @@ const MessengerRoomList = ({
                 {/* status 값이 있을 때 프로필 오른쪽 아래에 작은 상태 점을 보여줍니다. */}
                 {room.status && (
                   <span
-                    className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${statusDotClassName[room.status]}`}
+                    className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${getStatusDotClassName(room.status)}`}
                   />
                 )}
               </div>
