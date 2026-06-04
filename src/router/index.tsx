@@ -8,6 +8,7 @@ import FirstLoginPage from '../pages/auth/FirstLoginPage';
 import LoginPage from '../pages/auth/LoginPage';
 import CalendarPage from '../pages/calendar/CalendarPage';
 import { CalendarProvider } from '../pages/calendar/CalendarProvider';
+import DashboardPage from '../pages/dashboard/DashboardPage';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
@@ -37,6 +38,7 @@ export const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
+      { path: '/dashboard', element: <DashboardPage /> },
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
