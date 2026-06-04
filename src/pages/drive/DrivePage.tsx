@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, Upload, FolderPlus, ChevronDown } from 'lucide-react'
+import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, Upload, FolderPlus } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Checkbox from '../../components/common/form/checkbox/Checkbox'
@@ -12,7 +12,8 @@ import { useApiList, useApi } from '../../hooks/useApi'
 import { driveApi } from '../../api/driveApi'
 import type { DriveResponseDto } from '../../types/drive.dto'
 
-// ─── 파일 아이콘 ────────────────────────────────────────────────────────────
+
+//아이콘
 const FileIcon = ({ item }: { item: DriveResponseDto }) => {
   if (item.itemTypeCd === '01') {
     return <Folder size={20} className="text-amber-400" />
