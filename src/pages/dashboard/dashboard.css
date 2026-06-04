@@ -1,0 +1,38 @@
+.dashboard-page .react-grid-item {
+  transition: transform 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.dashboard-page .react-grid-item.react-grid-placeholder {
+  border-radius: 8px;
+  background: #38bdf8;
+  opacity: 0.18;
+}
+
+.dashboard-page .react-resizable-handle {
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.dashboard-page .react-grid-item:hover .react-resizable-handle,
+.dashboard-page.dashboard-editing .react-resizable-handle {
+  opacity: 1;
+}
+
+.dashboard-widget-card {
+  overflow: hidden;
+}
+
+.dashboard-editing .dashboard-widget-card {
+  cursor: grab;
+  outline: 1px dashed #cbd5e1;
+  outline-offset: -1px;
+}
+
+.dashboard-editing .react-draggable-dragging .dashboard-widget-card {
+  cursor: grabbing;
+}
+
+.dashboard-widget-action,
+.dashboard-widget-action * {
+  cursor: pointer;
+}
