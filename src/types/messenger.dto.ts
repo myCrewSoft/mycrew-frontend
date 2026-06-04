@@ -11,8 +11,12 @@ export interface ChatMessageRequestDto {
   content: string
 }
 
-export type ChatMessageResponseDto =
-  components['schemas']['ChatMessageResponse']
+export type ChatMessageResponseDto = components['schemas']['ChatMessageResponse']
 
-export type ChatRoomResponseDto =
-  components['schemas']['ChatRoomResponse']
+export type ChatRoomResponseDto = components['schemas']['ChatRoomResponse']
+
+export interface CreateChatRoomRequestDto {
+  chatName?: string;
+  chatDescription?: string;
+  participantIds: number[];
+}

@@ -1,5 +1,5 @@
-// 메신저 탭에서 사용할 수 있는 값만 모아둔 타입입니다.
-// 문자열을 아무거나 쓰지 못하게 막아주기 때문에 오타를 TypeScript가 잡아줍니다.
+// 메신저 화면에서 탭, 방 타입, 화면 모드를 문자열 리터럴로 제한합니다.
+// 오타가 나면 TypeScript가 바로 알려주기 때문에 조건 분기와 props 전달이 안전해집니다.
 export type ChatTab = 'all' | 'group' | 'project'
 
 // 실제 채팅방 종류입니다.
@@ -10,10 +10,8 @@ export type ChatRoomType = string
 // 백엔드는 STS1~STS4 같은 상태 코드값을 내려줄 수 있습니다.
 export type ChatStatus = string
 
-// 오른쪽 영역이 기존 채팅 화면인지, 새 대화 생성 화면인지 구분합니다.
 export type MessengerViewMode = 'chat' | 'create'
 
-// 왼쪽 채팅방 목록과 오른쪽 채팅방 헤더에서 사용하는 채팅방 데이터 모양입니다.
 export interface ChatRoom {
   id: number
   name: string
@@ -28,7 +26,6 @@ export interface ChatRoom {
   department?: string
 }
 
-// 오른쪽 대화 영역에서 말풍선 1개를 표현할 때 사용하는 데이터 모양입니다.
 export interface ChatMessage {
   id: number
   senderId: number
@@ -38,12 +35,4 @@ export interface ChatMessage {
   mine: boolean
   read?: boolean
   unreadCount?: number
-}
-
-// 새 대화 생성 폼에서 선택할 수 있는 구성원 데이터 모양입니다.
-export interface ChatMember {
-  id: number
-  name: string
-  department: string
-  jobTitle: string
 }

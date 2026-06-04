@@ -1,5 +1,11 @@
 import { X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { departmentApi } from '../../../api/departmentApi'
+import { employeeApi } from '../../../api/employeeApi'
+import type { EmployeeLookupParams } from '../../../api/employeeApi'
+import { useApi } from '../../../hooks/useApi'
+import SearchInput from '../form/searchInput/SearchInput'
+import Select from '../form/select/Select'
 
 export type EmployeeSearchVariant = 'detailed' | 'compact'
 
@@ -8,80 +14,280 @@ export interface EmployeeSearchItem {
   name: string
   department: string
   position: string
+  profileImageUrl?: string | null
+  genderCd?: string | null
   avatarColor?: string
+}
+
+export interface EmployeeSearchDepartmentOption {
+  value: string
+  label: string
 }
 
 interface EmployeeSearchPickerProps {
   variant: EmployeeSearchVariant
-  employees: EmployeeSearchItem[]
+  employees?: EmployeeSearchItem[]
   selectedEmployeeIds: Array<string | number>
   onChange: (nextEmployeeIds: Array<string | number>) => void
   keyword?: string
   onKeywordChange?: (keyword: string) => void
   departments?: string[]
+  departmentOptions?: EmployeeSearchDepartmentOption[]
+  showDepartmentFilter?: boolean
+  showAllOnEmpty?: boolean
+  remoteSearch?: boolean
   emptyText?: string
 }
 
-const avatarColors = [
-  '#14b8a6',
-  '#0ea5e9',
-  '#8b5cf6',
-  '#ec4899',
-  '#f97316',
-  '#22c55e',
-]
+const containsKorean = (keyword: string) =>
+  /[\u3131-\u318e\uac00-\ud7a3]/.test(keyword)
 
-const getAvatarColor = (employee: EmployeeSearchItem, index: number) =>
-  employee.avatarColor ?? avatarColors[index % avatarColors.length]
+const canSearchByKeyword = (keyword: string) =>
+  Boolean(keyword) && (containsKorean(keyword) || keyword.length >= 2)
+
+const getEmployeeIdKey = (id: string | number) => String(id)
+
+const hasUsableProfileImageUrl = (profileImageUrl?: string | null) => {
+  if (!profileImageUrl) return false
+  const normalizedUrl = profileImageUrl.trim().toLowerCase()
+  return normalizedUrl !== 'null' && normalizedUrl !== 'undefined'
+}
+
+const EmployeeAvatar = ({
+  employee,
+  size = 'md',
+}: {
+  employee: EmployeeSearchItem
+  index?: number
+  size?: 'sm' | 'md'
+}) => {
+  const [imageFailed, setImageFailed] = useState(false)
+  const sizeClassName = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10'
+  const src =
+    hasUsableProfileImageUrl(employee.profileImageUrl) && !imageFailed
+      ? employee.profileImageUrl
+      : '/avatar-default.svg'
+
+  return (
+    <img
+      src={src}
+      alt={employee.name}
+      className={`${sizeClassName} shrink-0 rounded-full object-cover`}
+      onError={() => setImageFailed(true)}
+    />
+  )
+}
+
+const EmployeeResultRow = ({
+  employee,
+  selected,
+  onToggle,
+}: {
+  employee: EmployeeSearchItem
+  selected: boolean
+  onToggle: () => void
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+    >
+      <EmployeeAvatar employee={employee} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-slate-900">
+          {employee.name}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">
+          {employee.position}
+        </span>
+      </span>
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+          selected
+            ? 'border-blue-500 bg-blue-500'
+            : 'border-slate-300 bg-white'
+        }`}
+        aria-hidden="true"
+      />
+    </button>
+  )
+}
 
 const EmployeeSearchPicker = ({
   variant,
-  employees,
+  employees = [],
   selectedEmployeeIds,
   onChange,
   keyword,
   onKeywordChange,
   departments = [],
+  departmentOptions = [],
+  showDepartmentFilter = false,
+  showAllOnEmpty = false,
+  remoteSearch = false,
   emptyText = '검색 결과가 없습니다.',
 }: EmployeeSearchPickerProps) => {
-  // keyword를 props로 받으면 부모가 검색어를 관리하고, 없으면 이 컴포넌트가 직접 관리합니다.
   const [internalKeyword, setInternalKeyword] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedEmployeeCache, setSelectedEmployeeCache] = useState<
+    EmployeeSearchItem[]
+  >([])
 
   const currentKeyword = keyword ?? internalKeyword
-  const isDetailed = variant === 'detailed'
+  const trimmedKeyword = currentKeyword.trim()
+  const canSearchCurrentKeyword = canSearchByKeyword(trimmedKeyword)
+  const remoteDeptCd =
+    remoteSearch && selectedDepartment !== 'all' ? selectedDepartment : undefined
+  const targetLabel = variant === 'detailed' ? '참석자' : '참여자'
 
-  const departmentOptions = useMemo(
-    () => ['all', ...departments.filter(Boolean)],
-    [departments],
+  const {
+    data: remoteEmployees,
+    loading: remoteLoading,
+    error: remoteError,
+    execute: lookupEmployees,
+    reset: resetLookupEmployees,
+  } = useApi<EmployeeSearchItem[], [EmployeeLookupParams]>(
+    employeeApi.lookupEmployees,
+    { immediate: false },
   )
 
-  const selectedEmployees = useMemo(
-    () =>
-      employees.filter((employee) => selectedEmployeeIds.includes(employee.id)),
-    [employees, selectedEmployeeIds],
+  const {
+    data: remoteDepartments,
+    loading: departmentsLoading,
+    execute: lookupDepartments,
+  } = useApi(departmentApi.lookupDepartments, { immediate: false })
+
+  useEffect(() => {
+    if (!remoteSearch || !showDepartmentFilter) return
+    void lookupDepartments()
+  }, [lookupDepartments, remoteSearch, showDepartmentFilter])
+
+  useEffect(() => {
+    if (!remoteSearch) return
+
+    if (!showAllOnEmpty && !canSearchCurrentKeyword && !remoteDeptCd) {
+      resetLookupEmployees()
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void lookupEmployees({
+        keyword: canSearchCurrentKeyword ? trimmedKeyword : undefined,
+        deptCd: remoteDeptCd,
+      })
+    }, 250)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    canSearchCurrentKeyword,
+    lookupEmployees,
+    remoteDeptCd,
+    remoteSearch,
+    resetLookupEmployees,
+    showAllOnEmpty,
+    trimmedKeyword,
+  ])
+
+  const uniqueDepartmentOptions = useMemo(() => {
+    const options = [
+      ...departmentOptions,
+      ...departments.filter(Boolean).map((department) => ({
+        value: department,
+        label: department,
+      })),
+      ...(remoteDepartments ?? []).map((department) => ({
+        value: department.deptCd,
+        label: department.deptNm,
+      })),
+    ]
+
+    return options.filter(
+      (department, index) =>
+        options.findIndex((option) => option.value === department.value) ===
+        index,
+    )
+  }, [departmentOptions, departments, remoteDepartments])
+
+  const employeeOptions = useMemo(
+    () => (remoteSearch ? (remoteEmployees ?? []) : employees),
+    [employees, remoteEmployees, remoteSearch],
   )
+
+  const selectedEmployees = useMemo(() => {
+    const cache = new Map<string, EmployeeSearchItem>()
+    selectedEmployeeCache.forEach((employee) =>
+      cache.set(getEmployeeIdKey(employee.id), employee),
+    )
+    employeeOptions.forEach((employee) =>
+      cache.set(getEmployeeIdKey(employee.id), employee),
+    )
+
+    return selectedEmployeeIds
+      .map((id) => cache.get(getEmployeeIdKey(id)))
+      .filter((employee): employee is EmployeeSearchItem => Boolean(employee))
+  }, [employeeOptions, selectedEmployeeCache, selectedEmployeeIds])
 
   const visibleEmployees = useMemo(() => {
-    const trimmedKeyword = currentKeyword.trim().toLowerCase()
+    const selectedDepartmentLabel =
+      uniqueDepartmentOptions.find(
+        (department) => department.value === selectedDepartment,
+      )?.label ?? selectedDepartment
 
-    if (!trimmedKeyword && (!isDetailed || selectedDepartment === 'all')) {
+    if (remoteSearch) return employeeOptions
+
+    if (
+      !trimmedKeyword &&
+      (!showDepartmentFilter || selectedDepartment === 'all')
+    ) {
       return []
     }
 
-    return employees.filter((employee) => {
+    return employeeOptions.filter((employee) => {
       const searchText =
         `${employee.name} ${employee.department} ${employee.position}`.toLowerCase()
       const matchesKeyword =
-        !trimmedKeyword || searchText.includes(trimmedKeyword)
+        !trimmedKeyword || searchText.includes(trimmedKeyword.toLowerCase())
       const matchesDepartment =
-        !isDetailed ||
+        !showDepartmentFilter ||
         selectedDepartment === 'all' ||
-        employee.department === selectedDepartment
+        employee.department === selectedDepartmentLabel
 
       return matchesKeyword && matchesDepartment
     })
-  }, [currentKeyword, employees, isDetailed, selectedDepartment])
+  }, [
+    employeeOptions,
+    remoteSearch,
+    selectedDepartment,
+    showDepartmentFilter,
+    trimmedKeyword,
+    uniqueDepartmentOptions,
+  ])
+
+  const shouldShowResults =
+    (remoteSearch ? showAllOnEmpty || canSearchCurrentKeyword : trimmedKeyword) ||
+    (showDepartmentFilter && selectedDepartment !== 'all')
+
+  const groupedVisibleEmployees = useMemo(() => {
+    const groupMap = new Map<string, EmployeeSearchItem[]>()
+
+    visibleEmployees.forEach((employee) => {
+      const departmentName = employee.department || '미지정'
+      const departmentEmployees = groupMap.get(departmentName) ?? []
+      departmentEmployees.push(employee)
+      groupMap.set(departmentName, departmentEmployees)
+    })
+
+    return Array.from(groupMap.entries()).map(([departmentName, groupEmployees]) => ({
+      departmentName,
+      employees: groupEmployees,
+    }))
+  }, [visibleEmployees])
+
+  const isEmployeeSelected = (employeeId: string | number) =>
+    selectedEmployeeIds.some(
+      (id) => getEmployeeIdKey(id) === getEmployeeIdKey(employeeId),
+    )
 
   const handleKeywordChange = (nextKeyword: string) => {
     setInternalKeyword(nextKeyword)
@@ -89,9 +295,28 @@ const EmployeeSearchPicker = ({
   }
 
   const handleToggleEmployee = (employeeId: string | number) => {
-    const nextEmployeeIds = selectedEmployeeIds.includes(employeeId)
-      ? selectedEmployeeIds.filter((id) => id !== employeeId)
+    const employeeIdKey = getEmployeeIdKey(employeeId)
+    const selected = isEmployeeSelected(employeeId)
+    const nextEmployeeIds = selected
+      ? selectedEmployeeIds.filter((id) => getEmployeeIdKey(id) !== employeeIdKey)
       : [...selectedEmployeeIds, employeeId]
+
+    if (!selected) {
+      const selectedEmployee = employeeOptions.find(
+        (employee) => getEmployeeIdKey(employee.id) === employeeIdKey,
+      )
+
+      if (selectedEmployee) {
+        setSelectedEmployeeCache((current) => {
+          const cache = new Map<string, EmployeeSearchItem>()
+          current.forEach((employee) =>
+            cache.set(getEmployeeIdKey(employee.id), employee),
+          )
+          cache.set(getEmployeeIdKey(selectedEmployee.id), selectedEmployee)
+          return Array.from(cache.values())
+        })
+      }
+    }
 
     onChange(nextEmployeeIds)
   }
@@ -100,202 +325,195 @@ const EmployeeSearchPicker = ({
     onChange([])
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      <span className="text-sm font-semibold text-slate-700">
-        {isDetailed ? '참석자 검색' : '참여자 검색'}
-      </span>
-
-      <div
-        className={
-          isDetailed
-            ? 'rounded-2xl border border-slate-200 bg-white p-4'
-            : 'flex flex-col gap-3'
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <input
-            value={currentKeyword}
-            onChange={(event) => handleKeywordChange(event.target.value)}
-            placeholder={
-              isDetailed ? '이름으로 검색' : '이름, 부서, 직급으로 검색'
-            }
-            className={
-              isDetailed
-                ? 'h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-blue-400'
-                : 'h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none placeholder:text-slate-400 focus:border-blue-400'
-            }
-          />
-
-          {isDetailed && (
-            <select
-              value={selectedDepartment}
-              onChange={(event) => setSelectedDepartment(event.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-400"
-            >
-              {departmentOptions.map((department) => (
-                <option key={department} value={department}>
-                  {department === 'all' ? '전체 부서' : department}
-                </option>
-              ))}
-            </select>
-          )}
+  const renderStatus = () => {
+    if (remoteLoading) {
+      return (
+        <div className="px-3 py-6 text-center text-sm text-slate-400">
+          검색 중입니다.
         </div>
+      )
+    }
 
-        {!isDetailed && (
-          <div className="mt-3 flex items-center justify-between border-b border-slate-200 pb-2">
-            <p className="text-xs font-bold text-slate-700">참여자</p>
-            <span className="text-[11px] text-slate-400">
-              {selectedEmployeeIds.length}명 선택
-            </span>
-          </div>
-        )}
+    if (remoteError) {
+      return (
+        <div className="px-3 py-6 text-center text-sm text-red-400">
+          사원 검색 중 오류가 발생했습니다.
+        </div>
+      )
+    }
 
-        {(currentKeyword.trim() || (isDetailed && selectedDepartment !== 'all')) && (
-          <div
-            className={
-              isDetailed
-                ? 'mt-4 max-h-[224px] overflow-y-auto rounded-xl border border-slate-200'
-                : 'mt-3 max-h-44 overflow-y-auto rounded-lg border border-slate-200'
-            }
-          >
-            {visibleEmployees.map((employee, index) => {
-              const selected = selectedEmployeeIds.includes(employee.id)
+    if (visibleEmployees.length === 0) {
+      return (
+        <div className="px-3 py-6 text-center text-sm text-slate-400">
+          {emptyText}
+        </div>
+      )
+    }
 
-              if (!isDetailed) {
-                return (
-                  <button
-                    key={employee.id}
-                    type="button"
-                    onClick={() => handleToggleEmployee(employee.id)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
-                      selected ? 'bg-blue-50' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-bold text-slate-900">
-                        {employee.name}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        {employee.position} · {employee.department}
-                      </span>
-                    </span>
+    return null
+  }
 
-                    <span
-                      className={`h-4 w-4 rounded-full border ${
-                        selected
-                          ? 'border-blue-500 bg-blue-500'
-                          : 'border-slate-300 bg-white'
-                      }`}
-                    />
-                  </button>
-                )
-              }
+  const renderGroupedEmployeeRows = () => {
+    if (remoteLoading || remoteError || visibleEmployees.length === 0) {
+      return renderStatus()
+    }
 
-              return (
-                <label
-                  key={employee.id}
-                  className="flex h-14 cursor-pointer items-center gap-3 border-b border-slate-200 px-3 last:border-b-0 hover:bg-slate-50"
-                >
-                  <span
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                    style={{ backgroundColor: getAvatarColor(employee, index) }}
-                  >
-                    {employee.name.slice(0, 1)}
-                  </span>
-
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-slate-900">
-                      {employee.name}
-                    </span>
-                    <span className="block truncate text-xs font-medium text-slate-500">
-                      {employee.department} · {employee.position}
-                    </span>
-                  </span>
-
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() => handleToggleEmployee(employee.id)}
-                    className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </label>
-              )
-            })}
-
-            {visibleEmployees.length === 0 && (
-              <div className="px-3 py-6 text-center text-sm text-slate-400">
-                {emptyText}
-              </div>
-            )}
-          </div>
-        )}
+    return groupedVisibleEmployees.map((group) => (
+      <div key={group.departmentName} className="border-b border-slate-100 last:border-b-0">
+        <div className="px-4 pb-1 pt-4 text-xs font-bold text-slate-500">
+          {group.departmentName}
+        </div>
+        <div className="pb-2">
+          {group.employees.map((employee) => (
+            <EmployeeResultRow
+              key={employee.id}
+              employee={employee}
+              selected={isEmployeeSelected(employee.id)}
+              onToggle={() => handleToggleEmployee(employee.id)}
+            />
+          ))}
+        </div>
       </div>
+    ))
+  }
 
-      {isDetailed ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-sm font-bold text-slate-900">
-                선택된 참석자
+  if (variant === 'compact') {
+    return (
+      <div className="flex flex-col gap-3">
+        {selectedEmployees.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedEmployees.map((employee) => (
+              <button
+                key={employee.id}
+                type="button"
+                onClick={() => handleToggleEmployee(employee.id)}
+                className="inline-flex h-9 max-w-full items-center gap-2 rounded-full border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800"
+              >
+                <span className="max-w-24 truncate">{employee.name}</span>
+                <X size={14} />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <SearchInput
+          value={currentKeyword}
+          onChange={(event) => handleKeywordChange(event.target.value)}
+          placeholder="이름 검색"
+          wrapperClassName="rounded-full"
+          className="h-10 rounded-full border-0 bg-slate-100 focus:border-0"
+        />
+
+        {shouldShowResults && (
+          <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <span className="text-xs font-bold text-slate-800">검색 결과</span>
+              <span className="text-xs text-slate-400">
+                {visibleEmployees.length}명
               </span>
-              <p className="mt-1 text-xs font-medium text-slate-500">
-                총 {selectedEmployeeIds.length}명이 일정에 초대됩니다.
-              </p>
             </div>
 
+            <div className="max-h-80 overflow-y-auto">
+              {renderGroupedEmployeeRows()}
+            </div>
+          </section>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <SearchInput
+            value={currentKeyword}
+            onChange={(event) => handleKeywordChange(event.target.value)}
+            placeholder="검색어를 입력하세요..."
+            aria-label="이름 또는 이메일 검색"
+          />
+
+          {showDepartmentFilter && (
+            <Select
+              label="부서 필터"
+              value={selectedDepartment}
+              onChange={(event) => setSelectedDepartment(event.target.value)}
+              options={[
+                {
+                  value: 'all',
+                  label: departmentsLoading ? '부서 불러오는 중' : '전체 부서',
+                },
+                ...uniqueDepartmentOptions,
+              ]}
+            />
+          )}
+        </div>
+      </section>
+
+      {shouldShowResults && (
+        <section className="rounded-md border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <span className="text-xs font-bold text-slate-800">검색 결과</span>
+            <span className="text-xs text-slate-400">
+              {visibleEmployees.length}명
+            </span>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto">
+            {renderGroupedEmployeeRows()}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-800">
+            선택된 {targetLabel}
+          </span>
+          {selectedEmployees.length > 0 && (
             <button
               type="button"
               onClick={handleClearSelectedEmployees}
-              className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
+              className="text-xs font-bold text-red-500 transition-colors hover:text-red-600"
             >
-              전체 삭제
+              전체 해제
             </button>
-          </div>
-
-          <div className="mt-4 min-h-12 rounded-xl border border-dashed border-slate-200 bg-slate-50/40 p-3">
-            {selectedEmployees.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {selectedEmployees.map((employee, index) => (
-                  <span
-                    key={employee.id}
-                    className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm"
-                  >
-                    <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold leading-none text-white"
-                      style={{ backgroundColor: getAvatarColor(employee, index) }}
-                    >
-                      {employee.name.slice(0, 1)}
-                    </span>
-
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-bold text-slate-900">
-                        {employee.name}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-400">
-                        {employee.department} · {employee.position}
-                      </span>
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleEmployee(employee.id)}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-                      aria-label={`${employee.name} 참석자 제거`}
-                    >
-                      <X size={13} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="flex h-10 items-center text-sm text-slate-400">
-                선택된 참석자가 없습니다.
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      ) : null}
+
+        {selectedEmployees.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {selectedEmployees.map((employee) => (
+              <div
+                key={employee.id}
+                className="flex items-center gap-3 rounded-md bg-indigo-50 px-3 py-2.5"
+              >
+                <EmployeeAvatar employee={employee} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold text-slate-900">
+                    {employee.name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                    {employee.department} / {employee.position}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleToggleEmployee(employee.id)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
+                  aria-label={`${employee.name} ${targetLabel} 제거`}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-md bg-slate-50 px-3 py-4 text-sm text-slate-400">
+            선택된 {targetLabel}가 없습니다.
+          </div>
+        )}
+      </section>
     </div>
   )
 }

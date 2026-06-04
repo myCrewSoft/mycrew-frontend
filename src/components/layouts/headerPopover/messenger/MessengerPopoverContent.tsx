@@ -11,8 +11,6 @@ import { useMessengerData } from './useMessengerData'
 const EMPTY_MEMBERS: ChatMember[] = []
 
 const MessengerPopoverContent = () => {
-  // 메신저 API 상태를 관리하는 커스텀 훅입니다.
-  // 내부에서 useApi를 사용하므로 AA 가이드의 API 호출 규칙을 따릅니다.
   const {
     messages: apiMessages,
     loadMessages,
@@ -28,22 +26,14 @@ const MessengerPopoverContent = () => {
     setActiveChatId,
   } = useMessengerSocketContext()
 
-  // viewMode는 오른쪽 영역이 기존 채팅 화면인지, 새 대화 생성 폼인지 구분합니다.
   const [viewMode, setViewMode] = useState<MessengerViewMode>('chat')
-
-  // activeTab은 현재 선택된 탭입니다. 전체, 그룹, 프로젝트 중 하나가 들어갑니다.
   const [activeTab, setActiveTab] = useState<ChatTab>('all')
 
   // selectedRoomId는 왼쪽 목록에서 선택한 채팅방 id이며 선택 전에는 null입니다.
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
-
-  // messageText는 아래 입력창에 사용자가 입력 중인 메시지입니다.
   const [messageText, setMessageText] = useState('')
-
-  // 아래 상태들은 새 대화 생성 폼에서 사용하는 값입니다.
   const [newRoomName, setNewRoomName] = useState('')
   const [newRoomDescription, setNewRoomDescription] = useState('')
-  const [memberSearch, setMemberSearch] = useState('')
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([])
 
   // Provider가 관리하는 최신 채팅방 목록을 화면용 배열로 사용합니다.
@@ -52,7 +42,6 @@ const MessengerPopoverContent = () => {
   // 선택한 채팅방의 과거 메시지 REST 응답을 빈 배열로 보정합니다.
   const messageSource = useMemo(() => apiMessages ?? [], [apiMessages])
 
-  // 탭이 바뀔 때마다 보여줄 채팅방 목록을 계산합니다.
   const filteredRooms = useMemo(() => {
     return roomSource.filter((room) => matchesChatTab(room, activeTab))
   }, [activeTab, roomSource])
@@ -70,8 +59,6 @@ const MessengerPopoverContent = () => {
   )
 
   const handleCreateChat = () => {
-    // 대화 시작 버튼을 누르면 백엔드 채팅방 생성 API를 호출합니다.
-    // 성공 후 새 채팅방으로 이동하거나 목록을 다시 조회하는 처리는 다음 단계에서 이어 붙이면 됩니다.
     void createChat({
       chatName: newRoomName.trim(),
       chatDescription: newRoomDescription.trim(),
@@ -131,7 +118,6 @@ const MessengerPopoverContent = () => {
 
   return (
     <div className="flex h-[560px] w-full overflow-hidden bg-white">
-      {/* 왼쪽 목록은 항상 보이고, 오른쪽 영역만 채팅 화면/새 대화 폼으로 교체됩니다. */}
       <MessengerRoomList
         activeTab={activeTab}
         rooms={filteredRooms}

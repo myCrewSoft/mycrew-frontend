@@ -618,7 +618,9 @@ const CalendarScheduleDrawer = ({
             {shouldShowAttendeePicker && (
               <EmployeeSearchPicker
                 variant="detailed"
-                employees={[]}
+                remoteSearch
+                showDepartmentFilter
+                showAllOnEmpty
                 selectedEmployeeIds={selectedAttendeeIds}
                 onChange={setSelectedAttendeeIds}
               />

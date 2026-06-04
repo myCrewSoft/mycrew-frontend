@@ -18,10 +18,15 @@ export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'
 export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
-export type ScheduleTargetResponseDto = 
-components['schemas']['ScheduleTargetResponseDto'];
+export type ScheduleTargetResponseDto = components['schemas']['ScheduleTargetResponseDto'];
 // 메신저
 export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
 export type ChatRoomResponse = components['schemas']['ChatRoomResponse'];
 
+// 사원 검색
+export type EmployeeLookupRequest = components['schemas']['EmployeeLookupRequest'];
+export type EmployeeLookupResponse = components['schemas']['EmployeeLookupResponse'];
+
+// 부서 필터
+export type DepartmentLookupResponse = components['schemas']['DepartmentLookupResponse'];
