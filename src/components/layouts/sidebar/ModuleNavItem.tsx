@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 
 interface ModuleNavItemProps {
-  icon?: LucideIcon
+  icon: LucideIcon
   label: string
   path: string
   active?: boolean
@@ -23,7 +23,7 @@ const ModuleNavItem = ({
           : 'text-slate-400 hover:bg-slate-800 hover:text-white'
       }`}
     >
-      {Icon && <Icon size={24} />}
+      <Icon size={24} />
       <span className="text-[11px] font-semibold leading-none tracking-tight">
         {label}
       </span>

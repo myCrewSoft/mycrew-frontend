@@ -10,10 +10,9 @@ import type {
 export const authApi = {
   login: (request: LoginRequest) =>
     axiosInstance.post<ApiResponse<LoginResponse>>('/api/v1/auth/login', request),
-  logout: () => axiosInstance.post<ApiResponse<string>>('/api/v1/auth/logout'),
   getGoogleAuthorizeUrl: () =>
     axiosInstance.get<ApiResponse<GoogleAuthorizeResponse>>(
-      '/api/mail/oauth/google/authorize',
+      '/api/v1/mail/oauth/google/authorize',
     ),
   completeFirstLogin: (request: FirstLoginRequest) =>
     axiosInstance.patch<ApiResponse<string>>(

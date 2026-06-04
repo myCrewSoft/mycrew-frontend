@@ -1,5 +1,7 @@
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -8,7 +10,14 @@ import {
 } from 'react'
 import ToastViewport from './ToastViewport'
 import type { ToastItem, ToastOptions } from './toast.types'
-import { ToastContext } from './toast.context'
+
+interface ToastContextValue {
+  showToast: (options: ToastOptions) => void
+  closeToast: (id: string) => void
+  clearToasts: () => void
+}
+
+const ToastContext = createContext<ToastContextValue | null>(null)
 
 interface ToastProviderProps {
   children: ReactNode
@@ -86,4 +95,14 @@ export const ToastProvider = ({ children }: ToastProviderProps) => {
       <ToastViewport items={items} onClose={closeToast} />
     </ToastContext.Provider>
   )
+}
+
+export const useToast = () => {
+  const context = useContext(ToastContext)
+
+  if (!context) {
+    throw new Error('useToast는 ToastProvider 내부에서만 사용할 수 있습니다.')
+  }
+
+  return context
 }

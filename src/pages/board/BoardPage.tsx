@@ -9,19 +9,31 @@ import {
   FileText,
 } from 'lucide-react'
 
-import { useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
+import { useLocation, useSearchParams, useParams } from 'react-router-dom'
 
 import BoardWriteForm from './BoardWriteForm'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 
 import type { BoardKind, BoardMeta } from '../../types/board'
-import type { BoardResponse } from '../../types'
 
-import { boardApi } from '../../api/boardApi'
-import { ApiError } from '../../api/axiosInstance'
+import axiosInstance, { ApiError } from '../../api/axiosInstance'
 
-export type BoardVo = BoardResponse
+export interface BoardVo {
+  boardId: number
+  boardTypeCd: string
+  boardSj: string
+  boardCn: string
+  frstRgtrId: number
+  frstRegDt: string
+  lastMdfrDt: string
+  boardAtchFileId: number | null
+  deptCd: string
+  projId: number | null
+  imprtntYn: string
+  cmntUseYn: string
+  viewCnt: number
+}
 
 const boardMeta: Record<BoardKind, BoardMeta> = {
   notice: {
@@ -65,7 +77,7 @@ const departmentNameMap: Record<string, string> = {
 }
 
 const getBoardTypeFromPath = (pathname: string): BoardKind => {
-  if (pathname.includes('/departments') || pathname.includes('/dept/')) return 'department'
+  if (pathname.includes('/departments')) return 'department'
   if (pathname.includes('/free')) return 'free'
   if (pathname.includes('/anonymous')) return 'anonymous'
   return 'notice'
@@ -73,8 +85,7 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
 
 const BoardPage = () => {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { deptCd } = useParams()
+  const { dept } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // 페이징 및 상태 관리
@@ -91,8 +102,7 @@ const BoardPage = () => {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
-  const boardName = searchParams.get('boardName')
-  const departmentName = boardName ?? (deptCd ? departmentNameMap[deptCd.toLowerCase()] ?? deptCd : '')
+  const departmentName = dept ? departmentNameMap[dept] : ''
 
   useEffect(() => {
     const fetchBoardData = async () => {
@@ -100,18 +110,23 @@ const BoardPage = () => {
         setLoading(true)
         setErrorMsg(null)
 
-        const response = await boardApi.getBoards({
-          type: boardType,
-          page,
-          keyword,
-          departmentCode: deptCd,
+        // 💡 중요: 백엔드의 ApiResponse 공통 규격을 연동합니다.
+        const response = await axiosInstance.get('/api/boards', {
+          params: {
+            keyword: keyword.trim() || undefined,
+            boardTypeCd: boardType.toUpperCase(), // 백엔드 DTO(boardTypeCd)에 매핑 및 대문자화
+            deptCd: boardType === 'department' ? dept?.toUpperCase() : undefined,
+            page: page, // 💡 현재 페이지 번호를 백엔드로 전달합니다 (1-based 기준)
+            size: 10,
+          },
         })
 
         if (response.data?.success) {
-          const pageData = response.data.data
-
-          setBoardList(pageData?.content ?? [])
-          setTotalPages(pageData?.totalPages ?? response.data.pagination?.totalPages ?? 1)
+          // 💡 data에서 목록을 꺼내고, pagination에서 전체 페이지 수를 세팅합니다.
+          setBoardList(response.data.data ?? [])
+          if (response.data.pagination) {
+            setTotalPages(response.data.pagination.totalPages || 1)
+          }
         }
       } catch (err) {
         if (err instanceof ApiError) {
@@ -126,11 +141,11 @@ const BoardPage = () => {
 
     fetchBoardData()
     // 💡 page가 변경될 때마다 서버에 새 데이터를 요청하도록 의존성 배열에 page 추가
-  }, [boardType, keyword, deptCd, page])
+  }, [boardType, keyword, dept, page])
 
   useEffect(() => {
     setPage(1)
-  }, [boardType, deptCd, boardName])
+  }, [boardType, dept])
 
   if (isCreateMode) {
     return (
@@ -211,15 +226,6 @@ const BoardPage = () => {
             {boardList.map((board) => (
               <div
                 key={board.boardId}
-
-                role="button"
-               tabIndex={0}
-                onClick={() => navigate(`${location.pathname}/${board.boardId}`)}
-                onKeyDown={(event) => {
-                 if (event.key === 'Enter' || event.key === ' ') {
-                    navigate(`${location.pathname}/${board.boardId}`)
-                 }
-               }}
                 className="flex h-14 items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50 cursor-pointer"
               >
                 <div className="w-24 text-slate-600">{board.boardId}</div>

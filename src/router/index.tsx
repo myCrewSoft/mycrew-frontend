@@ -11,7 +11,6 @@ import { CalendarProvider } from '../pages/calendar/CalendarProvider';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
-import { meetingRoutes } from './routes/meetingRoutes';
 import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
@@ -40,8 +39,7 @@ export const router = createBrowserRouter([
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
-      ...meetingRoutes,
-      ...driveRoutes
+      ...driveRoutes,
     ],
   },
   {

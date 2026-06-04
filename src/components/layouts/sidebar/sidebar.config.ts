@@ -60,7 +60,7 @@ export const menuItems: MenuItem[] = [
   { icon: CalendarPlus, label: '예약', path: '/reservations' },
   { icon: GraduationCap, label: '교육', path: '/education' },
   { icon: Network, label: '조직관리', path: '/organization' },
-  { icon: ClipboardList, label: '게시판', path: '/boards' },
+  { icon: ClipboardList, label: '게시판', path: '/board' },
 ]
 
 export const adminMenuItem: MenuItem = {
@@ -142,6 +142,23 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
       },
     ],
   },
+  meeting: {
+    title: '회의',
+    actions: [
+      { label: '회의 만들기', variant: 'primary' },
+      { label: '회의록 작성' },
+    ],
+    sections: [
+      {
+        title: '회의 관리',
+        items: [
+          { icon: Video, label: '회의 목록', path: '/meeting/list' },
+          { icon: Calendar, label: '예정된 회의', path: '/meeting/scheduled' },
+          { icon: FileText, label: '회의록', path: '/meeting/minutes' },
+        ],
+      },
+    ],
+  },
   attendance: {
     title: '근태',
     actions: [
@@ -214,13 +231,30 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
       {
     title: '',
         items: [
-         { icon: Sparkles, label: '공지사항', path: '/boards/notices' },
-         { icon: Users, label: '부서게시판', path: '/boards/departments',
-            children: [],
+         { icon: Sparkles, label: '공지사항', path: '/board/notices' },
+         { icon: Users, label: '부서게시판', path: '/board/departments',
+            children: [
+            {
+              label: '개발팀',
+              path: '/board/departments/dev',
+            },
+            {
+              label: '디자인팀',
+              path: '/board/departments/design',
+            },
+            {
+              label: '인사팀',
+              path: '/board/departments/hr',
+            },
+            {
+              label: '마케팅팀',
+              path: '/board/departments/marketing',
+            },
+          ],
 
           },
-         { icon: ClipboardList, label: '자유게시판', path: '/boards/free' },
-         { icon: Archive, label: '익명게시판', path: '/boards/anonymous' },
+         { icon: ClipboardList, label: '자유게시판', path: '/board/free' },
+         { icon: Archive, label: '익명게시판', path: '/board/anonymous' },
         ],
       },
     ],
@@ -244,13 +278,6 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
   },
 }
 
-export const getSidebarKey = (pathname: string): string => {
-  // 만약 /boards 혹은 /boards/FREE 등으로 들어온다면 'board'를 반환하도록 예외 처리 추가
-  if (pathname.startsWith('/boards') || pathname.startsWith('/board')) {
-    return 'board';
-  }
-  
-  // 기존 로직...
-  const [, firstSegment] = pathname.split('/');
-  return firstSegment || '';
+export const getSidebarKey = (pathname: string) => {
+  return pathname.split('/').filter(Boolean)[0] ?? ''
 }

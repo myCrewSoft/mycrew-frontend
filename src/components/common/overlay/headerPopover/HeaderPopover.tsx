@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 interface HeaderPopoverRenderProps {
   open: boolean
@@ -38,19 +38,18 @@ const HeaderPopover = ({
   // popoverRef는 바깥 클릭을 구분하기 위해 전체 팝오버 영역을 가리킵니다.
   const popoverRef = useRef<HTMLDivElement>(null)
 
-  const close = useCallback(() => {
+  const close = () => {
     setOpen(false)
     onClose?.()
-  }, [onClose])
-
-  const toggle = useCallback(() => {
+  }
+  const toggle = () => {
     if (open) {
       close()
       return
     }
 
     setOpen(true)
-  }, [close, open])
+  }
 
   useEffect(() => {
     if (!open) return
@@ -77,7 +76,7 @@ const HeaderPopover = ({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [close, open])
+  }, [open])
 
   return (
     <div ref={popoverRef} className="relative inline-flex">
