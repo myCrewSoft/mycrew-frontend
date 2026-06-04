@@ -36,7 +36,7 @@ const attachmentIconClassByType: Record<BoardAttachment['fileType'], string> = {
 }  
 
 const getBoardTypeFromPath = (pathname: string): BoardKind => {
-  if (pathname.includes('/departments')) return 'department'
+  if (pathname.includes('/departments') || pathname.includes('/dept/')) return 'department'
   if (pathname.includes('/free')) return 'free'
   if (pathname.includes('/anonymous')) return 'anonymous'
   return 'notice'
@@ -336,4 +336,3 @@ const BoardDetailPage = () => {
 }
 
 export default BoardDetailPage
-

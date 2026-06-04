@@ -19,6 +19,14 @@ interface SubSidebarProps {
   onToggle: () => void
 }
 
+const isPathActive = (pathname: string, itemPath: string) =>
+  pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+
+const isMenuActive = (pathname: string, search: string, item: any) =>
+  item.activeKey
+    ? `${pathname}${search}` === item.activeKey
+    : isPathActive(pathname, item.path)
+
 // 특정 메뉴에서 기본 메뉴 목록이 아니라 전용 UI를 보여주고 싶을 때 사용하는 매핑입니다.
 // 추가할 경우 아래와 동일하게 추가할 것
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
@@ -110,7 +118,12 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
                     label={item.label}
                     path={item.path}
                     children={item.children}
-                    active={location.pathname.startsWith(item.path)}
+                    active={
+                      isMenuActive(location.pathname, location.search, item) ||
+                      item.children?.some((child: any) =>
+                        isMenuActive(location.pathname, location.search, child),
+                      )
+                    }
                   />
                 ))}
               </SubSidebarSection>

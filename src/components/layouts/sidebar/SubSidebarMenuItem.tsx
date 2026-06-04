@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 
 interface SubSidebarMenuItemProps {
@@ -10,6 +10,14 @@ interface SubSidebarMenuItemProps {
    children?: any[]
 }
 
+const isPathActive = (pathname: string, itemPath: string) =>
+  pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+
+const isMenuActive = (pathname: string, search: string, item: any) =>
+  item.activeKey
+    ? `${pathname}${search}` === item.activeKey
+    : isPathActive(pathname, item.path)
+
 const SubSidebarMenuItem = ({
   icon: Icon,
   label,
@@ -17,6 +25,8 @@ const SubSidebarMenuItem = ({
   active = false,
   children
 }: SubSidebarMenuItemProps) => {
+  const location = useLocation()
+
   return (
     <div className="flex flex-col gap-1">
     <Link
@@ -35,12 +45,12 @@ const SubSidebarMenuItem = ({
         <div className="ml-6 flex flex-col gap-1">
           {children.map((child) => {
             const isChildActive =
-              location.pathname === child.path
+              isMenuActive(location.pathname, location.search, child)
 
             return (
               <Link
-                key={child.path}
-                to={child.path}
+                key={child.activeKey ?? child.path}
+                to={child.activeKey ?? child.path}
                 className={`flex h-10 items-center rounded-xl px-3 text-sm font-medium no-underline transition-colors ${
                   isChildActive
                     ? 'bg-blue-100 text-blue-700'

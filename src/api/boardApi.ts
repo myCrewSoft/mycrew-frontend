@@ -1,14 +1,13 @@
 import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance' // 프로젝트 구조에 맞게 경로 확인 필요
-import type { BoardKind, BoardListParams, BoardListResponse } from '../types/board'
-import type { BoardSideBarResponse } from '../types'
+import type { BoardKind, BoardListParams } from '../types/board'
+import type { ApiResponsePageBoardResponse, BoardSideBarResponse } from '../types'
 
-const boardEndpointByType: Record<BoardKind, string> = {
-  notice: '/notices',
-  department: '/boards',
-  free: '/boards',
-  anonymous: '/boards',
+const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
+  notice: 'NOTICE',
+  free: 'FREE',
+  anonymous: 'ANONYMOUS',
 }
 
 /**
@@ -20,13 +19,20 @@ export const boardApi = {
    */
   getBoards: (
     { type, page = 1, keyword = '', departmentCode }: BoardListParams
-  ): Promise<AxiosResponse<ApiResponse<BoardListResponse>>> => {
-    return axiosInstance.get(boardEndpointByType[type], {
+  ): Promise<AxiosResponse<ApiResponsePageBoardResponse>> => {
+    const boardTypeCd = type === 'department' ? 'DEPT' : boardTypeCdByKind[type]
+    const endpoint =
+      type === 'department' && departmentCode
+        ? `/api/boards/dept/${encodeURIComponent(departmentCode)}`
+        : `/api/boards/${boardTypeCd}`
+
+    return axiosInstance.get(endpoint, {
       params: {
-        page,
-        keyword: keyword || undefined,
-        boardType: type,
-        departmentCode: departmentCode || undefined,
+        page: Math.max(page - 1, 0),
+        size: 10,
+        keyword: keyword.trim() || undefined,
+        boardTypeCd,
+        deptCd: type === 'department' ? departmentCode : undefined,
       },
     })
   },
