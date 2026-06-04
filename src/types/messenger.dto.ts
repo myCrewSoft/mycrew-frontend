@@ -26,13 +26,6 @@ export interface ChatMessageResponseDto {
   read?: boolean;
 }
 
-export interface ChatMemberResponseDto {
-  id: number;
-  name: string;
-  department: string;
-  jobTitle: string;
-}
-
 export interface CreateChatRoomRequestDto {
   chatName?: string;
   chatDescription?: string;

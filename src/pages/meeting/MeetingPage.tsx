@@ -29,9 +29,7 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Button from '../../components/common/button/Button'
 import Checkbox from '../../components/common/form/checkbox/Checkbox'
-import EmployeeSearchPicker, {
-  type EmployeeSearchItem,
-} from '../../components/common/employeeSearch/EmployeeSearchPicker'
+import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Textarea from '../../components/common/form/textarea/Textarea'
@@ -51,15 +49,6 @@ const filterTabs: Array<{ value: MeetingListFilter; label: string }> = [
   { value: 'scheduled', label: '예약된 회의' },
   { value: 'live', label: '진행 중' },
   { value: 'ended', label: '지난 회의' },
-]
-
-const employeeOptions: EmployeeSearchItem[] = [
-  { id: 1, name: '한재훈', department: '개발팀', position: '사원' },
-  { id: 2, name: '정승우', department: '개발팀', position: '대리' },
-  { id: 3, name: '오하린', department: '기획팀', position: '과장' },
-  { id: 4, name: '김도윤', department: '경영지원팀', position: '팀장' },
-  { id: 5, name: '이서연', department: '인사팀', position: '대리' },
-  { id: 6, name: '강태오', department: '영업팀', position: '사원' },
 ]
 
 const meetingRoomOptions = [
@@ -1489,8 +1478,9 @@ const MeetingPage = () => {
 
               <EmployeeSearchPicker
                 variant="detailed"
-                employees={employeeOptions}
-                departments={['개발팀', '기획팀', '경영지원팀', '인사팀', '영업팀']}
+                remoteSearch
+                showDepartmentFilter
+                showAllOnEmpty
                 selectedEmployeeIds={selectedEmployeeIds}
                 onChange={setSelectedEmployeeIds}
                 emptyText="검색된 직원이 없습니다."
