@@ -4,10 +4,12 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom';
+import { useMemo } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
   ArrowLeft,
   BriefcaseBusiness,
+  Building2,
   CalendarDays,
   CheckCircle2,
   ClipboardList,
@@ -25,9 +27,13 @@ import Badge from '../../common/dataDisplay/badge/Badge';
 import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
-import type { AdminAccessResponse } from '../../../types/admin';
+import type {
+  AdminAccessResponse,
+  AdminDepartmentResponseDTO,
+} from '../../../types/admin';
 import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesHooks';
 import { useOptionalAdminRanks } from '../../../pages/admin/adminRanksHooks';
+import { useOptionalAdminDepartments } from '../../../pages/admin/adminDepartmentsHooks';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;
@@ -45,10 +51,16 @@ interface EmployeeFilterItem {
   empStatCd?: string;
 }
 
+interface DepartmentTreeNode {
+  department: AdminDepartmentResponseDTO;
+  children: DepartmentTreeNode[];
+}
+
 const adminNavItems: AdminNavItem[] = [
   { label: '사원', path: '/admin/users', icon: Users },
   { label: '권한', path: '/admin/roles', icon: ShieldCheck },
   { label: '직급', path: '/admin/ranks', icon: IdCard },
+  { label: '부서', path: '/admin/departments', icon: Building2 },
   { label: '게시판', path: '/admin/boards', icon: ClipboardList },
   { label: '프로젝트', path: '/admin/projects', icon: FolderKanban },
   { label: '조직도', path: '/admin/org', icon: Network },
@@ -63,6 +75,49 @@ const employeeFilterItems: EmployeeFilterItem[] = [
   })),
 ];
 
+const sortDepartmentNodes = (nodes: DepartmentTreeNode[]) => {
+  nodes.sort((left, right) =>
+    left.department.deptNm.localeCompare(right.department.deptNm, 'ko'),
+  );
+  nodes.forEach((node) => sortDepartmentNodes(node.children));
+  return nodes;
+};
+
+const buildDepartmentTree = (
+  departments: AdminDepartmentResponseDTO[],
+): DepartmentTreeNode[] => {
+  const nodeMap = new Map<string, DepartmentTreeNode>();
+  const roots: DepartmentTreeNode[] = [];
+
+  departments.forEach((department) => {
+    nodeMap.set(department.deptCd, {
+      department,
+      children: [],
+    });
+  });
+
+  departments.forEach((department) => {
+    const node = nodeMap.get(department.deptCd);
+
+    if (!node) {
+      return;
+    }
+
+    const parentNode = department.parentDeptCd
+      ? nodeMap.get(department.parentDeptCd)
+      : null;
+
+    if (parentNode) {
+      parentNode.children.push(node);
+      return;
+    }
+
+    roots.push(node);
+  });
+
+  return sortDepartmentNodes(roots);
+};
+
 export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const { clearAuth } = useAuth();
   const location = useLocation();
@@ -71,9 +126,15 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const isEmployeesPage = location.pathname.startsWith('/admin/users');
   const isRolesPage = location.pathname.startsWith('/admin/roles');
   const isRanksPage = location.pathname.startsWith('/admin/ranks');
+  const isDepartmentsPage = location.pathname.startsWith('/admin/departments');
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
   const adminRoles = useOptionalAdminRoles();
   const adminRanks = useOptionalAdminRanks();
+  const adminDepartments = useOptionalAdminDepartments();
+  const departmentTree = useMemo(
+    () => buildDepartmentTree(adminDepartments?.departments ?? []),
+    [adminDepartments?.departments],
+  );
 
   const handleLogout = async () => {
     try {
@@ -95,6 +156,55 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const openRankCreate = () => {
     window.dispatchEvent(new Event('admin:open-rank-create'));
   };
+
+  const openDepartmentCreate = () => {
+    window.dispatchEvent(new Event('admin:open-department-create'));
+  };
+
+  const renderDepartmentNodes = (
+    nodes: DepartmentTreeNode[],
+    depth = 0,
+  ): ReactNode =>
+    nodes.map((node) => {
+      const { department } = node;
+      const active = adminDepartments?.selectedDeptCd === department.deptCd;
+
+      return (
+        <div key={department.deptCd} className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={() => adminDepartments?.selectDepartment(department.deptCd)}
+            className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+              active
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-800 hover:bg-white'
+            }`}
+            style={{ paddingLeft: `${12 + depth * 16}px` }}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {active ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+              )}
+              <span className="truncate">{department.deptNm}</span>
+            </span>
+            <span
+              className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
+                active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {department.memberCount}
+            </span>
+          </button>
+          {node.children.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {renderDepartmentNodes(node.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#edf3f8] text-slate-950">
@@ -366,6 +476,44 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
                 ) : (
                   <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
                     등록된 직급이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : isDepartmentsPage && adminDepartments ? (
+          <>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+              부서
+            </h2>
+
+            <Button
+              variant="primary"
+              leftIcon={<PlusCircle size={16} />}
+              onClick={openDepartmentCreate}
+              className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+              fullWidth
+            >
+              부서 생성
+            </Button>
+
+            <div className="mt-9 flex min-h-0 flex-1 flex-col gap-3">
+              <p className="text-xs font-black text-slate-500">부서 목록</p>
+
+              <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                {adminDepartments.departmentsLoading ? (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    부서를 불러오는 중
+                  </div>
+                ) : adminDepartments.departmentsError ? (
+                  <div className="rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600">
+                    {adminDepartments.departmentsError.message}
+                  </div>
+                ) : departmentTree.length > 0 ? (
+                  renderDepartmentNodes(departmentTree)
+                ) : (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    등록된 부서가 없습니다.
                   </div>
                 )}
               </div>

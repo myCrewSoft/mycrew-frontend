@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
-  IdCard,
+  Building2,
+  MoveRight,
   Pencil,
   PlusCircle,
   RefreshCw,
-  ToggleLeft,
-  ToggleRight,
   Trash2,
-  UserMinus,
   UserPlus,
   Users,
 } from 'lucide-react';
@@ -25,16 +23,19 @@ import Modal from '../../components/common/overlay/modal/Modal';
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination';
 import SearchInput from '../../components/common/form/searchInput/SearchInput';
 import Select from '../../components/common/form/select/Select';
-import { useAdminRanks } from './adminRanksHooks';
-import type { RankResponse } from '../../types/admin';
+import type {
+  AdminDepartmentMemberResponseDTO,
+  AdminDepartmentResponseDTO,
+} from '../../types/admin';
 import type { AdminEmployeeListItem } from '../../types/adminEmployee';
+import { useAdminDepartments } from './adminDepartmentsHooks';
 
 const pageSize = 10;
+const noParentDepartmentValue = '__NO_PARENT_DEPARTMENT__';
 
-interface RankFormState {
-  rankId: string;
-  rankName: string;
-  sortOrder: number;
+interface DepartmentFormState {
+  deptNm: string;
+  parentDeptCd: string;
 }
 
 interface ConfirmAction {
@@ -45,10 +46,9 @@ interface ConfirmAction {
   onConfirm: () => Promise<void> | void;
 }
 
-const createEmptyRankForm = (): RankFormState => ({
-  rankId: '',
-  rankName: '',
-  sortOrder: 1,
+const createEmptyDepartmentForm = (): DepartmentFormState => ({
+  deptNm: '',
+  parentDeptCd: '',
 });
 
 const toApiError = (err: unknown) =>
@@ -56,98 +56,176 @@ const toApiError = (err: unknown) =>
     ? err
     : new ApiError((err as Error).message, 'UNKNOWN', 0);
 
-const rankErrorMessages: Record<string, string> = {
+const departmentErrorMessages: Record<string, string> = {
   AUTH_002: '접근 권한이 없습니다.',
   COMMON_001: '입력값을 확인해 주세요.',
-  RANK_NOT_FOUND: '직급을 찾을 수 없습니다.',
-  DUPLICATE_RANK_ID: '이미 사용 중인 직급 ID입니다.',
+  DEPARTMENT_NOT_FOUND: '부서를 찾을 수 없습니다.',
+  DUPLICATE_DEPARTMENT_CODE: '이미 사용 중인 부서 코드입니다.',
 };
 
 const getErrorMessage = (err: unknown) => {
   const apiError = toApiError(err);
-  const fallback = rankErrorMessages[apiError.errorCode];
+  const fallback = departmentErrorMessages[apiError.errorCode];
 
   return apiError.message || fallback || '요청 처리 중 오류가 발생했습니다.';
 };
 
-const formatCode = (value: string | null | undefined, fallback = '-') =>
-  value && value.trim() ? value : fallback;
-
-const getEmployeeDepartment = (employee: AdminEmployeeListItem) =>
-  formatCode(employee.department?.deptNm ?? employee.deptCd);
-
-const getEmployeeRankCode = (employee: AdminEmployeeListItem) =>
-  employee.jobGrade?.jobGrdCd ?? employee.jobGrdCd ?? null;
+const getEmployeeDepartmentName = (employee: AdminEmployeeListItem) =>
+  employee.department?.deptNm ?? employee.deptCd ?? '-';
 
 const getEmployeeRankName = (employee: AdminEmployeeListItem) =>
   employee.jobGrade?.jobGrdNm ?? employee.jobGrdCd ?? '-';
 
-const hasRank = (employee: AdminEmployeeListItem, rank: RankResponse | null) => {
-  if (!rank) {
-    return false;
-  }
+const getEmployeePositionName = (employee: AdminEmployeeListItem) =>
+  employee.jobPosition?.jobPstnNm ?? employee.jobPstnCd ?? '-';
 
-  return (
-    getEmployeeRankCode(employee) === rank.rankId ||
-    employee.jobGrade?.jobGrdNm === rank.rankName
-  );
-};
-
-export default function AdminRanksPage() {
+export default function AdminDepartmentsPage() {
   const {
-    ranks,
-    ranksLoading,
-    ranksError,
-    selectedRankId,
-    selectRank,
-    reloadRanks,
-  } = useAdminRanks();
-  const selectedRank = useMemo(
-    () => ranks.find((rank) => rank.rankId === selectedRankId) ?? null,
-    [ranks, selectedRankId],
+    departments,
+    departmentsLoading,
+    departmentsError,
+    selectedDeptCd,
+    selectDepartment,
+    reloadDepartments,
+  } = useAdminDepartments();
+  const selectedDepartmentFromList = useMemo(
+    () =>
+      departments.find((department) => department.deptCd === selectedDeptCd) ??
+      null,
+    [departments, selectedDeptCd],
   );
+  const [departmentDetail, setDepartmentDetail] =
+    useState<AdminDepartmentResponseDTO | null>(null);
+  const [departmentLoading, setDepartmentLoading] = useState(false);
+  const [departmentError, setDepartmentError] = useState<string | null>(null);
+  const [members, setMembers] = useState<AdminDepartmentMemberResponseDTO[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [membersReloadKey, setMembersReloadKey] = useState(0);
   const [employees, setEmployees] = useState<AdminEmployeeListItem[]>([]);
   const [employeesPagination, setEmployeesPagination] =
     useState<PageInfo | null>(null);
   const [employeesPage, setEmployeesPage] = useState(1);
-  const [employeesReloadKey, setEmployeesReloadKey] = useState(0);
   const [employeeKeyword, setEmployeeKeyword] = useState('');
   const [submittedEmployeeKeyword, setSubmittedEmployeeKeyword] = useState('');
+  const [employeesReloadKey, setEmployeesReloadKey] = useState(0);
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [employeesError, setEmployeesError] = useState<string | null>(null);
-  const [rankModalMode, setRankModalMode] = useState<'create' | 'edit' | null>(
-    null,
+  const [departmentModalMode, setDepartmentModalMode] = useState<
+    'create' | 'edit' | null
+  >(null);
+  const [departmentForm, setDepartmentForm] = useState<DepartmentFormState>(
+    createEmptyDepartmentForm,
   );
-  const [rankForm, setRankForm] = useState<RankFormState>(createEmptyRankForm);
-  const [rankSubmitError, setRankSubmitError] = useState<string | null>(null);
-  const [rankSubmitting, setRankSubmitting] = useState(false);
+  const [departmentSubmitting, setDepartmentSubmitting] = useState(false);
+  const [departmentSubmitError, setDepartmentSubmitError] = useState<
+    string | null
+  >(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [replacementRankId, setReplacementRankId] = useState('');
+  const [replacementDeptCd, setReplacementDeptCd] = useState('');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignEmployeeIds, setAssignEmployeeIds] = useState<number[]>([]);
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
-  const [selectedAssignedEmployeeIds, setSelectedAssignedEmployeeIds] =
-    useState<number[]>([]);
-  const [revokeSubmitting, setRevokeSubmitting] = useState(false);
-  const [revokeError, setRevokeError] = useState<string | null>(null);
-  const [statusUpdating, setStatusUpdating] = useState(false);
-  const [statusError, setStatusError] = useState<string | null>(null);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [targetDeptCd, setTargetDeptCd] = useState('');
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(
     null,
   );
 
-  const assignedEmployees = useMemo(
-    () => employees.filter((employee) => hasRank(employee, selectedRank)),
-    [employees, selectedRank],
+  const selectedDepartment = departmentDetail ?? selectedDepartmentFromList;
+  const memberCount = selectedDepartment?.memberCount ?? members.length;
+  const replacementOptions = departments.filter(
+    (department) => department.deptCd !== selectedDeptCd,
+  );
+  const parentOptions = departments.filter(
+    (department) => department.deptCd !== selectedDeptCd,
+  );
+  const selectableEmployees = useMemo(
+    () => employees.filter((employee) => employee.deptCd !== selectedDeptCd),
+    [employees, selectedDeptCd],
   );
 
-  const selectableEmployees = useMemo(
-    () => employees.filter((employee) => !hasRank(employee, selectedRank)),
-    [employees, selectedRank],
-  );
+  useEffect(() => {
+    let active = true;
+
+    const loadDepartmentDetail = async () => {
+      if (!selectedDeptCd) {
+        setDepartmentDetail(null);
+        setMembers([]);
+        return;
+      }
+
+      setDepartmentLoading(true);
+      setDepartmentError(null);
+
+      try {
+        const response = await adminApi.getDepartmentDetail(selectedDeptCd);
+
+        if (active) {
+          setDepartmentDetail(response.data.data ?? null);
+        }
+      } catch (err) {
+        if (active) {
+          setDepartmentDetail(null);
+          setDepartmentError(getErrorMessage(err));
+        }
+      } finally {
+        if (active) {
+          setDepartmentLoading(false);
+        }
+      }
+    };
+
+    void loadDepartmentDetail();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDeptCd, membersReloadKey]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadMembers = async () => {
+      if (!selectedDeptCd) {
+        setMembers([]);
+        return;
+      }
+
+      setMembersLoading(true);
+      setMembersError(null);
+
+      try {
+        const response = await adminApi.getDepartmentMembers(selectedDeptCd);
+
+        if (active) {
+          setMembers(response.data.data ?? []);
+          setSelectedMemberIds([]);
+        }
+      } catch (err) {
+        if (active) {
+          setMembers([]);
+          setMembersError(getErrorMessage(err));
+        }
+      } finally {
+        if (active) {
+          setMembersLoading(false);
+        }
+      }
+    };
+
+    void loadMembers();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDeptCd, membersReloadKey]);
 
   useEffect(() => {
     let active = true;
@@ -166,7 +244,6 @@ export default function AdminRanksPage() {
         if (active) {
           setEmployees(response.data.data ?? []);
           setEmployeesPagination(response.data.pagination ?? null);
-          setSelectedAssignedEmployeeIds([]);
         }
       } catch (err) {
         if (active) {
@@ -186,61 +263,26 @@ export default function AdminRanksPage() {
     return () => {
       active = false;
     };
-  }, [employeesPage, employeesReloadKey, submittedEmployeeKeyword, selectedRankId]);
+  }, [employeesPage, employeesReloadKey, submittedEmployeeKeyword]);
 
   useEffect(() => {
     const openCreate = () => {
-      setRankForm(createEmptyRankForm());
-      setRankSubmitError(null);
-      setRankModalMode('create');
+      setDepartmentForm(createEmptyDepartmentForm());
+      setDepartmentSubmitError(null);
+      setDepartmentModalMode('create');
     };
 
-    window.addEventListener('admin:open-rank-create', openCreate);
+    window.addEventListener('admin:open-department-create', openCreate);
     return () => {
-      window.removeEventListener('admin:open-rank-create', openCreate);
+      window.removeEventListener('admin:open-department-create', openCreate);
     };
   }, []);
 
-  const reloadAll = () => {
-    reloadRanks();
+  const reloadAll = async (preferredDeptCd?: string | null) => {
+    await reloadDepartments(preferredDeptCd);
+    setMembersReloadKey((current) => current + 1);
     setEmployeesReloadKey((current) => current + 1);
     setEmployeesPage(1);
-  };
-
-  const applyRankToCurrentEmployees = (empIds: number[]) => {
-    if (!selectedRank) {
-      return;
-    }
-
-    setEmployees((current) =>
-      current.map((employee) =>
-        empIds.includes(employee.empId)
-          ? {
-              ...employee,
-              jobGrdCd: selectedRank.rankId,
-              jobGrade: {
-                jobGrdCd: selectedRank.rankId,
-                jobGrdNm: selectedRank.rankName,
-                useYn: selectedRank.enabled,
-              },
-            }
-          : employee,
-      ),
-    );
-  };
-
-  const clearRankFromCurrentEmployees = (empIds: number[]) => {
-    setEmployees((current) =>
-      current.map((employee) =>
-        empIds.includes(employee.empId)
-          ? {
-              ...employee,
-              jobGrdCd: null,
-              jobGrade: null,
-            }
-          : employee,
-      ),
-    );
   };
 
   const handleEmployeeSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -250,142 +292,92 @@ export default function AdminRanksPage() {
   };
 
   const openCreateModal = () => {
-    setRankForm(createEmptyRankForm());
-    setRankSubmitError(null);
-    setRankModalMode('create');
+    setDepartmentForm(createEmptyDepartmentForm());
+    setDepartmentSubmitError(null);
+    setDepartmentModalMode('create');
   };
 
   const openEditModal = () => {
-    if (!selectedRank) {
+    if (!selectedDepartment) {
       return;
     }
 
-    setRankForm({
-      rankId: selectedRank.rankId,
-      rankName: selectedRank.rankName,
-      sortOrder: selectedRank.sortOrder,
+    setDepartmentForm({
+      deptNm: selectedDepartment.deptNm,
+      parentDeptCd: selectedDepartment.parentDeptCd ?? '',
     });
-    setRankSubmitError(null);
-    setRankModalMode('edit');
+    setDepartmentSubmitError(null);
+    setDepartmentModalMode('edit');
   };
 
-  const closeRankModal = () => {
-    if (rankSubmitting) {
+  const closeDepartmentModal = () => {
+    if (departmentSubmitting) {
       return;
     }
 
-    setRankModalMode(null);
-    setRankSubmitError(null);
+    setDepartmentModalMode(null);
+    setDepartmentSubmitError(null);
   };
 
-  const submitRankForm = async () => {
-    if (!rankForm.rankName.trim()) {
-      setRankSubmitError('직급명을 입력해 주세요.');
+  const submitDepartmentForm = async () => {
+    if (!departmentForm.deptNm.trim()) {
+      setDepartmentSubmitError('부서명을 입력해 주세요.');
       return;
     }
 
-    if (!Number.isFinite(rankForm.sortOrder) || rankForm.sortOrder < 0) {
-      setRankSubmitError('정렬 순서를 0 이상 숫자로 입력해 주세요.');
-      return;
-    }
-
-    if (rankModalMode === 'create' && !rankForm.rankId.trim()) {
-      setRankSubmitError('직급 ID를 입력해 주세요.');
-      return;
-    }
-
-    setRankSubmitting(true);
-    setRankSubmitError(null);
+    setDepartmentSubmitting(true);
+    setDepartmentSubmitError(null);
 
     try {
+      const parentDeptCd =
+        departmentForm.parentDeptCd === noParentDepartmentValue
+          ? undefined
+          : departmentForm.parentDeptCd.trim() || undefined;
       const response =
-        rankModalMode === 'create'
-          ? await adminApi.createRank({
-              rankId: rankForm.rankId.trim(),
-              rankName: rankForm.rankName.trim(),
-              sortOrder: rankForm.sortOrder,
+        departmentModalMode === 'create'
+          ? await adminApi.createDepartment({
+              ...(parentDeptCd ? { parentDeptCd } : {}),
+              deptNm: departmentForm.deptNm.trim(),
             })
-          : selectedRank
-            ? await adminApi.updateRank(selectedRank.rankId, {
-                rankName: rankForm.rankName.trim(),
-                sortOrder: rankForm.sortOrder,
-                enabled: selectedRank.enabled,
+          : selectedDepartment
+            ? await adminApi.updateDepartment(selectedDepartment.deptCd, {
+                ...(parentDeptCd ? { parentDeptCd } : {}),
+                deptNm: departmentForm.deptNm.trim(),
               })
             : null;
-      const nextRank = response?.data.data ?? null;
+      const nextDepartment = response?.data.data ?? null;
 
-      setRankModalMode(null);
-      reloadRanks();
+      setDepartmentModalMode(null);
+      await reloadAll(nextDepartment?.deptCd ?? selectedDepartment?.deptCd);
 
-      if (nextRank) {
-        selectRank(nextRank.rankId);
+      if (nextDepartment) {
+        selectDepartment(nextDepartment.deptCd);
       }
     } catch (err) {
-      setRankSubmitError(getErrorMessage(err));
+      setDepartmentSubmitError(getErrorMessage(err));
     } finally {
-      setRankSubmitting(false);
+      setDepartmentSubmitting(false);
     }
   };
 
-  const handleRankSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleDepartmentSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (rankModalMode === 'edit' && selectedRank) {
+    if (departmentModalMode === 'edit' && selectedDepartment) {
       setConfirmAction({
-        title: '직급을 수정할까요?',
-        description: `${selectedRank.rankName} 직급의 이름과 정렬 순서가 변경됩니다.`,
+        title: '부서를 수정할까요?',
+        description: `${selectedDepartment.deptNm} 부서 정보가 변경됩니다.`,
         confirmText: '수정',
-        onConfirm: submitRankForm,
+        onConfirm: submitDepartmentForm,
       });
       return;
     }
 
-    void submitRankForm();
-  };
-
-  const requestStatusToggle = () => {
-    if (!selectedRank) {
-      return;
-    }
-
-    const nextEnabled = selectedRank.enabled === 'Y' ? 'N' : 'Y';
-
-    setConfirmAction({
-      title:
-        nextEnabled === 'Y'
-          ? '직급을 사용 상태로 변경할까요?'
-          : '직급을 비활성화할까요?',
-      description: `${selectedRank.rankName} 직급의 사용 여부가 변경됩니다.`,
-      confirmText: nextEnabled === 'Y' ? '사용' : '비활성화',
-      variant: nextEnabled === 'Y' ? 'confirm' : 'danger',
-      onConfirm: () => updateRankStatus(nextEnabled),
-    });
-  };
-
-  const updateRankStatus = async (enabled: 'Y' | 'N') => {
-    if (!selectedRank) {
-      return;
-    }
-
-    setStatusUpdating(true);
-    setStatusError(null);
-
-    try {
-      await adminApi.updateRank(selectedRank.rankId, {
-        rankName: selectedRank.rankName,
-        sortOrder: selectedRank.sortOrder,
-        enabled,
-      });
-      reloadRanks();
-    } catch (err) {
-      setStatusError(getErrorMessage(err));
-    } finally {
-      setStatusUpdating(false);
-    }
+    void submitDepartmentForm();
   };
 
   const openDeleteModal = () => {
-    setReplacementRankId('');
+    setReplacementDeptCd('');
     setDeleteError(null);
     setDeleteOpen(true);
   };
@@ -400,33 +392,33 @@ export default function AdminRanksPage() {
   };
 
   const requestDeleteConfirmation = () => {
-    if (!selectedRank) {
+    if (!selectedDepartment) {
       return;
     }
 
-    const replacement = replacementRankId.trim() || null;
+    const replacement = replacementDeptCd.trim() || null;
 
-    if (assignedEmployeeCount > 0 && !replacement) {
-      setDeleteError('배정된 사원이 있으면 대체 직급을 선택해야 합니다.');
+    if (memberCount > 0 && !replacement) {
+      setDeleteError('소속 인원이 있으면 이동할 부서를 선택해야 합니다.');
       return;
     }
 
-    if (replacement === selectedRank.rankId) {
-      setDeleteError('삭제 대상 직급은 대체 직급으로 선택할 수 없습니다.');
+    if (replacement === selectedDepartment.deptCd) {
+      setDeleteError('삭제 대상 부서를 대체 부서로 선택할 수 없습니다.');
       return;
     }
 
     setConfirmAction({
-      title: '직급을 삭제할까요?',
-      description: `${selectedRank.rankName} 직급이 비활성화됩니다. 배정 사원이 있으면 대체 직급으로 이전됩니다.`,
+      title: '부서를 삭제할까요?',
+      description: `${selectedDepartment.deptNm} 부서가 삭제됩니다. 소속 인원이 있으면 선택한 부서로 이동합니다.`,
       confirmText: '삭제',
       variant: 'danger',
-      onConfirm: () => deleteRank(replacement),
+      onConfirm: () => deleteDepartment(replacement),
     });
   };
 
-  const deleteRank = async (replacementRankId: string | null) => {
-    if (!selectedRank) {
+  const deleteDepartment = async (replacementDeptCd: string | null) => {
+    if (!selectedDepartment) {
       return;
     }
 
@@ -434,9 +426,12 @@ export default function AdminRanksPage() {
     setDeleteError(null);
 
     try {
-      await adminApi.deleteRank(selectedRank.rankId, { replacementRankId });
+      await adminApi.deleteDepartment(
+        selectedDepartment.deptCd,
+        replacementDeptCd ? { replacementDeptCd } : null,
+      );
       setDeleteOpen(false);
-      reloadRanks();
+      await reloadAll();
     } catch (err) {
       setDeleteError(getErrorMessage(err));
     } finally {
@@ -470,25 +465,25 @@ export default function AdminRanksPage() {
   const requestAssignConfirmation = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!selectedRank) {
+    if (!selectedDepartment) {
       return;
     }
 
     if (assignEmployeeIds.length === 0) {
-      setAssignError('직급을 부여할 사원을 선택해 주세요.');
+      setAssignError('부서에 배정할 사원을 선택해 주세요.');
       return;
     }
 
     setConfirmAction({
-      title: '직급을 부여할까요?',
-      description: `${assignEmployeeIds.length}명의 사원에게 ${selectedRank.rankName} 직급을 부여합니다.`,
-      confirmText: '부여',
-      onConfirm: assignRank,
+      title: '사원을 배정할까요?',
+      description: `${assignEmployeeIds.length}명을 ${selectedDepartment.deptNm} 부서에 배정합니다.`,
+      confirmText: '배정',
+      onConfirm: assignMembers,
     });
   };
 
-  const assignRank = async () => {
-    if (!selectedRank) {
+  const assignMembers = async () => {
+    if (!selectedDepartment) {
       return;
     }
 
@@ -496,13 +491,12 @@ export default function AdminRanksPage() {
     setAssignError(null);
 
     try {
-      await adminApi.assignRank(selectedRank.rankId, {
+      await adminApi.assignDepartmentMembers(selectedDepartment.deptCd, {
         empIds: assignEmployeeIds,
       });
-      applyRankToCurrentEmployees(assignEmployeeIds);
       setAssignOpen(false);
       setAssignEmployeeIds([]);
-      reloadAll();
+      await reloadAll(selectedDepartment.deptCd);
     } catch (err) {
       setAssignError(getErrorMessage(err));
     } finally {
@@ -510,62 +504,83 @@ export default function AdminRanksPage() {
     }
   };
 
-  const toggleAssignedEmployee = (empId: number) => {
-    setSelectedAssignedEmployeeIds((current) =>
+  const toggleMember = (empId: number) => {
+    setSelectedMemberIds((current) =>
       current.includes(empId)
         ? current.filter((id) => id !== empId)
         : [...current, empId],
     );
   };
 
-  const requestRevokeConfirmation = () => {
-    if (!selectedRank) {
+  const openTransferModal = () => {
+    setTransferError(null);
+    setTargetDeptCd('');
+    setTransferOpen(true);
+  };
+
+  const closeTransferModal = () => {
+    if (transferSubmitting) {
       return;
     }
 
-    if (selectedAssignedEmployeeIds.length === 0) {
-      setRevokeError('회수할 사원을 선택해 주세요.');
+    setTransferOpen(false);
+    setTransferError(null);
+  };
+
+  const requestTransferConfirmation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!selectedDepartment) {
+      return;
+    }
+
+    if (selectedMemberIds.length === 0) {
+      setTransferError('이동할 사원을 선택해 주세요.');
+      return;
+    }
+
+    if (!targetDeptCd) {
+      setTransferError('이동할 대상 부서를 선택해 주세요.');
       return;
     }
 
     setConfirmAction({
-      title: '직급을 회수할까요?',
-      description: `${selectedAssignedEmployeeIds.length}명의 사원에게서 ${selectedRank.rankName} 직급을 회수합니다.`,
-      confirmText: '회수',
-      variant: 'danger',
-      onConfirm: revokeRank,
+      title: '사원을 이동할까요?',
+      description: `${selectedMemberIds.length}명을 선택한 부서로 이동합니다.`,
+      confirmText: '이동',
+      onConfirm: transferMembers,
     });
   };
 
-  const revokeRank = async () => {
-    if (!selectedRank) {
+  const transferMembers = async () => {
+    if (!selectedDepartment) {
       return;
     }
 
-    setRevokeSubmitting(true);
-    setRevokeError(null);
+    setTransferSubmitting(true);
+    setTransferError(null);
 
     try {
-      await adminApi.revokeRank(selectedRank.rankId, {
-        empIds: selectedAssignedEmployeeIds,
+      await adminApi.transferDepartmentMembers(selectedDepartment.deptCd, {
+        targetDeptCd,
+        empIds: selectedMemberIds,
       });
-      clearRankFromCurrentEmployees(selectedAssignedEmployeeIds);
-      setSelectedAssignedEmployeeIds([]);
-      reloadAll();
+      setTransferOpen(false);
+      setSelectedMemberIds([]);
+      await reloadAll(selectedDepartment.deptCd);
     } catch (err) {
-      setRevokeError(getErrorMessage(err));
+      setTransferError(getErrorMessage(err));
     } finally {
-      setRevokeSubmitting(false);
+      setTransferSubmitting(false);
     }
   };
 
   const closeConfirm = () => {
     if (
-      rankSubmitting ||
-      statusUpdating ||
+      departmentSubmitting ||
       deleteSubmitting ||
       assignSubmitting ||
-      revokeSubmitting
+      transferSubmitting
     ) {
       return;
     }
@@ -584,21 +599,15 @@ export default function AdminRanksPage() {
     setConfirmAction(null);
   };
 
-  const replacementOptions = ranks.filter(
-    (rank) => rank.rankId !== selectedRank?.rankId,
-  );
-  const assignedEmployeeCount =
-    selectedRank?.assignedEmployeeCount ?? assignedEmployees.length;
-
   return (
     <section className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-2xl font-bold tracking-tight text-slate-950">
-            직급 관리
+            부서 관리
           </h2>
           <p className="mt-2 text-sm font-medium text-slate-500">
-            직급 생성, 정렬 순서, 사용 여부와 사원 배정을 관리합니다.
+            부서 생성, 소속 인원, 사원 배정과 부서 이동을 관리합니다.
           </p>
         </div>
 
@@ -606,8 +615,8 @@ export default function AdminRanksPage() {
           <Button
             variant="outline"
             leftIcon={<RefreshCw size={17} />}
-            loading={ranksLoading || employeesLoading}
-            onClick={reloadAll}
+            loading={departmentsLoading || membersLoading || employeesLoading}
+            onClick={() => void reloadAll()}
           >
             새로고침
           </Button>
@@ -616,57 +625,59 @@ export default function AdminRanksPage() {
             leftIcon={<PlusCircle size={17} />}
             onClick={openCreateModal}
           >
-            직급 생성
+            부서 생성
           </Button>
         </div>
       </div>
 
-      {ranksError ? (
+      {departmentsError ? (
         <EmptyState
-          title="직급 목록을 불러오지 못했습니다."
-          description={ranksError.message}
+          title="부서 목록을 불러오지 못했습니다."
+          description={departmentsError.message}
           actions={
-            <Button variant="outline" onClick={reloadRanks}>
+            <Button variant="outline" onClick={reloadDepartments}>
               다시 시도
             </Button>
           }
         />
-      ) : ranks.length === 0 && !ranksLoading ? (
+      ) : departments.length === 0 && !departmentsLoading ? (
         <EmptyState
-          icon={<IdCard size={24} />}
-          title="등록된 직급이 없습니다."
-          description="직급 생성 버튼으로 새 직급을 등록할 수 있습니다."
+          icon={<Building2 size={24} />}
+          title="등록된 부서가 없습니다."
+          description="부서 생성 버튼으로 새 부서를 등록할 수 있습니다."
         />
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <ContentCard title="선택 직급">
+            <ContentCard title="선택 부서">
               <div className="flex items-end justify-between gap-4">
                 <div className="min-w-0">
                   <div className="truncate text-2xl font-bold tracking-tight text-slate-950">
-                    {selectedRank?.rankName ?? '-'}
+                    {selectedDepartment?.deptNm ?? '-'}
                   </div>
                   <p className="mt-1 truncate text-sm font-semibold text-slate-500">
-                    {selectedRank?.rankId ?? '-'}
+                    {selectedDepartment?.deptCd ?? '-'}
                   </p>
                 </div>
-                <IdCard size={26} className="shrink-0 text-blue-600" />
+                <Building2 size={26} className="shrink-0 text-blue-600" />
               </div>
             </ContentCard>
 
-            <ContentCard title="정렬 순서">
+            <ContentCard title="상위 부서">
               <div className="flex items-end justify-between gap-4">
-                <div className="text-3xl font-bold tracking-tight text-slate-950">
-                  {selectedRank?.sortOrder ?? '-'}
+                <div className="min-w-0 text-xl font-bold tracking-tight text-slate-950">
+                  {selectedDepartment?.parentDeptNm ?? '-'}
                 </div>
-                <Badge variant="outline">SORT_ORDER</Badge>
+                <Badge variant="outline">
+                  {selectedDepartment?.parentDeptCd ?? 'ROOT'}
+                </Badge>
               </div>
             </ContentCard>
 
-            <ContentCard title="배정 사원">
+            <ContentCard title="소속 인원">
               <div className="flex items-end justify-between gap-4">
                 <div className="text-3xl font-bold tracking-tight text-slate-950">
-                  {assignedEmployeeCount}
+                  {memberCount}
                 </div>
                 <Users size={26} className="text-emerald-600" />
               </div>
@@ -674,10 +685,10 @@ export default function AdminRanksPage() {
           </div>
 
           <ContentCard
-            title={selectedRank?.rankName ?? '직급 상세'}
-            description="선택한 직급의 정보와 배정 사원을 관리합니다."
+            title={selectedDepartment?.deptNm ?? '부서 상세'}
+            description="선택한 부서의 소속 인원과 부서 이동을 관리합니다."
             actions={
-              selectedRank ? (
+              selectedDepartment ? (
                 <>
                   <Button
                     variant="outline"
@@ -685,22 +696,7 @@ export default function AdminRanksPage() {
                     leftIcon={<Pencil size={15} />}
                     onClick={openEditModal}
                   >
-                    직급 수정
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={
-                      selectedRank.enabled === 'Y' ? (
-                        <ToggleLeft size={15} />
-                      ) : (
-                        <ToggleRight size={15} />
-                      )
-                    }
-                    loading={statusUpdating}
-                    onClick={requestStatusToggle}
-                  >
-                    {selectedRank.enabled === 'Y' ? '비활성화' : '사용'}
+                    부서 수정
                   </Button>
                   <Button
                     variant="danger"
@@ -708,7 +704,7 @@ export default function AdminRanksPage() {
                     leftIcon={<Trash2 size={15} />}
                     onClick={openDeleteModal}
                   >
-                    직급 삭제
+                    부서 삭제
                   </Button>
                   <Button
                     variant="primary"
@@ -716,93 +712,84 @@ export default function AdminRanksPage() {
                     leftIcon={<UserPlus size={15} />}
                     onClick={openAssignModal}
                   >
-                    직급 부여
+                    사원 배정
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    leftIcon={<UserMinus size={15} />}
-                    disabled={
-                      selectedAssignedEmployeeIds.length === 0 ||
-                      revokeSubmitting
-                    }
-                    loading={revokeSubmitting}
-                    onClick={requestRevokeConfirmation}
+                    leftIcon={<MoveRight size={15} />}
+                    disabled={selectedMemberIds.length === 0}
+                    onClick={openTransferModal}
                   >
-                    직급 회수
+                    사원 부서 이동
                   </Button>
                 </>
               ) : null
             }
           >
-            {statusError && (
+            {departmentError && (
               <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
-                {statusError}
+                {departmentError}
               </p>
             )}
-            {revokeError && (
+            {membersError && (
               <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
-                {revokeError}
+                {membersError}
               </p>
             )}
             <DataTable
-              data={assignedEmployees}
-              getRowKey={(employee) => String(employee.empId)}
+              data={members}
+              getRowKey={(member) => String(member.empId)}
               emptyText={
-                employeesLoading
-                  ? '사원 목록을 불러오는 중입니다.'
-                  : '현재 조회된 사원 중 이 직급에 배정된 사원이 없습니다.'
+                departmentLoading || membersLoading
+                  ? '소속 인원을 불러오는 중입니다.'
+                  : '현재 부서에 소속된 사원이 없습니다.'
               }
               columns={[
                 {
                   key: 'select',
                   header: '',
-                  render: (employee) => (
+                  render: (member) => (
                     <input
                       type="checkbox"
-                      checked={selectedAssignedEmployeeIds.includes(
-                        employee.empId,
-                      )}
-                      onChange={() => toggleAssignedEmployee(employee.empId)}
+                      checked={selectedMemberIds.includes(member.empId)}
+                      onChange={() => toggleMember(member.empId)}
                       className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      aria-label={`${employee.empNm} 회수 선택`}
+                      aria-label={`${member.empNm} 이동 선택`}
                     />
                   ),
                 },
                 {
                   key: 'employee',
                   header: '사원',
-                  render: (employee) => (
+                  render: (member) => (
                     <div>
                       <div className="font-bold text-slate-950">
-                        {employee.empNm}
+                        {member.empNm}
                       </div>
                       <div className="mt-1 text-xs font-semibold text-slate-400">
-                        EMP-{employee.empId}
+                        EMP-{member.empId}
                       </div>
                     </div>
                   ),
                 },
                 {
-                  key: 'dept',
-                  header: '부서',
-                  render: (employee) => getEmployeeDepartment(employee),
-                },
-                {
                   key: 'rank',
                   header: '직급',
-                  render: (employee) => (
-                    <Badge variant="outline">{getEmployeeRankName(employee)}</Badge>
-                  ),
+                  render: (member) => member.jobGrdNm ?? member.jobGrdCd ?? '-',
                 },
                 {
-                  key: 'enabled',
-                  header: '사용',
-                  render: (employee) => (
-                    <Badge
-                      variant={employee.enabled === 'Y' ? 'success' : 'danger'}
-                    >
-                      {employee.enabled === 'Y' ? '사용' : '중지'}
+                  key: 'position',
+                  header: '직책',
+                  render: (member) =>
+                    member.jobPstnNm ?? member.jobPstnCd ?? '-',
+                },
+                {
+                  key: 'status',
+                  header: '상태',
+                  render: (member) => (
+                    <Badge variant="outline">
+                      {member.empStatNm ?? member.empStatCd ?? '-'}
                     </Badge>
                   ),
                 },
@@ -812,7 +799,7 @@ export default function AdminRanksPage() {
 
           <ContentCard
             title="전체 사원 목록"
-            description="직급 부여 모달에서 선택 가능한 사원 목록입니다."
+            description="사원 배정 모달에서 선택 가능한 기준 목록입니다."
             actions={
               <form onSubmit={handleEmployeeSearch} className="flex gap-2">
                 <SearchInput
@@ -861,7 +848,7 @@ export default function AdminRanksPage() {
                     {
                       key: 'dept',
                       header: '부서',
-                      render: (employee) => getEmployeeDepartment(employee),
+                      render: (employee) => getEmployeeDepartmentName(employee),
                     },
                     {
                       key: 'rank',
@@ -869,17 +856,9 @@ export default function AdminRanksPage() {
                       render: (employee) => getEmployeeRankName(employee),
                     },
                     {
-                      key: 'enabled',
-                      header: '사용',
-                      render: (employee) => (
-                        <Badge
-                          variant={
-                            employee.enabled === 'Y' ? 'success' : 'danger'
-                          }
-                        >
-                          {employee.enabled === 'Y' ? '사용' : '중지'}
-                        </Badge>
-                      ),
+                      key: 'position',
+                      header: '직책',
+                      render: (employee) => getEmployeePositionName(employee),
                     },
                   ]}
                 />
@@ -898,27 +877,27 @@ export default function AdminRanksPage() {
       )}
 
       <Modal
-        open={rankModalMode !== null}
-        title={rankModalMode === 'create' ? '직급 생성' : '직급 수정'}
+        open={departmentModalMode !== null}
+        title={departmentModalMode === 'create' ? '부서 생성' : '부서 수정'}
         description={
-          rankModalMode === 'create'
-            ? '직급 ID, 직급명, 정렬 순서를 입력합니다.'
-            : '직급 ID는 수정할 수 없습니다.'
+          departmentModalMode === 'create'
+            ? '부서명과 상위 부서를 입력합니다. 부서 코드는 서버에서 자동 생성합니다.'
+            : '부서명과 상위 부서를 수정합니다.'
         }
-        onClose={closeRankModal}
+        onClose={closeDepartmentModal}
         footer={
           <>
             <Button
               variant="outline"
-              onClick={closeRankModal}
-              disabled={rankSubmitting}
+              onClick={closeDepartmentModal}
+              disabled={departmentSubmitting}
             >
               취소
             </Button>
             <Button
               type="submit"
-              form="admin-rank-form"
-              loading={rankSubmitting}
+              form="admin-department-form"
+              loading={departmentSubmitting}
             >
               저장
             </Button>
@@ -926,50 +905,41 @@ export default function AdminRanksPage() {
         }
       >
         <form
-          id="admin-rank-form"
+          id="admin-department-form"
           className="grid gap-4 md:grid-cols-2"
-          onSubmit={handleRankSubmit}
+          onSubmit={handleDepartmentSubmit}
         >
           <FormField
-            label="직급 ID"
-            required={rankModalMode === 'create'}
-            disabled={rankModalMode === 'edit'}
-            value={rankForm.rankId}
-            placeholder="RANK_MANAGER"
-            onChange={(event) =>
-              setRankForm((current) => ({
-                ...current,
-                rankId: event.target.value,
-              }))
-            }
-          />
-          <FormField
-            label="직급명"
+            label="부서명"
             required
-            value={rankForm.rankName}
+            value={departmentForm.deptNm}
             onChange={(event) =>
-              setRankForm((current) => ({
+              setDepartmentForm((current) => ({
                 ...current,
-                rankName: event.target.value,
+                deptNm: event.target.value,
               }))
             }
           />
-          <FormField
-            label="정렬 순서"
-            type="number"
-            min={0}
-            required
-            value={rankForm.sortOrder}
+          <Select
+            label="상위 부서"
+            value={departmentForm.parentDeptCd || noParentDepartmentValue}
             onChange={(event) =>
-              setRankForm((current) => ({
+              setDepartmentForm((current) => ({
                 ...current,
-                sortOrder: Number(event.target.value),
+                parentDeptCd: event.target.value,
               }))
             }
+            options={[
+              { value: noParentDepartmentValue, label: '없음' },
+              ...parentOptions.map((department) => ({
+                value: department.deptCd,
+                label: department.deptNm,
+              })),
+            ]}
           />
-          {rankSubmitError && (
+          {departmentSubmitError && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 md:col-span-2">
-              {rankSubmitError}
+              {departmentSubmitError}
             </p>
           )}
         </form>
@@ -977,8 +947,8 @@ export default function AdminRanksPage() {
 
       <Modal
         open={deleteOpen}
-        title="직급 삭제"
-        description="배정 사원이 있으면 대체 직급으로 이전한 뒤 기존 직급이 비활성화됩니다."
+        title="부서 삭제"
+        description="소속 인원이 있으면 이동할 대체 부서를 선택해야 합니다."
         variant="danger"
         onClose={closeDeleteModal}
         footer={
@@ -1003,24 +973,24 @@ export default function AdminRanksPage() {
         <div className="flex flex-col gap-4">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-bold text-slate-900">
-              {selectedRank?.rankName}
+              {selectedDepartment?.deptNm}
             </p>
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              배정 사원 {assignedEmployeeCount}명
+              소속 인원 {memberCount}명
             </p>
           </div>
 
-          {assignedEmployeeCount > 0 && (
+          {memberCount > 0 && (
             <Select
-              label="대체 직급"
+              label="이동할 부서"
               required
-              value={replacementRankId}
-              onChange={(event) => setReplacementRankId(event.target.value)}
+              value={replacementDeptCd}
+              onChange={(event) => setReplacementDeptCd(event.target.value)}
               options={[
-                { value: '', label: '대체 직급 선택' },
-                ...replacementOptions.map((rank) => ({
-                  value: rank.rankId,
-                  label: rank.rankName,
+                { value: '', label: '대체 부서 선택' },
+                ...replacementOptions.map((department) => ({
+                  value: department.deptCd,
+                  label: department.deptNm,
                 })),
               ]}
             />
@@ -1036,8 +1006,8 @@ export default function AdminRanksPage() {
 
       <Modal
         open={assignOpen}
-        title="직급 부여"
-        description="선택한 직급을 여러 사원에게 한 번에 부여합니다."
+        title="사원 배정"
+        description="선택한 사원을 현재 부서에 배정합니다."
         size="xl"
         onClose={closeAssignModal}
         footer={
@@ -1051,16 +1021,16 @@ export default function AdminRanksPage() {
             </Button>
             <Button
               type="submit"
-              form="admin-rank-assign-form"
+              form="admin-department-assign-form"
               loading={assignSubmitting}
             >
-              부여
+              배정
             </Button>
           </>
         }
       >
         <form
-          id="admin-rank-assign-form"
+          id="admin-department-assign-form"
           className="flex flex-col gap-4"
           onSubmit={requestAssignConfirmation}
         >
@@ -1107,12 +1077,12 @@ export default function AdminRanksPage() {
                 },
                 {
                   key: 'dept',
-                  header: '부서',
-                  render: (employee) => getEmployeeDepartment(employee),
+                  header: '현재 부서',
+                  render: (employee) => getEmployeeDepartmentName(employee),
                 },
                 {
                   key: 'rank',
-                  header: '현재 직급',
+                  header: '직급',
                   render: (employee) => getEmployeeRankName(employee),
                 },
               ]}
@@ -1122,6 +1092,59 @@ export default function AdminRanksPage() {
           {assignError && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
               {assignError}
+            </p>
+          )}
+        </form>
+      </Modal>
+
+      <Modal
+        open={transferOpen}
+        title="사원 부서 이동"
+        description="현재 부서에서 선택한 사원을 다른 부서로 이동합니다."
+        onClose={closeTransferModal}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={closeTransferModal}
+              disabled={transferSubmitting}
+            >
+              취소
+            </Button>
+            <Button
+              type="submit"
+              form="admin-department-transfer-form"
+              loading={transferSubmitting}
+            >
+              이동
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="admin-department-transfer-form"
+          className="flex flex-col gap-4"
+          onSubmit={requestTransferConfirmation}
+        >
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+            선택 사원 {selectedMemberIds.length}명
+          </div>
+          <Select
+            label="이동할 부서"
+            required
+            value={targetDeptCd}
+            onChange={(event) => setTargetDeptCd(event.target.value)}
+            options={[
+              { value: '', label: '대상 부서 선택' },
+              ...replacementOptions.map((department) => ({
+                value: department.deptCd,
+                label: department.deptNm,
+              })),
+            ]}
+          />
+          {transferError && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+              {transferError}
             </p>
           )}
         </form>
@@ -1138,11 +1161,10 @@ export default function AdminRanksPage() {
             <Button
               variant="outline"
               disabled={
-                rankSubmitting ||
-                statusUpdating ||
+                departmentSubmitting ||
                 deleteSubmitting ||
                 assignSubmitting ||
-                revokeSubmitting
+                transferSubmitting
               }
               onClick={closeConfirm}
             >
@@ -1153,11 +1175,10 @@ export default function AdminRanksPage() {
                 confirmAction?.variant === 'danger' ? 'danger' : 'primary'
               }
               loading={
-                rankSubmitting ||
-                statusUpdating ||
+                departmentSubmitting ||
                 deleteSubmitting ||
                 assignSubmitting ||
-                revokeSubmitting
+                transferSubmitting
               }
               onClick={() => void runConfirmedAction()}
             >
