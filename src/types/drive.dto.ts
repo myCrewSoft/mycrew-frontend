@@ -7,10 +7,6 @@ export interface DriveResponseDto {
     frstRegDt?: string
     lastMdfcnDt?: string
     timeAgo?: string
-    fileSz?: string           // 파일 크기 (byte) — 파일일 때만
+    fileSz?: number           // 파일 크기 (byte) — 파일일 때만
     orgnlFileNm?: string      // 원본 파일명 — 파일일 때만
-}
-
-export interface DriveRenameRequestDto {
-    itemNm : string
 }
