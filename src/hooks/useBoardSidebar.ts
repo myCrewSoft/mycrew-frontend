@@ -2,13 +2,21 @@
 import { useEffect, useState } from 'react'
 import { FileText } from 'lucide-react'
 import { boardApi } from '../api/boardApi'
+import type { BoardSideBarResponse } from '../types'
 
-// 백엔드 응답 규격에 맞춘 인터페이스
-interface BoardSideBarResponse {
-  boardTypeCd: string;
-  boardName: string;
-  underlevel?: BoardSideBarResponse[] | null;
+const boardPathByTypeCd: Record<string, string> = {
+  NOTICE: '/boards/notices',
+  DEPT: '/boards/departments',
+  FREE: '/boards/free',
+  ANONYMOUS: '/boards/anonymous',
 }
+
+const getBoardPath = (boardTypeCd: string) =>
+  boardPathByTypeCd[boardTypeCd.toUpperCase()] ?? `/boards/${boardTypeCd.toLowerCase()}`
+
+const getDepartmentPath = (deptCd: string) => `/boards/dept/${encodeURIComponent(deptCd)}`
+const getDepartmentActiveKey = (deptCd: string, boardName: string) =>
+  `${getDepartmentPath(deptCd)}?boardName=${encodeURIComponent(boardName)}`
 
 export const useBoardSidebar = (sidebarKey: string) => {
   const [dynamicBoards, setDynamicBoards] = useState<BoardSideBarResponse[]>([])
@@ -41,13 +49,14 @@ export const useBoardSidebar = (sidebarKey: string) => {
     ? dynamicBoards.map((board: BoardSideBarResponse) => ({
         icon: FileText,
         label: board.boardName,
-        path: `/board/${board.boardTypeCd.toLowerCase()}`,
+        path: getBoardPath(board.boardTypeCd),
         // 💡 underlevel이 있다면 children으로 변환하여 계층 구조 유지
         children: Array.isArray(board.underlevel)
           ? board.underlevel.map((sub: BoardSideBarResponse) => ({
               icon: FileText,
               label: sub.boardName,
-              path: `/board/${sub.boardName}`,
+              path: getDepartmentPath(sub.boardTypeCd),
+              activeKey: getDepartmentActiveKey(sub.boardTypeCd, sub.boardName),
             }))
           : undefined
       }))

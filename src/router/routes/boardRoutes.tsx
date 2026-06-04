@@ -8,6 +8,8 @@ export const boardRoutes: RouteObject[] = [
   { path: '/boards/notices/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/departments', element: <BoardPage /> },
   { path: '/boards/departments/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards/dept/:deptCd', element: <BoardPage /> },
+  { path: '/boards/dept/:deptCd/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/free', element: <BoardPage /> },
   { path: '/boards/free/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/anonymous', element: <BoardPage /> },

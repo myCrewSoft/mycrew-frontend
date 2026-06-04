@@ -14,6 +14,10 @@ import type { components } from "./generated";
 // export type TokenResponseDto  = components['schemas']['TokenResponseDto'];
 // 게시판
 export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];
+export type BoardResponse = components['schemas']['BoardResponse'];
+export type PageBoardResponse = components['schemas']['PageBoardResponse'];
+export type ApiResponsePageBoardResponse =
+  components['schemas']['ApiResponsePageBoardResponse'];
 // 일정 관리
 export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
