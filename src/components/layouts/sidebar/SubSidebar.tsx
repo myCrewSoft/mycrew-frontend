@@ -6,6 +6,7 @@ import Button from '../../common/button/Button'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
 import MeetingSubSidebarContent from './MeetingSubSidebarContent'
 import ReservationSubSidebarContent from './ReservationSubSidebarContent'
+import MailSubSidebarContent from './MailSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
@@ -31,6 +32,7 @@ const isMenuActive = (pathname: string, search: string, item: any) =>
 // 추가할 경우 아래와 동일하게 추가할 것
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
 const customSidebarContentMap: Record<string, ComponentType> = {
+  mail: MailSubSidebarContent,
   calendar: CalendarSubSidebarContent,
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,

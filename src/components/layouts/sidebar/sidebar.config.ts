@@ -74,7 +74,7 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
     title: '메일',
     actions: [
       { label: '메일 쓰기', variant: 'primary' },
-      { label: '내게 쓰기' },
+      { label: '전체 메일 보기' },
     ],
     sections: [
       {
@@ -82,7 +82,7 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
         items: [
           { icon: Inbox, label: '받은 메일함', path: '/mail/inbox' },
           { icon: Send, label: '보낸 메일함', path: '/mail/sent' },
-          { icon: Archive, label: '보관함', path: '/mail/archive' },
+          { icon: Archive, label: '전체 메일', path: '/mail/all' },
         ],
       },
     ],
