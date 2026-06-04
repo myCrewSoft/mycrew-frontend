@@ -28,4 +28,11 @@ export const driveApi = {
       axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive'),
 
 
+  // 즐겨찾기 등록/해제 
+  toggleBookmark: (driveItemId: number) =>
+    axiosInstance.patch<ApiResponse<DriveResponseDto>>(`/api/drive/items/${driveItemId}/bookmark`),
+
+  //단건 삭제
+  deleteItem : (driveItemId:number) => 
+    axiosInstance.patch<ApiResponse<string>>(`/api/drive/items/${driveItemId}/delete`)
 }
