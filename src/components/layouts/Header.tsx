@@ -6,12 +6,14 @@ import NotificationIconButton from '../common/button/NotificationIconButton'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
 import GlobalSearchPalette from './headerSearch/GlobalSearchPalette'
 import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
+import { useMessengerSocketContext } from './headerPopover/messenger/MessengerSocketProvider'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
 import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
 
 const Header = () => {
   // Global search palette open state. Header owns only opening/closing.
   const [searchOpen, setSearchOpen] = useState(false)
+  const { unreadCount: messengerUnreadCount } = useMessengerSocketContext()
 
   const { execute: readAllNotifications } = useApi<null>(
     notificationApi.readAllNotifications,
@@ -79,7 +81,7 @@ const Header = () => {
               <NotificationIconButton
                 active={open}
                 label="메신저"
-                count={7}
+                count={messengerUnreadCount}
                 onClick={toggle}
                 icon={
                   <MessageSquare

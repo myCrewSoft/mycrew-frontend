@@ -2,6 +2,7 @@ import { Check, ChevronDown, LogOut, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../../common/button/Button';
+import { authApi } from '../../../../api/authApi';
 import { useMyProfile, getProfileInitial, getProfileMeta } from '../../../../hooks/useMyProfile';
 import { useAuth } from '../../../../store/AuthContext';
 
@@ -35,10 +36,14 @@ const HeaderProfileStatusMenu = () => {
     statusOptions.find((option) => option.value === status) ?? statusOptions[0];
   const profileMeta = getProfileMeta(profile);
 
-  const handleLogout = () => {
-    clearAuth();
-    setOpen(false);
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearAuth();
+      setOpen(false);
+      navigate('/login', { replace: true });
+    }
   };
 
   useEffect(() => {
@@ -151,7 +156,7 @@ const HeaderProfileStatusMenu = () => {
               variant="outline"
               size="sm"
               leftIcon={<LogOut size={15} />}
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
             >
               로그아웃
             </Button>

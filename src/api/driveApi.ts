@@ -1,7 +1,7 @@
 //드라이브 API 함수 모음
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
-import type { DriveRenameRequestDto, DriveResponseDto } from '../types/drive.dto'
+import type { DriveResponseDto } from '../types/drive.dto'
 
 export const driveApi = {
 
@@ -23,15 +23,10 @@ export const driveApi = {
     )
   },
 
-  // 드라이브 목록 조회
-  getMyDriveList: (prntDriveItemId?: number) =>
-  axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive', {
-    params: { prntDriveItemId }
-  }),
+  //드라이브 목록 조회
+  getMyDriveList : () => 
+      axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive'),
 
-  // 폴더명 수정
-  renameFolder : (driveItemId:number, reqDto:DriveRenameRequestDto) => 
-    axiosInstance.patch<ApiResponse<DriveResponseDto>>(`/api/drive/folders/${driveItemId}/name`, reqDto),
 
   // 즐겨찾기 등록/해제 
   toggleBookmark: (driveItemId: number) =>
