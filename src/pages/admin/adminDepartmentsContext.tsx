@@ -27,7 +27,6 @@ export function AdminDepartmentsProvider({ children }: { children: ReactNode }) 
   const [departmentsError, setDepartmentsError] = useState<ApiError | null>(
     null,
   );
-  const [reloadKey, setReloadKey] = useState(0);
 
   const selectDepartment = useCallback(
     (deptCd: string) => {
@@ -36,29 +35,20 @@ export function AdminDepartmentsProvider({ children }: { children: ReactNode }) 
     [navigate],
   );
 
-  const reloadDepartments = useCallback(() => {
-    setReloadKey((current) => current + 1);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadDepartments = async () => {
+  const reloadDepartments = useCallback(
+    async (preferredDeptCd?: string | null) => {
       setDepartmentsLoading(true);
       setDepartmentsError(null);
 
       try {
         const response = await adminApi.getDepartments();
         const nextDepartments = sortDepartments(response.data.data ?? []);
-
-        if (!active) {
-          return;
-        }
+        const nextSelectedDeptCd = preferredDeptCd ?? selectedDeptCd;
 
         setDepartments(nextDepartments);
 
         const hasSelectedDepartment = nextDepartments.some(
-          (department) => department.deptCd === selectedDeptCd,
+          (department) => department.deptCd === nextSelectedDeptCd,
         );
 
         if (nextDepartments.length > 0 && !hasSelectedDepartment) {
@@ -70,27 +60,38 @@ export function AdminDepartmentsProvider({ children }: { children: ReactNode }) 
           );
         }
 
+        if (nextDepartments.length > 0 && hasSelectedDepartment) {
+          navigate(
+            `/admin/departments?deptCd=${encodeURIComponent(
+              nextSelectedDeptCd ?? nextDepartments[0].deptCd,
+            )}`,
+            { replace: true },
+          );
+        }
+
         if (nextDepartments.length === 0 && selectedDeptCd) {
           navigate('/admin/departments', { replace: true });
         }
+
+        return nextDepartments;
       } catch (err) {
-        if (active) {
-          setDepartments([]);
-          setDepartmentsError(toApiError(err));
-        }
+        const apiError = toApiError(err);
+
+        setDepartments([]);
+        setDepartmentsError(apiError);
+        throw apiError;
       } finally {
-        if (active) {
-          setDepartmentsLoading(false);
-        }
+        setDepartmentsLoading(false);
       }
-    };
+    },
+    [navigate, selectedDeptCd],
+  );
 
-    void loadDepartments();
-
-    return () => {
-      active = false;
-    };
-  }, [navigate, reloadKey, selectedDeptCd]);
+  useEffect(() => {
+    queueMicrotask(() => {
+      void reloadDepartments().catch(() => undefined);
+    });
+  }, [reloadDepartments]);
 
   const value = useMemo(
     () => ({

@@ -4,6 +4,7 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom';
+import { useMemo } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -26,7 +27,10 @@ import Badge from '../../common/dataDisplay/badge/Badge';
 import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
-import type { AdminAccessResponse } from '../../../types/admin';
+import type {
+  AdminAccessResponse,
+  AdminDepartmentResponseDTO,
+} from '../../../types/admin';
 import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesHooks';
 import { useOptionalAdminRanks } from '../../../pages/admin/adminRanksHooks';
 import { useOptionalAdminDepartments } from '../../../pages/admin/adminDepartmentsHooks';
@@ -45,6 +49,11 @@ interface AdminNavItem {
 interface EmployeeFilterItem {
   label: string;
   empStatCd?: string;
+}
+
+interface DepartmentTreeNode {
+  department: AdminDepartmentResponseDTO;
+  children: DepartmentTreeNode[];
 }
 
 const adminNavItems: AdminNavItem[] = [
@@ -66,6 +75,49 @@ const employeeFilterItems: EmployeeFilterItem[] = [
   })),
 ];
 
+const sortDepartmentNodes = (nodes: DepartmentTreeNode[]) => {
+  nodes.sort((left, right) =>
+    left.department.deptNm.localeCompare(right.department.deptNm, 'ko'),
+  );
+  nodes.forEach((node) => sortDepartmentNodes(node.children));
+  return nodes;
+};
+
+const buildDepartmentTree = (
+  departments: AdminDepartmentResponseDTO[],
+): DepartmentTreeNode[] => {
+  const nodeMap = new Map<string, DepartmentTreeNode>();
+  const roots: DepartmentTreeNode[] = [];
+
+  departments.forEach((department) => {
+    nodeMap.set(department.deptCd, {
+      department,
+      children: [],
+    });
+  });
+
+  departments.forEach((department) => {
+    const node = nodeMap.get(department.deptCd);
+
+    if (!node) {
+      return;
+    }
+
+    const parentNode = department.parentDeptCd
+      ? nodeMap.get(department.parentDeptCd)
+      : null;
+
+    if (parentNode) {
+      parentNode.children.push(node);
+      return;
+    }
+
+    roots.push(node);
+  });
+
+  return sortDepartmentNodes(roots);
+};
+
 export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const { clearAuth } = useAuth();
   const location = useLocation();
@@ -79,6 +131,10 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const adminRoles = useOptionalAdminRoles();
   const adminRanks = useOptionalAdminRanks();
   const adminDepartments = useOptionalAdminDepartments();
+  const departmentTree = useMemo(
+    () => buildDepartmentTree(adminDepartments?.departments ?? []),
+    [adminDepartments?.departments],
+  );
 
   const handleLogout = async () => {
     try {
@@ -104,6 +160,51 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const openDepartmentCreate = () => {
     window.dispatchEvent(new Event('admin:open-department-create'));
   };
+
+  const renderDepartmentNodes = (
+    nodes: DepartmentTreeNode[],
+    depth = 0,
+  ): ReactNode =>
+    nodes.map((node) => {
+      const { department } = node;
+      const active = adminDepartments?.selectedDeptCd === department.deptCd;
+
+      return (
+        <div key={department.deptCd} className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={() => adminDepartments?.selectDepartment(department.deptCd)}
+            className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+              active
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-800 hover:bg-white'
+            }`}
+            style={{ paddingLeft: `${12 + depth * 16}px` }}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              {active ? (
+                <CheckCircle2 size={17} />
+              ) : (
+                <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+              )}
+              <span className="truncate">{department.deptNm}</span>
+            </span>
+            <span
+              className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
+                active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {department.memberCount}
+            </span>
+          </button>
+          {node.children.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {renderDepartmentNodes(node.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#edf3f8] text-slate-950">
@@ -408,46 +509,8 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
                   <div className="rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600">
                     {adminDepartments.departmentsError.message}
                   </div>
-                ) : adminDepartments.departments.length > 0 ? (
-                  adminDepartments.departments.map((department) => {
-                    const active =
-                      adminDepartments.selectedDeptCd === department.deptCd;
-
-                    return (
-                      <button
-                        key={department.deptCd}
-                        type="button"
-                        onClick={() =>
-                          adminDepartments.selectDepartment(department.deptCd)
-                        }
-                        className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
-                          active
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'text-slate-800 hover:bg-white'
-                        }`}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          {active ? (
-                            <CheckCircle2 size={17} />
-                          ) : (
-                            <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
-                          )}
-                          <span className="truncate">
-                            {department.deptNm}
-                          </span>
-                        </span>
-                        <span
-                          className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
-                            active
-                              ? 'bg-white/20 text-white'
-                              : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {department.memberCount}
-                        </span>
-                      </button>
-                    );
-                  })
+                ) : departmentTree.length > 0 ? (
+                  renderDepartmentNodes(departmentTree)
                 ) : (
                   <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
                     등록된 부서가 없습니다.

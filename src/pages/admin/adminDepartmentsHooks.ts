@@ -8,7 +8,9 @@ export interface AdminDepartmentsContextValue {
   departmentsError: ApiError | null;
   selectedDeptCd: string | null;
   selectDepartment: (deptCd: string) => void;
-  reloadDepartments: () => void;
+  reloadDepartments: (
+    preferredDeptCd?: string | null,
+  ) => Promise<AdminDepartmentResponseDTO[]>;
 }
 
 export const AdminDepartmentsContext =

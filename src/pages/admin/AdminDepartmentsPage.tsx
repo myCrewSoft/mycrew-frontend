@@ -31,6 +31,7 @@ import type { AdminEmployeeListItem } from '../../types/adminEmployee';
 import { useAdminDepartments } from './adminDepartmentsHooks';
 
 const pageSize = 10;
+const noParentDepartmentValue = '__NO_PARENT_DEPARTMENT__';
 
 interface DepartmentFormState {
   deptNm: string;
@@ -277,8 +278,8 @@ export default function AdminDepartmentsPage() {
     };
   }, []);
 
-  const reloadAll = () => {
-    reloadDepartments();
+  const reloadAll = async (preferredDeptCd?: string | null) => {
+    await reloadDepartments(preferredDeptCd);
     setMembersReloadKey((current) => current + 1);
     setEmployeesReloadKey((current) => current + 1);
     setEmployeesPage(1);
@@ -328,23 +329,26 @@ export default function AdminDepartmentsPage() {
     setDepartmentSubmitError(null);
 
     try {
-      const parentDeptCd = departmentForm.parentDeptCd.trim() || null;
+      const parentDeptCd =
+        departmentForm.parentDeptCd === noParentDepartmentValue
+          ? undefined
+          : departmentForm.parentDeptCd.trim() || undefined;
       const response =
         departmentModalMode === 'create'
           ? await adminApi.createDepartment({
-              parentDeptCd,
+              ...(parentDeptCd ? { parentDeptCd } : {}),
               deptNm: departmentForm.deptNm.trim(),
             })
           : selectedDepartment
             ? await adminApi.updateDepartment(selectedDepartment.deptCd, {
-                parentDeptCd,
+                ...(parentDeptCd ? { parentDeptCd } : {}),
                 deptNm: departmentForm.deptNm.trim(),
               })
             : null;
       const nextDepartment = response?.data.data ?? null;
 
       setDepartmentModalMode(null);
-      reloadAll();
+      await reloadAll(nextDepartment?.deptCd ?? selectedDepartment?.deptCd);
 
       if (nextDepartment) {
         selectDepartment(nextDepartment.deptCd);
@@ -427,7 +431,7 @@ export default function AdminDepartmentsPage() {
         replacementDeptCd ? { replacementDeptCd } : null,
       );
       setDeleteOpen(false);
-      reloadAll();
+      await reloadAll();
     } catch (err) {
       setDeleteError(getErrorMessage(err));
     } finally {
@@ -492,7 +496,7 @@ export default function AdminDepartmentsPage() {
       });
       setAssignOpen(false);
       setAssignEmployeeIds([]);
-      reloadAll();
+      await reloadAll(selectedDepartment.deptCd);
     } catch (err) {
       setAssignError(getErrorMessage(err));
     } finally {
@@ -563,7 +567,7 @@ export default function AdminDepartmentsPage() {
       });
       setTransferOpen(false);
       setSelectedMemberIds([]);
-      reloadAll();
+      await reloadAll(selectedDepartment.deptCd);
     } catch (err) {
       setTransferError(getErrorMessage(err));
     } finally {
@@ -612,7 +616,7 @@ export default function AdminDepartmentsPage() {
             variant="outline"
             leftIcon={<RefreshCw size={17} />}
             loading={departmentsLoading || membersLoading || employeesLoading}
-            onClick={reloadAll}
+            onClick={() => void reloadAll()}
           >
             새로고침
           </Button>
@@ -918,7 +922,7 @@ export default function AdminDepartmentsPage() {
           />
           <Select
             label="상위 부서"
-            value={departmentForm.parentDeptCd}
+            value={departmentForm.parentDeptCd || noParentDepartmentValue}
             onChange={(event) =>
               setDepartmentForm((current) => ({
                 ...current,
@@ -926,7 +930,7 @@ export default function AdminDepartmentsPage() {
               }))
             }
             options={[
-              { value: '', label: '최상위 부서' },
+              { value: noParentDepartmentValue, label: '없음' },
               ...parentOptions.map((department) => ({
                 value: department.deptCd,
                 label: department.deptNm,
