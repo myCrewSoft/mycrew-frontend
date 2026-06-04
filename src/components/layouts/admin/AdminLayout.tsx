@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ClipboardList,
   FolderKanban,
+  IdCard,
   LogOut,
   Network,
   PlusCircle,
@@ -21,9 +22,12 @@ import {
 } from 'lucide-react';
 import Button from '../../common/button/Button';
 import Badge from '../../common/dataDisplay/badge/Badge';
+import { authApi } from '../../../api/authApi';
 import { useAuth } from '../../../store/AuthContext';
 import { adminEmployeeStatusOptions } from '../../../types/adminEmployee';
 import type { AdminAccessResponse } from '../../../types/admin';
+import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesHooks';
+import { useOptionalAdminRanks } from '../../../pages/admin/adminRanksHooks';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;
@@ -44,6 +48,7 @@ interface EmployeeFilterItem {
 const adminNavItems: AdminNavItem[] = [
   { label: '사원', path: '/admin/users', icon: Users },
   { label: '권한', path: '/admin/roles', icon: ShieldCheck },
+  { label: '직급', path: '/admin/ranks', icon: IdCard },
   { label: '게시판', path: '/admin/boards', icon: ClipboardList },
   { label: '프로젝트', path: '/admin/projects', icon: FolderKanban },
   { label: '조직도', path: '/admin/org', icon: Network },
@@ -64,15 +69,31 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isEmployeesPage = location.pathname.startsWith('/admin/users');
+  const isRolesPage = location.pathname.startsWith('/admin/roles');
+  const isRanksPage = location.pathname.startsWith('/admin/ranks');
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
+  const adminRoles = useOptionalAdminRoles();
+  const adminRanks = useOptionalAdminRanks();
 
-  const handleLogout = () => {
-    clearAuth();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearAuth();
+      navigate('/login', { replace: true });
+    }
   };
 
   const openEmployeeRegister = () => {
     window.dispatchEvent(new Event('admin:open-employee-register'));
+  };
+
+  const openRoleCreate = () => {
+    window.dispatchEvent(new Event('admin:open-role-create'));
+  };
+
+  const openRankCreate = () => {
+    window.dispatchEvent(new Event('admin:open-rank-create'));
   };
 
   return (
@@ -187,6 +208,169 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
               </div>
             </div>
           </>
+        ) : isRolesPage && adminRoles ? (
+          <>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+              권한
+            </h2>
+
+            <Button
+              variant="primary"
+              leftIcon={<PlusCircle size={16} />}
+              onClick={openRoleCreate}
+              className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+              fullWidth
+            >
+              역할 생성
+            </Button>
+
+            <div className="mt-9 flex min-h-0 flex-1 flex-col gap-3">
+              <p className="text-xs font-black text-slate-500">권한 메뉴</p>
+
+              <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                <button
+                  type="button"
+                  onClick={adminRoles.selectPermissionsView}
+                  className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+                    adminRoles.isPermissionsView
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-800 hover:bg-white'
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {adminRoles.isPermissionsView ? (
+                      <CheckCircle2 size={17} />
+                    ) : (
+                      <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+                    )}
+                    <span className="truncate">전체 권한</span>
+                  </span>
+                </button>
+
+                {adminRoles.rolesLoading ? (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    역할을 불러오는 중
+                  </div>
+                ) : adminRoles.rolesError ? (
+                  <div className="rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600">
+                    {adminRoles.rolesError.message}
+                  </div>
+                ) : adminRoles.roles.length > 0 ? (
+                  adminRoles.roles.map((role) => {
+                    const active =
+                      !adminRoles.isPermissionsView &&
+                      adminRoles.selectedRoleId === role.roleId;
+
+                    return (
+                      <button
+                        key={role.roleId}
+                        type="button"
+                        onClick={() => adminRoles.selectRole(role.roleId)}
+                        className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+                          active
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-800 hover:bg-white'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          {active ? (
+                            <CheckCircle2 size={17} />
+                          ) : (
+                            <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+                          )}
+                          <span className="truncate">{role.roleName}</span>
+                        </span>
+                        <span
+                          className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
+                            active
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {role.assignedEmployeeCount}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    등록된 역할이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : isRanksPage && adminRanks ? (
+          <>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">
+              직급
+            </h2>
+
+            <Button
+              variant="primary"
+              leftIcon={<PlusCircle size={16} />}
+              onClick={openRankCreate}
+              className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+              fullWidth
+            >
+              직급 생성
+            </Button>
+
+            <div className="mt-9 flex min-h-0 flex-1 flex-col gap-3">
+              <p className="text-xs font-black text-slate-500">직급 목록</p>
+
+              <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+                {adminRanks.ranksLoading ? (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    직급을 불러오는 중
+                  </div>
+                ) : adminRanks.ranksError ? (
+                  <div className="rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600">
+                    {adminRanks.ranksError.message}
+                  </div>
+                ) : adminRanks.ranks.length > 0 ? (
+                  adminRanks.ranks.map((rank) => {
+                    const active = adminRanks.selectedRankId === rank.rankId;
+
+                    return (
+                      <button
+                        key={rank.rankId}
+                        type="button"
+                        onClick={() => adminRanks.selectRank(rank.rankId)}
+                        className={`flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
+                          active
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-800 hover:bg-white'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          {active ? (
+                            <CheckCircle2 size={17} />
+                          ) : (
+                            <span className="h-4 w-4 rounded-full border border-slate-800 bg-white" />
+                          )}
+                          <span className="truncate">{rank.rankName}</span>
+                        </span>
+                        <span
+                          className={`ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
+                            active
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {rank.sortOrder}
+                        </span>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-xl bg-white px-3 py-4 text-sm font-bold text-slate-400">
+                    등록된 직급이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         ) : (
           <>
             <h2 className="text-2xl font-black tracking-tight text-slate-950">
@@ -251,8 +435,9 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
               variant="outline"
               size="sm"
               leftIcon={<LogOut size={16} />}
-              onClick={handleLogout}
-            >
+              onClick={() => void handleLogout()}
+
+>
               로그아웃
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import {
   Bell,
   Check,
@@ -18,9 +18,7 @@ import Checkbox from '../components/common/form/checkbox/Checkbox'
 import ContentCard from '../components/common/dataDisplay/card/ContentCard'
 import DataTable from '../components/common/dataDisplay/dataTable/DataTable'
 import DatePickerField from '../components/common/form/datePicker/DatePickerField'
-import EmployeeSearchPicker, {
-  type EmployeeSearchItem,
-} from '../components/common/employeeSearch/EmployeeSearchPicker'
+import EmployeeSearchPicker from '../components/common/employeeSearch/EmployeeSearchPicker'
 import EmptyState from '../components/common/dataDisplay/emptyState/EmptyState'
 import FileUpload from '../components/common/form/fileUpload/FileUpload'
 import FilterBar from '../components/common/dataDisplay/filter/FilterBar'
@@ -36,7 +34,7 @@ import Toggle from '../components/common/form/toggle/Toggle'
 import type { ToastItem } from '../components/common/toast/toast.types'
 import DropdownMenu from '../components/common/overlay/dropdownMenu/DropdownMenu'
 import ToastViewport from '../components/common/toast/ToastViewport'
-import { useToast } from '../components/common/toast/ToastProvider'
+import { useToast } from '../components/common/toast/useToast'
 import SubSidebarActionButton from '../components/layouts/sidebar/SubSidebarActionButton'
 import SubSidebarMenuItem from '../components/layouts/sidebar/SubSidebarMenuItem'
 import SubSidebarSection from '../components/layouts/sidebar/SubSidebarSection'
@@ -52,37 +50,6 @@ const approvalRows: ApprovalRow[] = [
   { id: 'AP-001', title: '휴가 신청서', writer: '박범준', status: '대기' },
   { id: 'AP-002', title: '지출 결의서', writer: '김민지', status: '진행' },
   { id: 'AP-003', title: '구매 요청서', writer: '이도윤', status: '완료' },
-]
-
-const employeeSearchGuideItems: EmployeeSearchItem[] = [
-  {
-    id: 1,
-    name: '김민수',
-    department: '개발팀',
-    position: '대리',
-    avatarColor: '#14b8a6',
-  },
-  {
-    id: 2,
-    name: '최지훈',
-    department: '개발팀',
-    position: '팀장',
-    avatarColor: '#0ea5e9',
-  },
-  {
-    id: 3,
-    name: '박준호',
-    department: '기획팀',
-    position: '대리',
-    avatarColor: '#8b5cf6',
-  },
-  {
-    id: 4,
-    name: '한유진',
-    department: '기획팀',
-    position: '매니저',
-    avatarColor: '#22c55e',
-  },
 ]
 
 const Source2323 = () => {
@@ -101,7 +68,6 @@ const Source2323 = () => {
   const [compactEmployeeIds, setCompactEmployeeIds] = useState<
     Array<string | number>
   >([])
-  const [compactEmployeeKeyword, setCompactEmployeeKeyword] = useState('')
 
   const { showToast } = useToast()
 
@@ -407,8 +373,8 @@ const Source2323 = () => {
 
                 <EmployeeSearchPicker
                   variant="detailed"
-                  employees={employeeSearchGuideItems}
-                  departments={['개발팀', '기획팀']}
+                  remoteSearch
+                  showDepartmentFilter
                   selectedEmployeeIds={detailedEmployeeIds}
                   onChange={setDetailedEmployeeIds}
                 />
@@ -424,9 +390,7 @@ const Source2323 = () => {
 
                 <EmployeeSearchPicker
                   variant="compact"
-                  employees={employeeSearchGuideItems}
-                  keyword={compactEmployeeKeyword}
-                  onKeywordChange={setCompactEmployeeKeyword}
+                  remoteSearch
                   selectedEmployeeIds={compactEmployeeIds}
                   onChange={setCompactEmployeeIds}
                 />

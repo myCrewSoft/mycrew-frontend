@@ -1,13 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../../common/button/Button'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
+import MeetingSubSidebarContent from './MeetingSubSidebarContent'
 import ReservationSubSidebarContent from './ReservationSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
 import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
+import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
+import mergeBoardSections from '../../../utils/boardMenuUtil'
 import DriveSubSidebarContent from './DriveSubSidebarContent'
 
 interface SubSidebarProps {
@@ -15,11 +19,20 @@ interface SubSidebarProps {
   onToggle: () => void
 }
 
+const isPathActive = (pathname: string, itemPath: string) =>
+  pathname === itemPath || pathname.startsWith(`${itemPath}/`)
+
+const isMenuActive = (pathname: string, search: string, item: any) =>
+  item.activeKey
+    ? `${pathname}${search}` === item.activeKey
+    : isPathActive(pathname, item.path)
+
 // 특정 메뉴에서 기본 메뉴 목록이 아니라 전용 UI를 보여주고 싶을 때 사용하는 매핑입니다.
 // 추가할 경우 아래와 동일하게 추가할 것
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
 const customSidebarContentMap: Record<string, ComponentType> = {
   calendar: CalendarSubSidebarContent,
+  meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
   drive: DriveSubSidebarContent,
 }
@@ -39,6 +52,8 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   // 현재 경로에 맞는 전용 서브사이드바 컴포넌트가 있는지 확인합니다.
   const CustomSidebarContent = customSidebarContentMap[sidebarKey]
 
+ const {boardMenuItems} =useBoardSidebar(sidebarKey)
+
   const handleActionClick = (actionLabel: string) => {
     if (sidebarKey === 'board' && actionLabel.includes('글')) {
       navigate(`${location.pathname}?mode=create`)
@@ -49,7 +64,14 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   if (!CustomSidebarContent && !sidebarConfig) {
     return null
   }
+  const getMergedSections =()=>{
+    const baseSections = sidebarConfig ?[...sidebarConfig.sections] :[]
 
+   if (sidebarKey === 'board') {
+      return mergeBoardSections(baseSections, boardMenuItems )
+    }
+    return baseSections
+  }
   return (
     <div
       className={`relative h-full flex-shrink-0 transition-all duration-300 ease-in-out ${
@@ -87,15 +109,21 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
               ))}
             </div>
 
-            {sidebarConfig.sections.map((section) => (
+            {getMergedSections().map((section:any) => (
               <SubSidebarSection key={section.title} title={section.title}>
-                {section.items.map((item) => (
+                {section.items.map((item:any) => (
                   <SubSidebarMenuItem
                     key={item.path}
                     icon={item.icon}
                     label={item.label}
                     path={item.path}
-                    active={location.pathname.startsWith(item.path)}
+                    children={item.children}
+                    active={
+                      isMenuActive(location.pathname, location.search, item) ||
+                      item.children?.some((child: any) =>
+                        isMenuActive(location.pathname, location.search, child),
+                      )
+                    }
                   />
                 ))}
               </SubSidebarSection>

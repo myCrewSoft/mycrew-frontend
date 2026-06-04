@@ -31,7 +31,7 @@ const PageComponent = ({
         </div>
 
         {actions && (
-          <div className="flex w-full flex-shrink-0 flex-wrap gap-2 md:justify-end">
+          <div className="flex w-full flex-shrink-0 flex-wrap gap-2 md:w-auto md:justify-end">
             {actions}
           </div>
         )}
