@@ -1,30 +1,19 @@
-// 메신저 DTO 임시 타입 파일입니다.
-// 백엔드에서 프론트 화면에 맞춘 응답 DTO를 만들면 generated.ts 타입 별칭으로 교체하면 됩니다.
-// 예) import { components } from './generated';
-// 예) export type ChatRoomResponseDto = components['schemas']['ChatRoomResponseDto'];
+import type { components } from './generated'
 
-export interface ChatRoomResponseDto {
-  id: number;
-  name: string;
-  type: 'direct' | 'group' | 'project';
-  avatar: string;
-  description: string;
-  lastMessage: string;
-  lastTime: string;
-  unreadCount: number;
-  status?: 'online' | 'away' | 'offline';
-  jobTitle?: string;
-  department?: string;
+// 메신저 DTO 타입 별칭입니다.
+// generated.ts는 자동 생성 파일이므로 직접 수정하지 않고, 이 파일에서 필요한 DTO만 꺼내 씁니다.
+export type CreateChatRoomRequestDto =
+  components['schemas']['CreateChatRoomRequest']
+
+// ChatMessageRequestDto는 REST 요청 DTO가 아니라 WebSocket publish payload입니다.
+// OpenAPI generated.ts에 포함되지 않으므로 프론트에서 웹소켓 전송용 타입으로 직접 관리합니다.
+export interface ChatMessageRequestDto {
+  content: string
 }
 
-export interface ChatMessageResponseDto {
-  id: number;
-  senderName: string;
-  content: string;
-  time: string;
-  mine: boolean;
-  read?: boolean;
-}
+export type ChatMessageResponseDto = components['schemas']['ChatMessageResponse']
+
+export type ChatRoomResponseDto = components['schemas']['ChatRoomResponse']
 
 export interface CreateChatRoomRequestDto {
   chatName?: string;

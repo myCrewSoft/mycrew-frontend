@@ -6,6 +6,7 @@ export const useMessengerData = () => {
   const roomsApi = useApi(messengerApi.getChats, { immediate: false })
   const messagesApi = useApi(messengerApi.getMessages, { immediate: false })
   const createChatApi = useApi(messengerApi.createChat, { immediate: false })
+  const markAsReadApi = useApi(messengerApi.markAsRead, { immediate: false })
 
   const createChat = (payload: CreateChatRoomRequestDto) =>
     createChatApi.execute(payload)
@@ -15,8 +16,17 @@ export const useMessengerData = () => {
     messages: messagesApi.data ?? null,
     loadRooms: roomsApi.execute,
     loadMessages: messagesApi.execute,
+    markAsRead: markAsReadApi.execute,
     createChat,
-    loading: roomsApi.loading || messagesApi.loading || createChatApi.loading,
-    error: roomsApi.error ?? messagesApi.error ?? createChatApi.error,
+    loading:
+      roomsApi.loading ||
+      messagesApi.loading ||
+      createChatApi.loading ||
+      markAsReadApi.loading,
+    error:
+      roomsApi.error ??
+      messagesApi.error ??
+      createChatApi.error ??
+      markAsReadApi.error,
   }
 }

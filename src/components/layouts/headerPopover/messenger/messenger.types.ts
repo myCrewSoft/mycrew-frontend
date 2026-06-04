@@ -2,9 +2,13 @@
 // 오타가 나면 TypeScript가 바로 알려주기 때문에 조건 분기와 props 전달이 안전해집니다.
 export type ChatTab = 'all' | 'group' | 'project'
 
-export type ChatRoomType = 'direct' | 'group' | 'project'
+// 실제 채팅방 종류입니다.
+// 백엔드는 M1(1:1), M2(그룹), M3(프로젝트) 같은 코드값을 내려줄 수 있습니다.
+export type ChatRoomType = string
 
-export type ChatStatus = 'online' | 'away' | 'offline'
+// 프로필 아이콘 오른쪽 아래에 표시할 사용자/방 상태입니다.
+// 백엔드는 STS1~STS4 같은 상태 코드값을 내려줄 수 있습니다.
+export type ChatStatus = string
 
 export type MessengerViewMode = 'chat' | 'create'
 
@@ -24,9 +28,11 @@ export interface ChatRoom {
 
 export interface ChatMessage {
   id: number
+  senderId: number
   senderName: string
   content: string
   time: string
   mine: boolean
   read?: boolean
+  unreadCount?: number
 }
