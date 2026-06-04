@@ -635,7 +635,10 @@ export default function AdminDepartmentsPage() {
           title="부서 목록을 불러오지 못했습니다."
           description={departmentsError.message}
           actions={
-            <Button variant="outline" onClick={reloadDepartments}>
+            <Button
+              variant="outline"
+              onClick={() => void reloadDepartments()}
+            >
               다시 시도
             </Button>
           }
