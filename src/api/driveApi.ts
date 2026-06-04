@@ -33,7 +33,7 @@ export const driveApi = {
   renameFolder : (driveItemId:number, reqDto:DriveRenameRequestDto) => 
     axiosInstance.patch<ApiResponse<DriveResponseDto>>(`/api/drive/folders/${driveItemId}/name`, reqDto),
 
-  // 즐겨찾기 등록/해제
+  // 즐겨찾기 등록/해제 
   toggleBookmark: (driveItemId: number) =>
     axiosInstance.patch<ApiResponse<DriveResponseDto>>(`/api/drive/items/${driveItemId}/bookmark`),
 

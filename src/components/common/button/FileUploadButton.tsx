@@ -9,7 +9,7 @@ interface FileUploadButtonProps {
 
 const FileUploadButton = ({ onUpload, accept }: FileUploadButtonProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null)
-
+//.
   return (
     <>
       <input

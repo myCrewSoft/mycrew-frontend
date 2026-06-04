@@ -14,6 +14,8 @@ import { useApiList, useApi } from '../../hooks/useApi'
 import { driveApi } from '../../api/driveApi'
 import type { DriveResponseDto, DriveRenameRequestDto } from '../../types/drive.dto'
 
+
+//아이콘
 const FileIcon = ({ item }: { item: DriveResponseDto }) => {
   if (item.itemTypeCd === '01') return <Folder size={20} className="text-amber-400" />
   return <FileImage size={20} className="text-blue-400" />
