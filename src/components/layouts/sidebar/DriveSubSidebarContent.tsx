@@ -13,9 +13,24 @@ export default function DriveSubSidebarContent() {
       </div>
 
       <SubSidebarSection title="저장 공간">
-        <SubSidebarMenuItem icon={Folder} label="내 드라이브" path="/drive/my" active={location.pathname === '/drive/my'} />
-        <SubSidebarMenuItem icon={Users} label="공유 드라이브" path="/drive/shared" active={location.pathname === '/drive/shared'} />
-        <SubSidebarMenuItem icon={Archive} label="휴지통" path="/drive/trash" active={location.pathname === '/drive/trash'} />
+        <SubSidebarMenuItem
+          icon={Folder}
+          label="내 드라이브"
+          path="/drive"
+          active={location.pathname === '/drive' || location.pathname.startsWith('/drive/folders')}
+        />
+        <SubSidebarMenuItem
+          icon={Users}
+          label="공유 드라이브"
+          path="/drive/shared"
+          active={location.pathname === '/drive/shared'}
+        />
+        <SubSidebarMenuItem
+          icon={Archive}
+          label="휴지통"
+          path="/drive/trash"
+          active={location.pathname === '/drive/trash'}
+        />
       </SubSidebarSection>
     </div>
   )
