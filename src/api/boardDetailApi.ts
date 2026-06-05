@@ -1,34 +1,37 @@
-import axiosInstance from './axiosInstance'
 import type { BoardKind } from '../types/board'
-import type { BoardComment, BoardDetail } from '../types/boardDetail'
+import type { AxiosResponse } from 'axios'
+import axiosInstance from './axiosInstance'
+import type { ApiResponse } from './axiosInstance'
+import type { BoardResponse } from '../types'
 
-const detailEndpointByType: Record<BoardKind, string> = {
-  notice: '/api/notices',
-  department: '/api/boards',
-  free: '/api/boards',
-  anonymous: '/api/boards',
+const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
+  notice: 'NOTICE',
+  free: 'FREE',
+  anonymous: 'ANON',
 }
 
-export const getBoardDetail = async (
-  boardType: BoardKind,
-  boardId: number,
-): Promise<BoardDetail> => {
-  const response = await axiosInstance.get(`${detailEndpointByType[boardType]}/${boardId}`)
-  return response.data?.data ?? response.data
+interface GetBoardDetailParams {
+  boardType: BoardKind
+  boardId: number
+  deptCd?: string
 }
 
-export const getBoardComments = async (boardId: number): Promise<BoardComment[]> => {
-  const response = await axiosInstance.get(`/api/boards/${boardId}/comments`)
-  return response.data?.data ?? response.data
-}
+export const boardDetailApi = {
+  getBoardDetail: ({
+    boardType,
+    boardId,
+    deptCd,
+  }: GetBoardDetailParams): Promise<AxiosResponse<ApiResponse<BoardResponse>>> => {
+    if (boardType === 'department' && deptCd) {
+      return axiosInstance.get(
+        `/api/boards/dept/${encodeURIComponent(deptCd)}/${boardId}`,
+      )
+    }
 
-export const createBoardComment = async (
-  boardId: number,
-  content: string,
-): Promise<BoardComment> => {
-  const response = await axiosInstance.post(`/api/boards/${boardId}/comments`, {
-    content,
-  })
-  return response.data?.data ?? response.data
-}
+    const boardTypeCd = boardType === 'department'
+      ? 'DEPT'
+      : boardTypeCdByKind[boardType]
 
+    return axiosInstance.get(`/api/boards/${boardTypeCd}/${boardId}`)
+  },
+}

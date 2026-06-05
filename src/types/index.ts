@@ -16,6 +16,8 @@ import type { components } from "./generated";
 export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];
 export type BoardResponse = components['schemas']['BoardResponse'];
 export type PageBoardResponse = components['schemas']['PageBoardResponse'];
+export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
+
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
 // 일정 관리

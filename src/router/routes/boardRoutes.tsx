@@ -14,4 +14,6 @@ export const boardRoutes: RouteObject[] = [
   { path: '/boards/free/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/anonymous', element: <BoardPage /> },
   { path: '/boards/anonymous/:boardId', element: <BoardDetailPage /> },
+  { path: '/boards/anon', element: <BoardPage /> },
+  { path: '/boards/anon/:boardId', element: <BoardDetailPage /> },
 ]
