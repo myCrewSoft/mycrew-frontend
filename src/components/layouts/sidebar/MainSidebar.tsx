@@ -10,7 +10,7 @@ const MainSidebar = () => {
     <aside className="flex h-screen w-24 flex-shrink-0 flex-col justify-between bg-[#0d1527] px-2 py-5 text-white">
       <div className="flex w-full flex-col items-center">
         <Link
-          to="/"
+          to="/dashboard"
           className="mb-2 flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563eb] to-[#5ac8fa] text-3xl font-black text-white no-underline shadow-md transition-transform hover:scale-105"
         >
           M

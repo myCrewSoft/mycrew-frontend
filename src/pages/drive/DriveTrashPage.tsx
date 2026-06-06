@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Folder, FileImage, LayoutList, LayoutGrid, Info, X } from 'lucide-react'
 import IconButton from '../../components/common/button/IconButton'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
-import Tabs from '../../components/common/tabs/Tabs'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
 import Modal from '../../components/common/overlay/modal/Modal'
 import { useApiList, useApi } from '../../hooks/useApi'
@@ -14,14 +13,32 @@ const FileIcon = ({ item }: { item: DriveResponseDto }) => {
   return <FileImage size={20} className="text-blue-400" />
 }
 
+// 드라이브 구분 뱃지 (프로젝트만 표시)
+const ScopeBadge = ({ item }: { item: DriveResponseDto }) => {
+  if (item.driveScopeCd !== '02') return null
+  return (
+    <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-600">
+      프로젝트
+    </span>
+  )
+}
+
+// 하위 아이템 개수 뱃지 (폴더만)
+const ChildCntBadge = ({ item }: { item: DriveResponseDto }) => {
+  if (item.itemTypeCd !== '01' || !item.childCnt) return null
+  return (
+    <span className="ml-1.5 text-xs text-slate-400">
+      ({item.childCnt}개)
+    </span>
+  )
+}
+
 interface DetailPanelProps {
   item: DriveResponseDto | null
   onClose: () => void
 }
 
 const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
-  const [detailTab, setDetailTab] = useState('info')
-
   return (
     <aside className="flex h-full w-72 flex-shrink-0 flex-col border-l border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
@@ -34,52 +51,62 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
         <IconButton size="sm" aria-label="닫기" onClick={onClose}><X size={16} /></IconButton>
       </div>
 
-      <div className="px-4 pt-2">
-        <Tabs
-          value={detailTab}
-          onChange={setDetailTab}
-          items={[{ value: 'info', label: '상세 정보' }]}
-        />
-      </div>
-
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {detailTab === 'info' && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-50">
-              {item?.itemTypeCd === '02'
-                ? <FileImage size={48} className="text-blue-300" />
-                : <Folder size={48} className="text-amber-400" />}
-            </div>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="py-2 text-slate-500 w-24">종류</td>
-                  <td className="py-2 text-slate-800 font-medium">
-                    {item ? (item.itemTypeCd === '01' ? '폴더' : '파일') : '-'}
-                  </td>
-                </tr>
-                {item?.fileSz && (
-                  <tr>
-                    <td className="py-2 text-slate-500">크기</td>
-                    <td className="py-2 text-slate-800 font-medium">{item.fileSz}</td>
-                  </tr>
-                )}
-                {item && (
-                  <>
-                    <tr>
-                      <td className="py-2 text-slate-500">삭제일</td>
-                      <td className="py-2 text-slate-800 font-medium">{item.delDt ?? '-'}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 text-slate-500">생성일</td>
-                      <td className="py-2 text-slate-800 font-medium">{item.frstRegDt ?? '-'}</td>
-                    </tr>
-                  </>
-                )}
-              </tbody>
-            </table>
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-50">
+            {item?.itemTypeCd === '02'
+              ? <FileImage size={48} className="text-blue-300" />
+              : <Folder size={48} className="text-amber-400" />}
           </div>
-        )}
+          <table className="w-full text-sm">
+            <tbody className="divide-y divide-slate-100">
+              <tr>
+                <td className="py-2 text-slate-500 w-24">종류</td>
+                <td className="py-2 text-slate-800 font-medium">
+                  {item ? (item.itemTypeCd === '01' ? '폴더' : '파일') : '-'}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2 text-slate-500">드라이브</td>
+                <td className="py-2 text-slate-800 font-medium">
+                  {item?.driveScopeCd === '02' ? '프로젝트' : '개인'}
+                </td>
+              </tr>
+              {item?.fileSz && (
+                <tr>
+                  <td className="py-2 text-slate-500">크기</td>
+                  <td className="py-2 text-slate-800 font-medium">{item.fileSz}</td>
+                </tr>
+              )}
+              {item?.itemTypeCd === '01' && (
+                <tr>
+                  <td className="py-2 text-slate-500">하위 항목</td>
+                  <td className="py-2 text-slate-800 font-medium">{item.childCnt ?? 0}개</td>
+                </tr>
+              )}
+              {item && (
+                <>
+                  <tr>
+                    <td className="py-2 text-slate-500">생성자</td>
+                    <td className="py-2 text-slate-800 font-medium">{item.frstRgtrNm ?? '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-slate-500">생성일</td>
+                    <td className="py-2 text-slate-800 font-medium">{item.frstRegDt ?? '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-slate-500">삭제자</td>
+                    <td className="py-2 text-slate-800 font-medium">{item.deltrMbrNm ?? '-'}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-slate-500">삭제일</td>
+                    <td className="py-2 text-slate-800 font-medium">{item.delDt ?? '-'}</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </aside>
   )
@@ -88,7 +115,7 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
 export default function DriveTrashPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selectedItem, setSelectedItem] = useState<DriveResponseDto | null>(null)
-  const [showPanel, setShowPanel] = useState(true)
+  const [showPanel, setShowPanel] = useState(false)
 
   // ── 복구 확인 모달 ──
   const [restoreModalOpen, setRestoreModalOpen] = useState(false)
@@ -172,10 +199,11 @@ export default function DriveTrashPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                  <th className="w-10 py-2 pl-5">종류</th>
+                  <th className="w-8 py-2 pl-5 pr-3 text-center whitespace-nowrap">종류</th>
                   <th className="py-2 pr-4">이름</th>
-                  <th className="w-24 py-2 pr-4">크기</th>
-                  <th className="w-36 py-2 pr-4">삭제한 날짜</th>
+                  <th className="w-24 py-2 pr-4 whitespace-nowrap">크기</th>
+                  <th className="w-28 py-2 pr-4 whitespace-nowrap">삭제자</th>
+                  <th className="w-36 py-2 pr-4 whitespace-nowrap">삭제한 날짜</th>
                   <th className="w-12 py-2 pr-4"></th>
                 </tr>
               </thead>
@@ -188,9 +216,16 @@ export default function DriveTrashPage() {
                       selectedItem?.driveItemId === item.driveItemId ? 'bg-blue-50' : ''
                     }`}
                   >
-                    <td className="py-2.5 pl-5"><FileIcon item={item} /></td>
-                    <td className="py-2.5 pr-4 font-medium text-slate-800">{item.itemNm}</td>
+                    <td className="py-2.5 pl-5 pr-3 text-center"><FileIcon item={item} /></td>
+                    <td className="py-2.5 pr-4 font-medium text-slate-800">
+                      <div className="flex items-center">
+                        <span>{item.itemNm}</span>
+                        <ChildCntBadge item={item} />
+                        <ScopeBadge item={item} />
+                      </div>
+                    </td>
                     <td className="py-2.5 pr-4 text-slate-500">{item.fileSz ?? '-'}</td>
+                    <td className="py-2.5 pr-4 text-slate-500">{item.deltrMbrNm ?? '-'}</td>
                     <td className="py-2.5 pr-4 text-slate-500">{item.delDt ?? '-'}</td>
                     <td className="py-2.5 pr-4" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu
@@ -215,7 +250,16 @@ export default function DriveTrashPage() {
                   }`}
                 >
                   <div className="flex h-12 w-12 items-center justify-center"><FileIcon item={item} /></div>
-                  <span className="w-full truncate text-center text-xs font-medium text-slate-700">{item.itemNm}</span>
+                  <div className="flex w-full flex-col items-center gap-0.5">
+                    <span className="w-full truncate text-center text-xs font-medium text-slate-700">
+                      {item.itemNm}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <ChildCntBadge item={item} />
+                      <ScopeBadge item={item} />
+                    </div>
+                    <span className="text-xs text-slate-400">{item.deltrMbrNm ?? '-'}</span>
+                  </div>
                   <div className="opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu
                       items={[
