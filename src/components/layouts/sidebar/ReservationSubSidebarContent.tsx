@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
 import { meetingRoomReservationApi } from '../../../api/ReservationApi'
 import { useApi } from '../../../hooks/useApi'
 import type { ReservationResponse } from '../../../types'
 import IconButton from '../../common/button/IconButton'
 import Checkbox from '../../common/form/checkbox/Checkbox'
 import { useReservation } from '../../../pages/Reservation/ReservationContext'
+import RoomManagementModal from '../../../pages/Reservation/RoomManagementModal'
 import { formatDateKey, formatMonthTitle } from '../../../utils/date'
 
 const weekDayLabels = ['일', '월', '화', '수', '목', '금', '토']
@@ -17,7 +18,6 @@ const getMonthDates = (currentMonth: Date) => {
   const lastDate = new Date(year, month + 1, 0)
   const dates: Date[] = []
 
-  // 달력 첫 줄을 일요일부터 시작시키기 위해 이전 달 날짜를 채웁니다.
   for (let index = firstDate.getDay(); index > 0; index -= 1) {
     dates.push(new Date(year, month, 1 - index))
   }
@@ -26,7 +26,6 @@ const getMonthDates = (currentMonth: Date) => {
     dates.push(new Date(year, month, day))
   }
 
-  // 7칸 단위로 맞추기 위해 다음 달 날짜를 채웁니다.
   while (dates.length % 7 !== 0) {
     dates.push(new Date(year, month, dates.length - firstDate.getDay() + 1))
   }
@@ -48,6 +47,23 @@ const formatReservationDateTime = (dateTime: string) => {
   }).format(date)
 }
 
+const hasRoomManagementPermission = (room: unknown) => {
+  const source = room as Record<string, unknown>
+
+  return [
+    source.canManage,
+    source.manageable,
+    source.manager,
+    source.isManager,
+    source.isRoomManager,
+    source.canManageRooms,
+    source.roomManager,
+    source.roomManagerYn === 'Y',
+    source.mngrYn === 'Y',
+    source.adminYn === 'Y',
+  ].some(Boolean)
+}
+
 const ReservationSubSidebarContent = () => {
   const {
     selectedDate,
@@ -58,6 +74,7 @@ const ReservationSubSidebarContent = () => {
     roomsLoading,
     roomsErrorMessage,
   } = useReservation()
+  const [managementModalOpen, setManagementModalOpen] = useState(false)
 
   const {
     data: myUpcomingReservations,
@@ -90,6 +107,11 @@ const ReservationSubSidebarContent = () => {
         )
         .slice(0, 2),
     [myUpcomingReservations],
+  )
+
+  const canManageRooms = useMemo(
+    () => rooms.some((room) => hasRoomManagementPermission(room)),
+    [rooms],
   )
 
   const moveMonth = (direction: 'prev' | 'next') => {
@@ -177,7 +199,22 @@ const ReservationSubSidebarContent = () => {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-bold text-slate-950">회의실 필터</h3>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-950">회의실 필터</h3>
+
+          <IconButton
+            size="xs"
+            aria-label="회의실 관리"
+            title={
+              canManageRooms
+                ? '회의실 관리'
+                : '회의실 관리 미리보기'
+            }
+            onClick={() => setManagementModalOpen(true)}
+          >
+            <Settings size={14} />
+          </IconButton>
+        </div>
 
         {roomsLoading && (
           <p className="text-sm font-semibold text-slate-400">
@@ -245,6 +282,12 @@ const ReservationSubSidebarContent = () => {
           </div>
         )}
       </section>
+
+      <RoomManagementModal
+        open={managementModalOpen}
+        rooms={rooms}
+        onClose={() => setManagementModalOpen(false)}
+      />
     </div>
   )
 }
