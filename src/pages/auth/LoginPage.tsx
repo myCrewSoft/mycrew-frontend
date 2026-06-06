@@ -38,7 +38,7 @@ export default function LoginPage() {
     [location.search],
   );
   const expired = searchParams.get('expired') === 'true';
-  const redirectTo = searchParams.get('redirect') || '/components';
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
 
   const empIdError = empId && !/^\d+$/.test(empId)
     ? '사번은 숫자만 입력해주세요.'

@@ -8,6 +8,7 @@ import FirstLoginPage from '../pages/auth/FirstLoginPage';
 import LoginPage from '../pages/auth/LoginPage';
 import CalendarPage from '../pages/calendar/CalendarPage';
 import { CalendarProvider } from '../pages/calendar/CalendarProvider';
+import DashboardPage from '../pages/dashboard/DashboardPage';
 import { boardRoutes } from './routes/boardRoutes';
 import ReservationPage from '../pages/Reservation/ReservationPage';
 import { ReservationProvider } from '../pages/Reservation/ReservationProvider';
@@ -16,6 +17,9 @@ import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
 import { projectRoutes } from './routes/projectRoutes';
+import MailPage from '../pages/mail/MailPage';
+import OrganizationPage from '../pages/organization/OrganizationPage';
+import ApprovalPage from '../pages/approval/ApprovalPage';
 
 
 export const router = createBrowserRouter([
@@ -38,8 +42,15 @@ export const router = createBrowserRouter([
   {
     element: <MainLayout />,
     children: [
+      { path: '/dashboard', element: <DashboardPage /> },
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
+      { path: '/mail', element: <MailPage /> },
+      { path: '/mail/:mailbox', element: <MailPage /> },
+      { path: '/approval', element: <ApprovalPage /> },
+      { path: '/approval/:folder/:status', element: <ApprovalPage /> },
+      { path: '/organization', element: <OrganizationPage /> },
+      { path: '/organization/chart', element: <OrganizationPage /> },
       ...boardRoutes,
       ...meetingRoutes,
       ...driveRoutes,
