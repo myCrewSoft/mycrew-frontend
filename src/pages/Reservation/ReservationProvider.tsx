@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
-import type { MeetingRoom } from '../../types/Reservation'
+import type { RoomResponse } from '../../types'
 import { formatDateKey } from '../../utils/date'
 import { ReservationContext } from './ReservationContext'
 
@@ -18,7 +18,7 @@ export const ReservationProvider = ({ children }: { children: ReactNode }) => {
     loading: roomsLoading,
     error,
     execute: fetchRooms,
-  } = useApi<MeetingRoom[]>(meetingRoomReservationApi.getMeetingRooms, {
+  } = useApi<RoomResponse[]>(meetingRoomReservationApi.getMeetingRooms, {
     immediate: false,
     initialData: [],
   })
