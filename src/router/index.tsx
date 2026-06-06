@@ -16,6 +16,7 @@ import { meetingRoutes } from './routes/meetingRoutes';
 import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
+import AttendancePage from '../pages/attendance/AttendancePage';
 
 
 export const router = createBrowserRouter([
@@ -41,6 +42,8 @@ export const router = createBrowserRouter([
       { path: '/dashboard', element: <DashboardPage /> },
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
+      { path: '/attendance', element: <AttendancePage /> },
+      { path: '/attendance/status', element: <AttendancePage /> },
       ...boardRoutes,
       ...meetingRoutes,
       ...driveRoutes

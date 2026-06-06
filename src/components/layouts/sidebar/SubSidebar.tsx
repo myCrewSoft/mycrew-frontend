@@ -6,6 +6,7 @@ import Button from '../../common/button/Button'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
 import MeetingSubSidebarContent from './MeetingSubSidebarContent'
 import ReservationSubSidebarContent from './ReservationSubSidebarContent'
+import AttendanceSubSidebarContent from './AttendanceSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
 import SubSidebarSection from './SubSidebarSection'
@@ -35,6 +36,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
   drive: DriveSubSidebarContent,
+  attendance: AttendanceSubSidebarContent,
 }
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
