@@ -15,6 +15,7 @@ import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
 import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
 import mergeBoardSections from '../../../utils/boardMenuUtil'
 import DriveSubSidebarContent from './DriveSubSidebarContent'
+import ProjectSubSidebarContent from './ProjectSubSideBarContent'
 
 interface SubSidebarProps {
   isOpen: boolean
@@ -39,6 +40,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
   drive: DriveSubSidebarContent,
+  project: ProjectSubSidebarContent,
 }
 
 const hiddenSubSidebarKeys = new Set(['organization'])

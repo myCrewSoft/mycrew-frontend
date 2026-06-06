@@ -1,14 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, Info, X, FolderPlus, ChevronRight, Star } from 'lucide-react'
+import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, FolderPlus, ChevronRight, Star } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
-import Tabs from '../../components/common/tabs/Tabs'
 import Modal from '../../components/common/overlay/modal/Modal'
 import FormField from '../../components/common/form/formField/FormField'
 import FileUploadButton from '../../components/common/button/FileUploadButton'
+import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
 import { useApiList, useApi } from '../../hooks/useApi'
 import { driveApi } from '../../api/driveApi'
 import type { DriveResponseDto, DriveRenameRequestDto } from '../../types/drive.dto'
@@ -58,69 +58,6 @@ const NewItemDropdown = ({ onCreateFolder, onUploadFile }: NewItemDropdownProps)
   )
 }
 
-// interface DetailPanelProps {
-//   item: DriveResponseDto | null
-//   onClose: () => void
-// }
-
-// const DetailPanel = ({ item, onClose }: DetailPanelProps) => {
-//   const [detailTab, setDetailTab] = useState('info')
-
-//   return (
-//     <aside className="flex h-full w-72 flex-shrink-0 flex-col border-l border-slate-200 bg-white">
-//       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-//         <div className="flex items-center gap-2">
-//           {item ? <FileIcon item={item} /> : <Folder size={18} className="text-amber-400" />}
-//           <span className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">
-//             {item ? item.itemNm : '내 드라이브'}
-//           </span>
-//         </div>
-//         <IconButton size="sm" aria-label="닫기" onClick={onClose}><X size={16} /></IconButton>
-//       </div>
-
-//       <div className="flex-1 overflow-y-auto px-4 py-4">
-//         {detailTab === 'info' && (
-//           <div className="flex flex-col items-center gap-4">
-//             <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-slate-50">
-//               {item?.itemTypeCd === '02'
-//                 ? <FileImage size={48} className="text-blue-300" />
-//                 : <Folder size={48} className="text-amber-400" />}
-//             </div>
-//             <table className="w-full text-sm">
-//               <tbody className="divide-y divide-slate-100">
-//                 <tr>
-//                   <td className="py-2 text-slate-500 w-24">종류</td>
-//                   <td className="py-2 text-slate-800 font-medium">
-//                     {item ? (item.itemTypeCd === '01' ? '폴더' : '파일') : '내 드라이브'}
-//                   </td>
-//                 </tr>
-//                 {item?.fileSz && (
-//                   <tr>
-//                     <td className="py-2 text-slate-500">크기</td>
-//                     <td className="py-2 text-slate-800 font-medium">{item.fileSz}</td>
-//                   </tr>
-//                 )}
-//                 {item && (
-//                   <>
-//                     <tr>
-//                       <td className="py-2 text-slate-500">수정일</td>
-//                       <td className="py-2 text-slate-800 font-medium">{item.lastMdfcnDt ?? '-'}</td>
-//                     </tr>
-//                     <tr>
-//                       <td className="py-2 text-slate-500">생성일</td>
-//                       <td className="py-2 text-slate-800 font-medium">{item.frstRegDt ?? '-'}</td>
-//                     </tr>
-//                   </>
-//                 )}
-//               </tbody>
-//             </table>
-//           </div>
-//         )}
-//       </div>
-//     </aside>
-//   )
-// }
-
 interface BreadcrumbItem {
   id: number | null
   name: string
@@ -154,8 +91,7 @@ export default function DriveMyPage() {
   const currentFolderId = folderId ? Number(folderId) : undefined
 
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const [selectedItem, setSelectedItem] = useState<DriveResponseDto | null>(null)
-  const [showPanel, setShowPanel] = useState(false) // 초기값 false — 처음엔 패널 닫힌 상태
+  const [page, setPage] = useState(0) // 0-based
 
   const [folderModalOpen, setFolderModalOpen] = useState(false)
   const [folderName, setFolderName] = useState('')
@@ -173,12 +109,12 @@ export default function DriveMyPage() {
     return saved ? JSON.parse(saved) : [{ id: null, name: '내 드라이브' }]
   })
 
-  const { data: items, loading, execute: fetchList } = useApiList(
-    () => driveApi.getMyDriveList(currentFolderId),
+  const { data: items, loading, pagination, execute: fetchList } = useApiList(
+    () => driveApi.getMyDriveList(currentFolderId, page),
     { immediate: false }
   )
 
-  useEffect(() => { void fetchList() }, [currentFolderId, fetchList])
+  useEffect(() => { void fetchList() }, [currentFolderId, page, fetchList])
 
   useEffect(() => {
     sessionStorage.setItem('drive-breadcrumb', JSON.stringify(breadcrumb))
@@ -264,24 +200,6 @@ export default function DriveMyPage() {
     setDeleteModalOpen(true)
   }
 
-  // ── 파일 다운로드 ──
-const handleDownload = async (item: DriveResponseDto) => {
-  try {
-    const response = await driveApi.downloadFile(item.driveItemId)
-    const blob = new Blob([response.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = item.orgnlFileNm ?? item.itemNm
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch {
-    // 에러 처리 필요 시 추가
-  }
-}
-
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return
     await deleteItem(deleteTarget)
@@ -295,16 +213,28 @@ const handleDownload = async (item: DriveResponseDto) => {
     setDeleteTarget(null)
   }
 
-  // ── 상세 정보 패널 열기 ──
-  const handleOpenDetail = (item: DriveResponseDto) => {
-    setSelectedItem(item)
-    setShowPanel(true)
+  // ── 파일 다운로드 ──
+  const handleDownload = async (item: DriveResponseDto) => {
+    try {
+      const response = await driveApi.downloadFile(item.driveItemId)
+      const blob = new Blob([response.data])
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = item.orgnlFileNm ?? item.itemNm
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      // 에러 처리 필요 시 추가
+    }
   }
 
   // ── 폴더 진입 ──
   const handleFolderEnter = (item: DriveResponseDto) => {
     setBreadcrumb((prev) => [...prev, { id: item.driveItemId, name: item.itemNm }])
-    setSelectedItem(null)
+    setPage(0)
     navigate(`/drive/folders/${item.driveItemId}`)
   }
 
@@ -313,15 +243,14 @@ const handleDownload = async (item: DriveResponseDto) => {
       const index = prev.findIndex((b) => b.id === id)
       return prev.slice(0, index + 1)
     })
-    setSelectedItem(null)
+    setPage(0)
     if (id === null) navigate('/drive')
     else navigate(`/drive/folders/${id}`)
   }
 
-  // ── 행 클릭: 폴더면 진입, 파일이면 패널 ──
+  // ── 행 클릭: 폴더면 진입 ──
   const handleRowClick = (item: DriveResponseDto) => {
     if (item.itemTypeCd === '01') handleFolderEnter(item)
-    else handleOpenDetail(item)
   }
 
   if (loading) return <div>로딩 중...</div>
@@ -342,7 +271,6 @@ const handleDownload = async (item: DriveResponseDto) => {
             <Button variant="outline" leftIcon={<ArrowUpDown size={14} />} size="sm">수정한 날짜순</Button>
             <IconButton size="sm" aria-label="목록 보기" active={viewMode === 'list'} onClick={() => setViewMode('list')}><LayoutList size={16} /></IconButton>
             <IconButton size="sm" aria-label="격자 보기" active={viewMode === 'grid'} onClick={() => setViewMode('grid')}><LayoutGrid size={16} /></IconButton>
-            {/* <IconButton size="sm" aria-label="상세 정보" active={showPanel} onClick={() => setShowPanel((v) => !v)}><Info size={16} /></IconButton> */}
           </div>
         </div>
 
@@ -381,9 +309,7 @@ const handleDownload = async (item: DriveResponseDto) => {
                   <tr
                     key={item.driveItemId}
                     onClick={() => handleRowClick(item)}
-                    className={`group cursor-pointer transition-colors hover:bg-slate-50 ${
-                      selectedItem?.driveItemId === item.driveItemId ? 'bg-blue-50' : ''
-                    }`}
+                    className="group cursor-pointer transition-colors hover:bg-slate-50"
                   >
                     <td className="py-2.5 pl-5 pr-2" onClick={(e) => handleBookmarkClick(e, item)}>
                       <Star
@@ -404,11 +330,7 @@ const handleDownload = async (item: DriveResponseDto) => {
                       <div className="opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu
                           items={[
-                            // 상세 정보 — 폴더/파일 공통
-                            { label: '상세 정보', onClick: () => handleOpenDetail(item) },
-                            // 폴더명 변경 — 폴더만
                             ...(item.itemTypeCd === '01' ? [{ label: '폴더명 변경', onClick: () => handleRenameOpen(item) }] : []),
-                            // 다운로드 — 파일만
                             ...(item.itemTypeCd === '02' ? [{
                               label: '다운로드',
                               onClick: () => void handleDownload(item),
@@ -432,9 +354,7 @@ const handleDownload = async (item: DriveResponseDto) => {
                 <div
                   key={item.driveItemId}
                   onClick={() => handleRowClick(item)}
-                  className={`group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border p-4 transition-colors hover:bg-slate-50 ${
-                    selectedItem?.driveItemId === item.driveItemId ? 'border-blue-300 bg-blue-50' : 'border-slate-100 bg-white'
-                  }`}
+                  className="group relative flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-slate-100 bg-white p-4 transition-colors hover:bg-slate-50"
                 >
                   {item.bookmarkYn === 'Y' && (
                     <Star size={13} className="absolute right-2 top-2 fill-amber-400 text-amber-400" />
@@ -446,9 +366,18 @@ const handleDownload = async (item: DriveResponseDto) => {
             </div>
           )}
         </div>
-      </div>
 
-      {showPanel && <DetailPanel item={selectedItem} onClose={() => setShowPanel(false)} />}
+        {/* 페이지네이션 */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex justify-center border-t border-slate-100 py-3">
+            <Pagination
+              page={page + 1}
+              totalPages={pagination.totalPages}
+              onChange={(p) => setPage(p - 1)}
+            />
+          </div>
+        )}
+      </div>
 
       {/* 폴더 생성 모달 */}
       <Modal open={folderModalOpen} title="폴더 생성" variant="confirm" confirmText="생성" onConfirm={handleCreateFolder} onClose={closeFolderModal}>

@@ -16,6 +16,7 @@ import { meetingRoutes } from './routes/meetingRoutes';
 import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
+import { projectRoutes } from './routes/projectRoutes';
 import MailPage from '../pages/mail/MailPage';
 import OrganizationPage from '../pages/organization/OrganizationPage';
 import ApprovalPage from '../pages/approval/ApprovalPage';
@@ -52,7 +53,8 @@ export const router = createBrowserRouter([
       { path: '/organization/chart', element: <OrganizationPage /> },
       ...boardRoutes,
       ...meetingRoutes,
-      ...driveRoutes
+      ...driveRoutes,
+      ...projectRoutes,
     ],
   },
   {
