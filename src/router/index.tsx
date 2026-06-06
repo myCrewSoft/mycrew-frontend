@@ -17,6 +17,8 @@ import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
 import MailPage from '../pages/mail/MailPage';
+import OrganizationPage from '../pages/organization/OrganizationPage';
+import ApprovalPage from '../pages/approval/ApprovalPage';
 
 
 export const router = createBrowserRouter([
@@ -44,6 +46,10 @@ export const router = createBrowserRouter([
       { path: '/mypage', element: <MyPage /> },
       { path: '/mail', element: <MailPage /> },
       { path: '/mail/:mailbox', element: <MailPage /> },
+      { path: '/approval', element: <ApprovalPage /> },
+      { path: '/approval/:folder/:status', element: <ApprovalPage /> },
+      { path: '/organization', element: <OrganizationPage /> },
+      { path: '/organization/chart', element: <OrganizationPage /> },
       ...boardRoutes,
       ...meetingRoutes,
       ...driveRoutes
