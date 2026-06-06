@@ -89,17 +89,22 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
   },
   approval: {
     title: '전자결재',
-    actions: [
-      { label: '기안 작성', variant: 'primary' },
-      { label: '임시 저장함' },
-    ],
+    actions: [{ label: '기안서 작성', variant: 'primary' }],
     sections: [
       {
-        title: '결재함',
+        title: '결재 상신함',
         items: [
-          { icon: PenLine, label: '기안 문서', path: '/approval/drafts' },
-          { icon: Inbox, label: '수신 문서', path: '/approval/received' },
-          { icon: Check, label: '완료 문서', path: '/approval/done' },
+          { icon: PenLine, label: '진행 중 기안서 목록', path: '/approval/sent/progress' },
+          { icon: Check, label: '완료된 기안서 목록', path: '/approval/sent/completed' },
+          { icon: Archive, label: '반려된 기안서 목록', path: '/approval/sent/rejected' },
+        ],
+      },
+      {
+        title: '결재 수신함',
+        items: [
+          { icon: Inbox, label: '결재 요청 목록', path: '/approval/received/requests' },
+          { icon: ListChecks, label: '결재 내역', path: '/approval/received/history' },
+          { icon: Check, label: '완료된 기안서 목록', path: '/approval/received/completed' },
         ],
       },
     ],
