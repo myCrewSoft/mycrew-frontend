@@ -34,3 +34,13 @@ export type EmployeeLookupResponse = components['schemas']['EmployeeLookupRespon
 
 // 부서 필터
 export type DepartmentLookupResponse = components['schemas']['DepartmentLookupResponse'];
+
+// 예약
+export type ReservationCreateRequest = components['schemas']['ReservationCreateRequest'];
+export type ReservationUpdateRequest = components['schemas']['ReservationUpdateRequest'];
+export type ReservationResponse = components['schemas']['ReservationResponse'];
+
+// 회의실
+export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
+export type RoomUpdateRequest = components['schemas']['RoomUpdateRequest'];
+export type RoomResponse = components['schemas']['RoomResponse'];

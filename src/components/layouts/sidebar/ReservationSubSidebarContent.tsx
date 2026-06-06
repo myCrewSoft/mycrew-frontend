@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { meetingRoomReservationApi } from '../../../api/ReservationApi'
 import { useApi } from '../../../hooks/useApi'
-import type { MeetingRoomReservation } from '../../../types/Reservation'
+import type { ReservationResponse } from '../../../types'
 import IconButton from '../../common/button/IconButton'
 import Checkbox from '../../common/form/checkbox/Checkbox'
 import { useReservation } from '../../../pages/Reservation/ReservationContext'
@@ -62,7 +62,7 @@ const ReservationSubSidebarContent = () => {
   const {
     data: myUpcomingReservations,
     execute: fetchMyUpcomingReservations,
-  } = useApi<MeetingRoomReservation[]>(
+  } = useApi<ReservationResponse[]>(
     meetingRoomReservationApi.getMyUpcomingReservations,
     {
       immediate: false,
@@ -202,7 +202,7 @@ const ReservationSubSidebarContent = () => {
             {rooms.map((room) => (
               <Checkbox
                 key={room.roomId}
-                label={`${room.floor} ${room.roomName}`}
+                label={`${room.floor}층 ${room.roomName}`}
                 checked={checkedRoomIds.includes(room.roomId)}
                 onChange={() => toggleRoom(room.roomId)}
               />
