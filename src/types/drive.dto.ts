@@ -22,6 +22,10 @@ export interface DriveResponseDto {
  
   fileSz?: string               // 파일 크기 (포맷된 문자열, 예: "1.2 MB") — 파일일 때만
   orgnlFileNm?: string          // 원본 파일명 — 파일일 때만
+  childCnt?:number              // 하위 아이템 개수
+  deltrMbrNm?:string            // 삭제자 이름
+  frstRgtrNm?:string            // 생성자 이름
+  lastMdfrNm?:string            // 수정자 이름
 }
 
 export interface DriveRenameRequestDto{
