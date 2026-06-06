@@ -7,6 +7,7 @@ import ApprovalSubSidebarContent from './ApprovalSubSidebarContent'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
 import MeetingSubSidebarContent from './MeetingSubSidebarContent'
 import ReservationSubSidebarContent from './ReservationSubSidebarContent'
+import AttendanceSubSidebarContent from './AttendanceSubSidebarContent'
 import MailSubSidebarContent from './MailSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
@@ -40,6 +41,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
   drive: DriveSubSidebarContent,
+  attendance: AttendanceSubSidebarContent,
   project: ProjectSubSidebarContent,
 }
 
