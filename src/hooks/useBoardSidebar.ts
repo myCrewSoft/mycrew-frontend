@@ -8,15 +8,45 @@ const boardPathByTypeCd: Record<string, string> = {
   NOTICE: '/boards/notices',
   DEPT: '/boards/departments',
   FREE: '/boards/free',
+  ANON: '/boards/anonymous',
   ANONYMOUS: '/boards/anonymous',
 }
 
 const getBoardPath = (boardTypeCd: string) =>
   boardPathByTypeCd[boardTypeCd.toUpperCase()] ?? `/boards/${boardTypeCd.toLowerCase()}`
 
+type DepartmentBoardSideBarResponse = BoardSideBarResponse & {
+  deptCd?: string
+  deptCode?: string
+  departmentCode?: string
+  code?: string
+}
+
+const departmentCodeByName: Record<string, string> = {
+  개발팀: 'DEV',
+  운영팀: 'OPS',
+  디자인팀: 'DESIGN',
+  인사팀: 'HR',
+  마케팅팀: 'MARKETING',
+}
+
+const getDepartmentCode = (board: DepartmentBoardSideBarResponse) => {
+  const candidates = [
+    board.deptCd,
+    board.deptCode,
+    board.departmentCode,
+    board.code,
+    departmentCodeByName[board.boardName],
+    board.boardTypeCd?.toUpperCase() === 'DEPT' ? undefined : board.boardTypeCd,
+  ]
+
+  const departmentCode =
+    candidates.find((value): value is string => Boolean(value?.trim())) ?? board.boardTypeCd
+
+  return departmentCode.toUpperCase()
+}
+
 const getDepartmentPath = (deptCd: string) => `/boards/dept/${encodeURIComponent(deptCd)}`
-const getDepartmentActiveKey = (deptCd: string, boardName: string) =>
-  `${getDepartmentPath(deptCd)}?boardName=${encodeURIComponent(boardName)}`
 
 export const useBoardSidebar = (sidebarKey: string) => {
   const [dynamicBoards, setDynamicBoards] = useState<BoardSideBarResponse[]>([])
@@ -52,12 +82,16 @@ export const useBoardSidebar = (sidebarKey: string) => {
         path: getBoardPath(board.boardTypeCd),
         // 💡 underlevel이 있다면 children으로 변환하여 계층 구조 유지
         children: Array.isArray(board.underlevel)
-          ? board.underlevel.map((sub: BoardSideBarResponse) => ({
-              icon: FileText,
-              label: sub.boardName,
-              path: getDepartmentPath(sub.boardTypeCd),
-              activeKey: getDepartmentActiveKey(sub.boardTypeCd, sub.boardName),
-            }))
+          ? board.underlevel.map((sub: BoardSideBarResponse) => {
+              const deptCd = getDepartmentCode(sub)
+
+              return {
+                icon: FileText,
+                label: sub.boardName,
+                path: getDepartmentPath(deptCd),
+                activeKey: getDepartmentPath(deptCd),
+              }
+            })
           : undefined
       }))
     : []
