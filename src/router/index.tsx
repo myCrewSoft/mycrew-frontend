@@ -15,6 +15,7 @@ import { meetingRoutes } from './routes/meetingRoutes';
 import ChatbotPage from '../pages/ai/Chatbotpage';
 import MyPage from '../pages/mypage/MyPage';
 import { driveRoutes } from './routes/driveRoutes'
+import { projectRoutes } from './routes/projectRoutes';
 
 
 export const router = createBrowserRouter([
@@ -41,7 +42,8 @@ export const router = createBrowserRouter([
       { path: '/mypage', element: <MyPage /> },
       ...boardRoutes,
       ...meetingRoutes,
-      ...driveRoutes
+      ...driveRoutes,
+      ...projectRoutes,
     ],
   },
   {
