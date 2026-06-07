@@ -7,23 +7,22 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type {
-  ChatMessageRequestDto,
-  ChatMessageResponseDto,
-  ChatRoomResponseDto,
-} from '../../../../types/messenger.dto'
+import type { ChatMessageResponse, ChatRoomResponse } from '../../../../types'
 import { useAuth } from '../../../../store/AuthContext'
 import { useMessengerData } from './useMessengerData'
 import { useMessengerSocket } from './useMessengerSocket'
+import type { ChatMessageRequestPayload } from './useMessengerSocket'
 
 interface MessengerSocketContextValue {
-  rooms: ChatRoomResponseDto[]
-  messagesByRoomId: Record<number, ChatMessageResponseDto[]>
+  rooms: ChatRoomResponse[]
+  messagesByRoomId: Record<number, ChatMessageResponse[]>
+  messageUnreadCountsById: Record<number, number>
+  lastReadMessageIdByRoomId: Record<number, number>
   unreadCount: number
   connected: boolean
   error: string | null
   reloadRooms: () => void
-  sendMessage: (chatId: number, payload: ChatMessageRequestDto) => boolean
+  sendMessage: (chatId: number, payload: ChatMessageRequestPayload) => boolean
   markRoomAsRead: (chatId: number) => void
   setActiveChatId: (chatId: number | null) => void
 }
@@ -70,6 +69,9 @@ export const MessengerSocketProvider = ({
     connected,
     messagesByRoomId,
     unreadCountsByRoomId,
+    messageUnreadCountsById,
+    lastReadMessageIdByRoomId,
+    lastMessageByRoomId,
     error,
     sendMessage,
     markRoomAsRead: markSocketRoomAsRead,
@@ -79,22 +81,39 @@ export const MessengerSocketProvider = ({
   })
 
   const roomsWithUnreadCount = useMemo(
-    () =>
-      (rooms ?? []).map((room) => ({
-        ...room,
-        // 이미 열어본 방은 REST가 내려준 기존 unreadCount를 화면에서 0으로 보정합니다.
-        // REST unreadCount가 0으로 내려오는 경우를 대비해 메시지 목록 기반 초기 unreadCount도 함께 사용합니다.
-        unreadCount:
-          (readRoomIds.has(room.id)
-            ? 0
-            : Math.max(
-                toUnreadCount(room.unreadCount),
-                toUnreadCount(initialUnreadCountsByRoomId[room.id]),
-              )) +
-          toUnreadCount(unreadCountsByRoomId[room.id]),
-      })),
+    () => {
+      const nextRooms = (rooms ?? []).map((room) => {
+        const restUnreadCount = readRoomIds.has(room.id)
+          ? 0
+          : Math.max(
+              toUnreadCount(room.unreadCount),
+              toUnreadCount(initialUnreadCountsByRoomId[room.id]),
+            )
+        const realtimeUnreadCount = toUnreadCount(unreadCountsByRoomId[room.id])
+
+        return {
+          ...room,
+          lastMessage: lastMessageByRoomId[room.id]?.content ?? room.lastMessage,
+          lastTime: lastMessageByRoomId[room.id]?.time ?? room.lastTime,
+          // REST 재조회값과 WebSocket 실시간 보정값은 같은 메시지를 가리킬 수 있으므로 더하지 않습니다.
+          // 둘 중 큰 값을 사용해야 메시지 1개가 알림 2개로 보이는 중복 카운팅을 막을 수 있습니다.
+          unreadCount: Math.max(restUnreadCount, realtimeUnreadCount),
+        }
+      })
+
+      // WebSocket으로 새 메시지가 온 방은 REST 재조회 전에도 목록 최상단에 보이게 합니다.
+      return nextRooms.sort((leftRoom, rightRoom) => {
+        const leftOrder = lastMessageByRoomId[leftRoom.id]?.order ?? 0
+        const rightOrder = lastMessageByRoomId[rightRoom.id]?.order ?? 0
+
+        if (leftOrder === rightOrder) return 0
+
+        return rightOrder - leftOrder
+      })
+    },
     [
       initialUnreadCountsByRoomId,
+      lastMessageByRoomId,
       readRoomIds,
       rooms,
       unreadCountsByRoomId,
@@ -167,6 +186,8 @@ export const MessengerSocketProvider = ({
     () => ({
       rooms: canConnect ? roomsWithUnreadCount : [],
       messagesByRoomId,
+      messageUnreadCountsById,
+      lastReadMessageIdByRoomId,
       unreadCount,
       connected,
       error,
@@ -180,6 +201,8 @@ export const MessengerSocketProvider = ({
       connected,
       error,
       markRoomAsRead,
+      messageUnreadCountsById,
+      lastReadMessageIdByRoomId,
       messagesByRoomId,
       reloadRooms,
       roomsWithUnreadCount,
