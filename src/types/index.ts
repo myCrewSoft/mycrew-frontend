@@ -27,8 +27,12 @@ export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = components['schemas']['ScheduleTargetResponseDto'];
 // 메신저
 export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
+export type AddParticipantsRequest = components['schemas']['AddParticipantsRequest'];
+export type RemoveParticipantsRequest = components['schemas']['RemoveParticipantsRequest'];
+export type UpdateChatRoomRequest = components['schemas']['UpdateChatRoomRequest'];
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
 export type ChatRoomResponse = components['schemas']['ChatRoomResponse'];
+export type ChatParticipantResponse = components['schemas']['ChatParticipantResponse'];
 
 // 사원 검색
 export type EmployeeLookupRequest = components['schemas']['EmployeeLookupRequest'];
