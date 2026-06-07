@@ -1,16 +1,101 @@
 import { PencilLine } from 'lucide-react'
+import { useState } from 'react'
 import Badge from '../../../common/dataDisplay/badge/Badge'
 import SearchInput from '../../../common/form/searchInput/SearchInput'
 import type { ChatRoom, ChatTab } from './messenger.types'
-import { getRoomListDepartment, getStatusDotClassName } from './messenger.utils'
+import {
+  getProfileImageUrlByFileId,
+  getRoomListDepartment,
+  getStatusDotClassName,
+  isDirectChatRoom,
+  isGroupChatRoom,
+  isProjectChatRoom,
+  isTaskChatRoom,
+} from './messenger.utils'
 
 // 왼쪽 목록 상단에 표시할 탭입니다.
-// '전체'는 필터 없이 모두 보여주고, '그룹'과 '프로젝트'는 채팅방 type으로 필터링합니다.
+// '전체'는 필터 없이 모두 보여주고, '그룹'과 '업무'는 채팅방 type으로 필터링합니다.
 const chatTabs: { value: ChatTab; label: string }[] = [
   { value: 'all', label: '전체' },
   { value: 'group', label: '그룹' },
-  { value: 'project', label: '프로젝트' },
+  { value: 'work', label: '업무' },
 ]
+
+const getSafeText = (value: unknown) =>
+  typeof value === 'string' ? value.trim() : ''
+
+const getRoomAvatarStyle = (room: ChatRoom) => {
+  if (isGroupChatRoom(room)) {
+    return {
+      label: '단체',
+      className: 'bg-indigo-100 text-indigo-600',
+    }
+  }
+
+  if (isProjectChatRoom(room)) {
+    return {
+      label: '프로젝트',
+      className: 'bg-violet-100 text-violet-600',
+    }
+  }
+
+  if (isTaskChatRoom(room)) {
+    return {
+      label: '업무',
+      className: 'bg-emerald-100 text-emerald-600',
+    }
+  }
+
+  return {
+    label: getSafeText(room.name).charAt(0) || '?',
+    className: 'bg-blue-100 text-blue-600',
+  }
+}
+
+const getParticipantCount = (room: ChatRoom) => {
+  const count = room.participantCount
+
+  return typeof count === 'number' && Number.isFinite(count) ? count : null
+}
+
+const RoomAvatar = ({
+  room,
+  avatarStyle,
+}: {
+  room: ChatRoom
+  avatarStyle: ReturnType<typeof getRoomAvatarStyle>
+}) => {
+  const [imageFailed, setImageFailed] = useState(false)
+  const profileImageUrl = isDirectChatRoom(room)
+    ? getProfileImageUrlByFileId(room.prflImgFileId)
+    : null
+  const showProfileImage = Boolean(profileImageUrl) && !imageFailed
+
+  return (
+    <div
+      className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold ${avatarStyle.className}`}
+    >
+      {/* 1:1 채팅방은 ChatRoomResponse.prflImgFileId를 파일 이미지 URL로 변환해서 표시합니다. */}
+      {showProfileImage ? (
+        <img
+          src={profileImageUrl ?? ''}
+          alt={`${room.name} 프로필`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span className="max-w-[32px] truncate px-1">{avatarStyle.label}</span>
+      )}
+
+      {/* status 값이 있을 때 프로필 오른쪽 아래에 작은 상태 점을 보여줍니다. */}
+      {room.status && (
+        <span
+          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${getStatusDotClassName(room.status)}`}
+        />
+      )}
+    </div>
+  )
+}
 
 interface MessengerRoomListProps {
   activeTab: ChatTab
@@ -69,30 +154,24 @@ const MessengerRoomList = ({
         {rooms.map((room) => {
           // 새 대화 폼을 보는 중에는 기존 채팅방이 선택된 것처럼 보이지 않게 합니다.
           const selected = !createMode && room.id === selectedRoomId
+          const avatarStyle = getRoomAvatarStyle(room)
+          const latestMessage = getSafeText(room.lastMessage)
+          const participantCount = getParticipantCount(room)
 
           return (
             <button
               key={room.id}
               type="button"
               onClick={() => onSelectRoom(room.id)}
-              className={`flex w-full gap-3 rounded-lg p-2 text-left transition-colors ${
+              className={`flex min-h-[64px] w-full gap-3 rounded-lg p-2 text-left transition-colors ${
                 selected ? 'bg-slate-100' : 'hover:bg-slate-50'
               }`}
             >
-              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
-                {room.avatar}
+              <RoomAvatar room={room} avatarStyle={avatarStyle} />
 
-                {/* status 값이 있을 때 프로필 오른쪽 아래에 작은 상태 점을 보여줍니다. */}
-                {room.status && (
-                  <span
-                    className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${getStatusDotClassName(room.status)}`}
-                  />
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-1 flex-col justify-center">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-baseline gap-1.5">
+                  <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
                     <p className="min-w-0 truncate text-sm font-bold text-slate-900">
                       {room.name}
                     </p>
@@ -103,6 +182,13 @@ const MessengerRoomList = ({
                         {getRoomListDepartment(room)}
                       </span>
                     )}
+
+                    {/* 1:1이 아닌 채팅방은 제목 옆에 참여자 수를 작고 연하게 표시합니다. */}
+                    {!isDirectChatRoom(room) && participantCount !== null && (
+                      <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                        {participantCount}명
+                      </span>
+                    )}
                   </div>
 
                   <span className="shrink-0 text-[10px] text-slate-400">
@@ -110,9 +196,15 @@ const MessengerRoomList = ({
                   </span>
                 </div>
 
-                <div className="mt-1 flex items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate text-xs text-slate-500">
-                    {room.lastMessage}
+                <div className="mt-1 flex min-w-0 items-center gap-2">
+                  <p
+                    className={`min-w-0 flex-1 truncate text-xs ${
+                      latestMessage
+                        ? 'text-slate-500'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {latestMessage}
                   </p>
 
                   {/* unreadCount가 1개 이상일 때만 읽지 않은 메시지 배지를 표시합니다. */}
