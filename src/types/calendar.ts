@@ -11,6 +11,12 @@ export type ScheduleTypeCode =
   | 'C008' // 회의실 일정
 
 export type RepeatTypeCode = '01' | '02' | '03'
+
+export interface CalendarSelectedRange {
+  start: string
+  end: string
+  allDay: boolean
+}
 // 반복 타입: 01 - 매일, 02 - 매주, 03 - 매월
 
 // 스케줄 응답 데이터
