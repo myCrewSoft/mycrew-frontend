@@ -5,6 +5,7 @@ import Button from '../../../common/button/Button';
 import { authApi } from '../../../../api/authApi';
 import { useMyProfile, getProfileInitial, getProfileMeta } from '../../../../hooks/useMyProfile';
 import { useAuth } from '../../../../store/AuthContext';
+import { useMessengerData } from '../messenger/useMessengerData';
 
 type ProfileStatus = 'online' | 'away' | 'busy' | 'offline';
 
@@ -12,13 +13,15 @@ interface StatusOption {
   value: ProfileStatus;
   label: string;
   dotClassName: string;
+  statusCode: string;
 }
 
 const statusOptions: StatusOption[] = [
-  { value: 'online', label: '온라인', dotClassName: 'bg-emerald-500' },
-  { value: 'away', label: '자리 비움', dotClassName: 'bg-amber-500' },
-  { value: 'busy', label: '다른 업무 중', dotClassName: 'bg-red-500' },
-  { value: 'offline', label: '오프라인', dotClassName: 'bg-slate-300' },
+  // 화면용 value와 백엔드 참여자 상태 코드를 같이 보관해서 클릭 시 바로 PATCH 요청에 사용합니다.
+  { value: 'online', label: '온라인', dotClassName: 'bg-emerald-500', statusCode: 'STS1' },
+  { value: 'away', label: '자리 비움', dotClassName: 'bg-amber-500', statusCode: 'STS2' },
+  { value: 'busy', label: '다른 업무 중', dotClassName: 'bg-red-500', statusCode: 'STS3' },
+  { value: 'offline', label: '오프라인', dotClassName: 'bg-slate-300', statusCode: 'STS4' },
 ];
 
 const formatCode = (value: string | null | undefined, fallback = '-') =>
@@ -28,6 +31,7 @@ const HeaderProfileStatusMenu = () => {
   const navigate = useNavigate();
   const { clearAuth } = useAuth();
   const { profile } = useMyProfile();
+  const { updateParticipantStatus } = useMessengerData();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<ProfileStatus>('online');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,6 +48,13 @@ const HeaderProfileStatusMenu = () => {
       setOpen(false);
       navigate('/login', { replace: true });
     }
+  };
+
+  const handleChangeStatus = (option: StatusOption) => {
+    // 화면 상태는 먼저 바꾸고, 백엔드에는 참여자 상태 코드(STS1~STS4)를 전달합니다.
+    setStatus(option.value);
+    setOpen(false);
+    void updateParticipantStatus(option.statusCode);
   };
 
   useEffect(() => {
@@ -124,10 +135,7 @@ const HeaderProfileStatusMenu = () => {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => {
-                    setStatus(option.value);
-                    setOpen(false);
-                  }}
+                  onClick={() => handleChangeStatus(option)}
                   className="flex h-8 items-center justify-between rounded-lg px-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   role="menuitem"
                 >
