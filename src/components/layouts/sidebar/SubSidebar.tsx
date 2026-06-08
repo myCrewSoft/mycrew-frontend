@@ -16,6 +16,7 @@ import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
 import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
 import mergeBoardSections from '../../../utils/boardMenuUtil'
 import DriveSubSidebarContent from './DriveSubSidebarContent'
+import EducationSubSidebarContent from './EducationSubSidebarContent'
 import ProjectSubSidebarContent from './ProjectSubSideBarContent'
 
 interface SubSidebarProps {
@@ -43,6 +44,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   drive: DriveSubSidebarContent,
   attendance: AttendanceSubSidebarContent,
   project: ProjectSubSidebarContent,
+  education: EducationSubSidebarContent,
 }
 
 const hiddenSubSidebarKeys = new Set(['organization'])

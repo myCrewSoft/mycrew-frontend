@@ -21,6 +21,7 @@ import { projectRoutes } from './routes/projectRoutes';
 import MailPage from '../pages/mail/MailPage';
 import OrganizationPage from '../pages/organization/OrganizationPage';
 import ApprovalPage from '../pages/approval/ApprovalPage';
+import EducationPage from '../pages/education/EducationPage';
 
 
 export const router = createBrowserRouter([
@@ -54,6 +55,8 @@ export const router = createBrowserRouter([
       { path: '/approval/:folder/:status', element: <ApprovalPage /> },
       { path: '/organization', element: <OrganizationPage /> },
       { path: '/organization/chart', element: <OrganizationPage /> },
+      { path: '/education', element: <EducationPage /> },
+      { path: '/education/:educationId', element: <EducationPage /> },
       ...boardRoutes,
       ...meetingRoutes,
       ...driveRoutes,
