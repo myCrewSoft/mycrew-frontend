@@ -715,11 +715,12 @@ export default function MailPage() {
 
   const connectGoogleMail = async () => {
     try {
-      const response = await authApi.getGoogleAuthorizeUrl();
+      const response = await authApi.getGoogleAuthorizeUrl('mail');
       const authorizationUrl = response.data.data?.authorizationUrl;
-      window.location.href = authorizationUrl || '/mail/oauth/google/authorize';
+      window.location.href =
+        authorizationUrl || '/mail/oauth/google/authorize?context=mail';
     } catch {
-      window.location.href = '/mail/oauth/google/authorize';
+      window.location.href = '/mail/oauth/google/authorize?context=mail';
     }
   };
 
