@@ -22,13 +22,7 @@ const recentProjects = [
   { id: 3, name: '모바일 앱 v3.0 출시', color: '#10b981' },
 ]
 
-interface ProjectSubSidebarContentProps {
-  onRegisterClick?: () => void
-}
-
-const ProjectSubSidebarContent = ({
-  onRegisterClick,
-}: ProjectSubSidebarContentProps) => {
+const ProjectSubSidebarContent = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [projectsOpen, setProjectsOpen] = useState(true)
