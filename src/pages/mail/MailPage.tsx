@@ -597,10 +597,15 @@ export default function MailPage() {
     setListLoading(true);
     setErrorMessage('');
     setScopeRequired(false);
+    let syncError: unknown = null;
 
     try {
       if (options?.syncBefore) {
-        await syncMails();
+        try {
+          await syncMails();
+        } catch (error) {
+          syncError = error;
+        }
       }
 
       const response = trashView
@@ -614,6 +619,11 @@ export default function MailPage() {
       const nextMails = response.data.data ?? [];
       setMails(nextMails);
       setPagination(response.data.pagination ?? null);
+      if (syncError) {
+        setErrorMessage(
+          `메일 동기화 중 문제가 발생했지만 저장된 메일을 표시합니다. ${getMailErrorMessage(syncError)}`,
+        );
+      }
       setSelectedMailId((current) => {
         if (current && nextMails.some((mail) => mail.mailId === current)) {
           return current;
@@ -705,11 +715,12 @@ export default function MailPage() {
 
   const connectGoogleMail = async () => {
     try {
-      const response = await authApi.getGoogleAuthorizeUrl();
+      const response = await authApi.getGoogleAuthorizeUrl('mail');
       const authorizationUrl = response.data.data?.authorizationUrl;
-      window.location.href = authorizationUrl || '/mail/oauth/google/authorize';
+      window.location.href =
+        authorizationUrl || '/mail/oauth/google/authorize?context=mail';
     } catch {
-      window.location.href = '/mail/oauth/google/authorize';
+      window.location.href = '/mail/oauth/google/authorize?context=mail';
     }
   };
 
