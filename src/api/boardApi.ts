@@ -23,7 +23,7 @@ export const boardApi = {
     const boardTypeCd = type === 'department' ? 'DEPT' : boardTypeCdByKind[type]
     const isDepartment = type === 'department' && departmentCode
     const endpoint = isDepartment
-      ? `/api/boards/dept/${encodeURIComponent(departmentCode)}`
+      ? `/api/boards/DEPT/${encodeURIComponent(departmentCode)}`
       : `/api/boards/${boardTypeCd}`
 
     return axiosInstance.get(endpoint, {
