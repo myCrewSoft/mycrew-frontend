@@ -1,22 +1,33 @@
 import type { ChatRoom, ChatStatus, ChatTab } from './messenger.types'
 
+const getRoomType = (room: ChatRoom) =>
+  typeof room.type === 'string' ? room.type : ''
+
 // 백엔드 채팅방 type 코드와 화면에서 쓰던 type 이름을 함께 판단합니다.
 // generated.ts의 DTO를 그대로 쓰기 때문에, 여기서만 코드값 해석을 담당합니다.
 export const isDirectChatRoom = (room: ChatRoom) =>
-  room.type === 'direct' || room.type === 'M1'
+  getRoomType(room) === 'direct' || getRoomType(room) === 'M1'
 
 export const isGroupChatRoom = (room: ChatRoom) =>
-  room.type === 'group' || room.type === 'M2'
+  getRoomType(room) === 'group' || getRoomType(room) === 'M2'
+
+export const isWorkChatRoom = (room: ChatRoom) =>
+  getRoomType(room) === 'work' ||
+  getRoomType(room) === 'M3' ||
+  getRoomType(room) === 'M4'
 
 export const isProjectChatRoom = (room: ChatRoom) =>
-  room.type === 'project' || room.type === 'M3'
+  getRoomType(room) === 'project' || getRoomType(room) === 'M3'
+
+export const isTaskChatRoom = (room: ChatRoom) =>
+  getRoomType(room) === 'task' || getRoomType(room) === 'M4'
 
 // 현재 선택된 탭에 맞는 채팅방인지 확인합니다.
 // 탭 필터링 조건이 컴포넌트 안에 흩어지지 않도록 함수로 분리했습니다.
 export const matchesChatTab = (room: ChatRoom, tab: ChatTab) => {
   if (tab === 'all') return true
   if (tab === 'group') return isGroupChatRoom(room)
-  return isProjectChatRoom(room)
+  return isWorkChatRoom(room)
 }
 
 // 상태값에 따라 프로필 아이콘 오른쪽 아래에 표시할 점 색상을 정합니다.
@@ -49,6 +60,16 @@ export const getDirectRoomMeta = (room: ChatRoom) =>
 // 목록은 폭이 좁아서 정보를 많이 넣으면 쉽게 깨지기 때문입니다.
 export const getRoomListDepartment = (room: ChatRoom) =>
   isDirectChatRoom(room) ? room.department : undefined
+
+// 백엔드는 프로필 이미지를 URL이 아니라 첨부파일 ID(prflImgFileId)로 내려줍니다.
+// 실제 파일 조회 API 경로가 바뀌면 메신저 화면 전체가 아니라 이 함수만 수정하면 됩니다.
+export const getProfileImageUrlByFileId = (fileId?: number | null) => {
+  if (!fileId) return null
+
+  const apiBaseUrl = import.meta.env.VITE_API_URL ?? ''
+
+  return `${apiBaseUrl}/api/files/${fileId}`
+}
 
 // 백엔드가 내려주는 HH:mm 24시간 형식을 오전/오후 12시간 형식으로 바꿉니다.
 // 예: 09:05 -> 오전 9:05, 14:32 -> 오후 2:32

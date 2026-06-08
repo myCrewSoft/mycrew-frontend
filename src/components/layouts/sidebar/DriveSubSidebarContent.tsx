@@ -1,4 +1,4 @@
-import { Folder, Users, Archive } from 'lucide-react'
+import { Folder, Users, Archive, Star } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import SubSidebarSection from './SubSidebarSection'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
@@ -21,9 +21,15 @@ export default function DriveSubSidebarContent() {
         />
         <SubSidebarMenuItem
           icon={Users}
-          label="공유 드라이브"
+          label="프로젝트 드라이브"
           path="/drive/shared"
           active={location.pathname === '/drive/shared'}
+        />
+        <SubSidebarMenuItem
+          icon={Star}
+          label="즐겨찾기 목록"
+          path="/drive/shared"
+          active={location.pathname === '/drive/bookmark'}
         />
         <SubSidebarMenuItem
           icon={Archive}

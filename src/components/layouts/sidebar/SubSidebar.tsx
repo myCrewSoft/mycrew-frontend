@@ -3,9 +3,11 @@ import type { ComponentType } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import Button from '../../common/button/Button'
+import ApprovalSubSidebarContent from './ApprovalSubSidebarContent'
 import CalendarSubSidebarContent from './CalendarSubSidebarContent'
 import MeetingSubSidebarContent from './MeetingSubSidebarContent'
 import ReservationSubSidebarContent from './ReservationSubSidebarContent'
+import AttendanceSubSidebarContent from './AttendanceSubSidebarContent'
 import MailSubSidebarContent from './MailSubSidebarContent'
 import SubSidebarActionButton from './SubSidebarActionButton'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
@@ -14,6 +16,8 @@ import { getSidebarKey, subSidebarConfigs } from './sidebar.config'
 import { useBoardSidebar } from '../../../hooks/useBoardSidebar'
 import mergeBoardSections from '../../../utils/boardMenuUtil'
 import DriveSubSidebarContent from './DriveSubSidebarContent'
+import EducationSubSidebarContent from './EducationSubSidebarContent'
+import ProjectSubSidebarContent from './ProjectSubSideBarContent'
 
 interface SubSidebarProps {
   isOpen: boolean
@@ -33,11 +37,17 @@ const isMenuActive = (pathname: string, search: string, item: any) =>
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
 const customSidebarContentMap: Record<string, ComponentType> = {
   mail: MailSubSidebarContent,
+  approval: ApprovalSubSidebarContent,
   calendar: CalendarSubSidebarContent,
   meeting: MeetingSubSidebarContent,
   reservations: ReservationSubSidebarContent,
   drive: DriveSubSidebarContent,
+  attendance: AttendanceSubSidebarContent,
+  project: ProjectSubSidebarContent,
+  education: EducationSubSidebarContent,
 }
+
+const hiddenSubSidebarKeys = new Set(['organization'])
 
 const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   const location = useLocation()
@@ -55,6 +65,10 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
   const CustomSidebarContent = customSidebarContentMap[sidebarKey]
 
  const {boardMenuItems} =useBoardSidebar(sidebarKey)
+
+  if (hiddenSubSidebarKeys.has(sidebarKey)) {
+    return null
+  }
 
   const handleActionClick = (actionLabel: string) => {
     if (sidebarKey === 'board' && actionLabel.includes('글')) {

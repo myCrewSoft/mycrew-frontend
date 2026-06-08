@@ -7,7 +7,7 @@ import type { ApiResponsePageBoardResponse, BoardSideBarResponse } from '../type
 const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
   notice: 'NOTICE',
   free: 'FREE',
-  anonymous: 'ANONYMOUS',
+  anonymous: 'ANON',
 }
 
 /**
@@ -21,18 +21,17 @@ export const boardApi = {
     { type, page = 1, keyword = '', departmentCode }: BoardListParams
   ): Promise<AxiosResponse<ApiResponsePageBoardResponse>> => {
     const boardTypeCd = type === 'department' ? 'DEPT' : boardTypeCdByKind[type]
-    const endpoint =
-      type === 'department' && departmentCode
-        ? `/api/boards/dept/${encodeURIComponent(departmentCode)}`
-        : `/api/boards/${boardTypeCd}`
+    const isDepartment = type === 'department' && departmentCode
+    const endpoint = isDepartment
+      ? `/api/boards/dept/${encodeURIComponent(departmentCode)}`
+      : `/api/boards/${boardTypeCd}`
 
     return axiosInstance.get(endpoint, {
       params: {
         page: Math.max(page - 1, 0),
         size: 10,
         keyword: keyword.trim() || undefined,
-        boardTypeCd,
-        deptCd: type === 'department' ? departmentCode : undefined,
+        boardTypeCd: isDepartment ? undefined : boardTypeCd,
       },
     })
   },
