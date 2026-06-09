@@ -4,6 +4,7 @@ import BoardDetailPage from '../../pages/board/BoardDetailPage'
 
 export const boardRoutes: RouteObject[] = [
   { path: '/boards', element: <BoardPage /> },
+  { path: '/boards/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/notices', element: <BoardPage /> },
   { path: '/boards/notices/:boardId', element: <BoardDetailPage /> },
   { path: '/boards/departments', element: <BoardPage /> },

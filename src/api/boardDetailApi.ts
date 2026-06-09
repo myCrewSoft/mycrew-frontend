@@ -16,22 +16,54 @@ interface GetBoardDetailParams {
   deptCd?: string
 }
 
+const pendingDetailRequests = new Map<
+  string,
+  Promise<AxiosResponse<ApiResponse<BoardResponse>>>
+>()
+
+const getBoardDetailRequestKey = ({
+  boardType,
+  boardId,
+  deptCd = '',
+}: GetBoardDetailParams) => `${boardType}:${deptCd}:${boardId}`
+
 export const boardDetailApi = {
   getBoardDetail: ({
     boardType,
     boardId,
     deptCd,
   }: GetBoardDetailParams): Promise<AxiosResponse<ApiResponse<BoardResponse>>> => {
-    if (boardType === 'department' && deptCd) {
-      return axiosInstance.get(
-        `/api/boards/DEPT/${encodeURIComponent(deptCd)}/${boardId}`,
-      )
+    const requestKey = getBoardDetailRequestKey({ boardType, boardId, deptCd })
+    const pendingRequest = pendingDetailRequests.get(requestKey)
+
+    if (pendingRequest) {
+      return pendingRequest
     }
+
+    let promise: Promise<AxiosResponse<ApiResponse<BoardResponse>>>
 
     const boardTypeCd = boardType === 'department'
       ? 'DEPT'
       : boardTypeCdByKind[boardType]
 
-    return axiosInstance.get(`/api/boards/${boardTypeCd}/${boardId}`)
+    if (boardType === 'department' && deptCd) {
+      promise = axiosInstance.get(
+        `/api/boards/DEPT/${encodeURIComponent(deptCd)}/${boardId}`,
+      )
+    } else {
+      promise = axiosInstance.get(`/api/boards/${boardTypeCd}/${boardId}`)
+    }
+
+    pendingDetailRequests.set(requestKey, promise)
+
+    void promise.finally(() => {
+      const currentRequest = pendingDetailRequests.get(requestKey)
+
+      if (currentRequest === promise) {
+        pendingDetailRequests.delete(requestKey)
+      }
+    }).catch(() => undefined)
+
+    return promise
   },
 }

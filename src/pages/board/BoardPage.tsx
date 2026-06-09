@@ -69,6 +69,38 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
   return 'notice'
 }
 
+const getBoardDetailPath = (boardType: BoardKind, boardId: number, deptCd?: string) => {
+  if (boardType === 'department' && deptCd) {
+    return `/boards/dept/${encodeURIComponent(deptCd)}/${boardId}`
+  }
+
+  if (boardType === 'department') {
+    return `/boards/departments/${boardId}`
+  }
+
+  if (boardType === 'free') {
+    return `/boards/free/${boardId}`
+  }
+
+  if (boardType === 'anonymous') {
+    return `/boards/anonymous/${boardId}`
+  }
+
+  return `/boards/notices/${boardId}`
+}
+
+const formatBoardAuthor = (board: BoardResponse, boardType: BoardKind) => {
+  if (boardType === 'anonymous') return '익명'
+
+  const employeeName = board.empNm?.trim()
+
+  if (employeeName) {
+    return `${employeeName}(${board.frstRgtrId})`
+  }
+
+  return `사원(${board.frstRgtrId})`
+}
+
 const BoardPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -81,6 +113,7 @@ const BoardPage = () => {
   const [boardList, setBoardList] = useState<BoardVo[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const boardType = getBoardTypeFromPath(location.pathname)
   const isCreateMode = searchParams.get('mode') === 'create'
@@ -129,7 +162,7 @@ const BoardPage = () => {
     }
 
     void fetchBoardData()
-  }, [boardType, keyword, deptCd, page])
+  }, [boardType, keyword, deptCd, page, reloadKey])
 
   useEffect(() => {
     setPage(1)
@@ -139,7 +172,12 @@ const BoardPage = () => {
     return (
       <BoardWriteForm
         initialBoardType={boardType}
+        departmentCode={deptCd}
         onClose={() => setSearchParams({})}
+        onCreated={() => {
+          setPage(1)
+          setReloadKey((current) => current + 1)
+        }}
       />
     )
   }
@@ -227,10 +265,10 @@ const BoardPage = () => {
                 key={board.boardId}
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(`${location.pathname}/${board.boardId}`)}
+                onClick={() => navigate(getBoardDetailPath(boardType, board.boardId, deptCd))}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    navigate(`${location.pathname}/${board.boardId}`)
+                    navigate(getBoardDetailPath(boardType, board.boardId, deptCd))
                   }
                 }}
                 className="flex h-14 cursor-pointer items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50"
@@ -243,7 +281,7 @@ const BoardPage = () => {
                   )}
                 </div>
                 <div className="w-40 text-slate-700">
-                  {boardType === 'anonymous' ? '익명' : `사원(${board.frstRgtrId})`}
+                  {formatBoardAuthor(board, boardType)}
                 </div>
                 <div className="w-40 text-slate-500">
                   {board.frstRegDt?.split('T')[0].replace(/-/g, '.')}
