@@ -28,6 +28,11 @@ const sentItems = [
     label: '반려된 기안서 목록',
     path: '/approval/sent/rejected',
   },
+  {
+    icon: Inbox,
+    label: '임시저장 기안서',
+    path: '/approval/sent/temporary',
+  },
 ]
 
 const receivedItems = [
