@@ -15,9 +15,11 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Textarea from '../../components/common/form/textarea/Textarea'
+import BoardWriteForm from './BoardWriteForm'
 import { boardDetailApi } from '../../api/boardDetailApi'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
+import type { BoardMutationRequest } from '../../api/boardApi'
 import type { BoardResponse } from '../../types'
 
 const boardLabelByType: Record<BoardKind, string> = {
@@ -67,20 +69,46 @@ const isCommentEnabled = (detail: BoardResponse, boardType: BoardKind) => {
   return boardType !== 'notice'
 }
 
+const getDetailStateKey = (boardType: BoardKind, boardId: number, deptCd = '') =>
+  `${boardType}:${deptCd}:${boardId}`
+
+const formatBoardAuthor = (detail: BoardResponse, boardType: BoardKind) => {
+  if (boardType === 'anonymous') return '익명'
+
+  const employeeName = detail.empNm?.trim()
+
+  if (employeeName) {
+    return `${employeeName}(${detail.frstRgtrId})`
+  }
+
+  return `사원(${detail.frstRgtrId})`
+}
+
 const BoardDetailPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { boardId, deptCd } = useParams()
   const boardType = getBoardTypeFromPath(location.pathname)
   const numericBoardId = Number(boardId)
+  const detailStateKey = getDetailStateKey(boardType, numericBoardId, deptCd)
   const [commentContent, setCommentContent] = useState('')
+  const [editModeKey, setEditModeKey] = useState<string | null>(null)
+  const [updatedDetail, setUpdatedDetail] = useState<{
+    key: string
+    detail: BoardResponse
+  } | null>(null)
 
   const {
-    data: detail,
+    data: fetchedDetail,
     loading,
     error,
     execute: fetchBoardDetail,
   } = useApi(boardDetailApi.getBoardDetail, { immediate: false })
+
+  const detail = updatedDetail?.key === detailStateKey
+    ? updatedDetail.detail
+    : fetchedDetail
+  const isEditMode = editModeKey === detailStateKey
 
   useEffect(() => {
     if (!Number.isFinite(numericBoardId)) return
@@ -106,11 +134,56 @@ const BoardDetailPage = () => {
   }
 
   const handleEditClick = () => {
-    window.alert('게시글 수정 기능은 API 연결 후 사용할 수 있습니다.')
+    setEditModeKey(detailStateKey)
+  }
+
+  const handleUpdated = (request: BoardMutationRequest) => {
+    setUpdatedDetail((currentDetailState) => {
+      const baseDetail = currentDetailState?.key === detailStateKey
+        ? currentDetailState.detail
+        : fetchedDetail
+
+      if (!baseDetail) return currentDetailState
+
+      const nextDetail = {
+        ...baseDetail,
+        boardTypeCd: request.boardTypeCd,
+        boardSj: request.boardSj,
+        boardCn: request.boardCn,
+        boardAtchFileId: request.boardAtchFileId,
+        deptCd: request.deptCd,
+        projId: request.projId,
+        imprtntYn: request.imprtntYn,
+        cmntUseYn: request.cmntUseYn,
+      }
+
+      return {
+        key: detailStateKey,
+        detail: nextDetail,
+      }
+    })
   }
 
   const handleDeleteClick = () => {
     window.alert('게시글 삭제 기능은 API 연결 후 사용할 수 있습니다.')
+  }
+
+  if (isEditMode && detail && Number.isFinite(numericBoardId)) {
+    return (
+      <BoardWriteForm
+        mode="edit"
+        boardId={numericBoardId}
+        initialBoardType={boardType}
+        departmentCode={deptCd}
+        initialTitle={detail.boardSj}
+        initialContent={detail.boardCn}
+        initialImportantYn={detail.imprtntYn}
+        initialCommentUseYn={detail.cmntUseYn}
+        initialAttachmentFileId={detail.boardAtchFileId}
+        onClose={() => setEditModeKey(null)}
+        onUpdated={handleUpdated}
+      />
+    )
   }
 
   return (
@@ -208,7 +281,7 @@ const BoardDetailPage = () => {
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-slate-500">
                   <span className="font-bold text-slate-800">
-                    {boardType === 'anonymous' ? '익명' : `사원(${detail.frstRgtrId})`}
+                    {formatBoardAuthor(detail, boardType)}
                   </span>
                   {detail.deptCd && <span>부서 {detail.deptCd}</span>}
                   <span>{formatDateTime(detail.frstRegDt)}</span>

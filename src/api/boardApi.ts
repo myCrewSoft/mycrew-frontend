@@ -2,12 +2,25 @@ import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance' // 프로젝트 구조에 맞게 경로 확인 필요
 import type { BoardKind, BoardListParams } from '../types/board'
-import type { ApiResponsePageBoardResponse, BoardSideBarResponse } from '../types'
+import type {
+  ApiResponsePageBoardResponse,
+  BoardCreateRequest,
+  BoardSideBarResponse,
+} from '../types'
+
+export type BoardMutationRequest = Omit<BoardCreateRequest, 'frstRgtrId'>
 
 const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
   notice: 'NOTICE',
   free: 'FREE',
   anonymous: 'ANON',
+}
+
+interface UpdateBoardParams {
+  type: BoardKind
+  boardId: number
+  departmentCode?: string
+  request: BoardMutationRequest
 }
 
 /**
@@ -34,6 +47,25 @@ export const boardApi = {
         boardTypeCd: isDepartment ? undefined : boardTypeCd,
       },
     })
+  },
+
+  /**
+   * 게시글 등록
+   */
+  createBoard: (
+    request: BoardMutationRequest,
+  ): Promise<AxiosResponse<ApiResponse<number>>> => {
+    return axiosInstance.post('/api/boards', request)
+  },
+
+  /**
+   * 게시글 수정
+   */
+  updateBoard: ({
+    boardId,
+    request,
+  }: UpdateBoardParams): Promise<AxiosResponse<ApiResponse<number>>> => {
+    return axiosInstance.put(`/api/boards/${boardId}`, request)
   },
 
   /**

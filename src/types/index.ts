@@ -15,8 +15,9 @@ import type { components } from "./generated";
 // 게시판
 export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];
 export type BoardResponse = components['schemas']['BoardResponse'];
-export type PageBoardResponse = components['schemas']['PageBoardResponse'];
 export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
+export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
+export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
 
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
