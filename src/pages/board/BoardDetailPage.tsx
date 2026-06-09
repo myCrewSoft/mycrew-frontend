@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronRight,
   FileArchive,
@@ -6,11 +6,15 @@ import {
   Megaphone,
   MessageSquare,
   Paperclip,
+  Pencil,
+  Send,
   ThumbsUp,
+  Trash2,
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
+import Textarea from '../../components/common/form/textarea/Textarea'
 import { boardDetailApi } from '../../api/boardDetailApi'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
@@ -52,8 +56,7 @@ const formatDateTime = (value?: string) => {
   }).format(date)
 }
 
-const getCommentCount = (detail: BoardResponse) =>
-  detail.commentList?.length ?? 0
+const getCommentCount = (detail: BoardResponse) => detail.commentList?.length ?? 0
 
 const isCommentEnabled = (detail: BoardResponse, boardType: BoardKind) => {
   const useYn = detail.cmntUseYn?.toUpperCase()
@@ -70,6 +73,7 @@ const BoardDetailPage = () => {
   const { boardId, deptCd } = useParams()
   const boardType = getBoardTypeFromPath(location.pathname)
   const numericBoardId = Number(boardId)
+  const [commentContent, setCommentContent] = useState('')
 
   const {
     data: detail,
@@ -95,6 +99,19 @@ const BoardDetailPage = () => {
 
   const hasAttachment = Boolean(detail?.boardAtchFileId)
   const commentsEnabled = detail ? isCommentEnabled(detail, boardType) : false
+  const trimmedComment = commentContent.trim()
+
+  const handleCommentSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+  }
+
+  const handleEditClick = () => {
+    window.alert('게시글 수정 기능은 API 연결 후 사용할 수 있습니다.')
+  }
+
+  const handleDeleteClick = () => {
+    window.alert('게시글 삭제 기능은 API 연결 후 사용할 수 있습니다.')
+  }
 
   return (
     <section className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm">
@@ -153,24 +170,47 @@ const BoardDetailPage = () => {
           {!loading && !error && detail && (
             <>
               <div className="border-b border-slate-200 pb-6">
-                <div className="mb-4 flex items-start gap-3">
-                  <span
-                    className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold ${boardBadgeClassByType[boardType]}`}
-                  >
-                    {boardLabelByType[boardType]}
-                  </span>
-                  <h1 className="min-w-0 break-words text-2xl font-bold text-slate-950">
-                    {detail.boardSj}
-                  </h1>
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <span
+                      className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold ${boardBadgeClassByType[boardType]}`}
+                    >
+                      {boardLabelByType[boardType]}
+                    </span>
+                    <h1 className="min-w-0 break-words text-2xl font-bold text-slate-950">
+                      {detail.boardSj}
+                    </h1>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-md px-3"
+                      leftIcon={<Pencil size={15} />}
+                      onClick={handleEditClick}
+                    >
+                      수정
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      className="h-9 rounded-md px-3"
+                      leftIcon={<Trash2 size={15} />}
+                      onClick={handleDeleteClick}
+                    >
+                      삭제
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-slate-500">
                   <span className="font-bold text-slate-800">
                     {boardType === 'anonymous' ? '익명' : `사원(${detail.frstRgtrId})`}
                   </span>
-                  {detail.deptCd && (
-                    <span>부서 {detail.deptCd}</span>
-                  )}
+                  {detail.deptCd && <span>부서 {detail.deptCd}</span>}
                   <span>{formatDateTime(detail.frstRegDt)}</span>
                   <span>조회 {detail.viewCnt ?? 0}</span>
                 </div>
@@ -203,8 +243,8 @@ const BoardDetailPage = () => {
               </section>
 
               {commentsEnabled ? (
-                <section className="pt-4">
-                  <div className="mb-3 flex items-center justify-between text-sm font-bold">
+                <section className="pt-5">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm font-bold">
                     <button type="button" className="inline-flex items-center gap-2 text-blue-600">
                       <ThumbsUp size={17} />
                       좋아요 {detail.likeCnt ?? 0}
@@ -215,13 +255,39 @@ const BoardDetailPage = () => {
                     </span>
                   </div>
 
-                  <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-slate-50">
+                  <form
+                    onSubmit={handleCommentSubmit}
+                    className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <Textarea
+                      value={commentContent}
+                      onChange={(event) => setCommentContent(event.target.value)}
+                      maxLength={500}
+                      placeholder="댓글을 입력하세요."
+                      className="min-h-24 resize-none rounded-lg"
+                    />
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-slate-400">
+                        {commentContent.length}/500
+                      </span>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!trimmedComment}
+                        leftIcon={<Send size={15} />}
+                      >
+                        등록
+                      </Button>
+                    </div>
+                  </form>
+
+                  <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
                     {comments.length > 0 ? (
                       comments.map((comment, index) => (
                         <div
                           key={comment.commentId ?? index}
-                          className={`flex gap-3 px-4 py-3 ${
-                            comment.commentDepth ? 'pl-9' : ''
+                          className={`flex gap-3 px-4 py-4 ${
+                            comment.commentDepth ? 'bg-slate-50 pl-10' : ''
                           }`}
                         >
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-xs font-bold text-white">
@@ -236,29 +302,36 @@ const BoardDetailPage = () => {
                                   ? '익명'
                                   : `사원(${comment.wrterEmpId ?? '-'})`}
                               </span>
+                              {Boolean(comment.commentDepth) && (
+                                <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-500">
+                                  답글
+                                </span>
+                              )}
                             </div>
                             <p className="whitespace-pre-wrap break-words text-sm font-medium leading-6 text-slate-700">
                               {comment.commentCn}
                             </p>
-                            <div className="mt-1 flex items-center gap-3 text-xs font-medium text-slate-500">
+                            <div className="mt-2 flex items-center gap-3 text-xs font-medium text-slate-500">
                               <span>{formatDateTime(comment.wrteDt)}</span>
+                              <button type="button" className="font-semibold text-slate-600 hover:text-blue-600">
+                                답글
+                              </button>
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="px-4 py-6 text-center text-sm font-medium text-slate-400">
+                      <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">
                         등록된 댓글이 없습니다.
                       </div>
                     )}
-
                   </div>
                 </section>
               ) : (
                 <section className="pt-5">
                   <div className="flex h-16 items-center gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-slate-700">
                     <Megaphone size={18} className="text-slate-700" />
-                    이 게시판은 댓글 기능을 제공하지 않습니다.
+                    이 게시글은 댓글 기능을 제공하지 않습니다.
                   </div>
                 </section>
               )}
