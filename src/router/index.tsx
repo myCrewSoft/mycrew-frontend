@@ -47,6 +47,7 @@ export const router = createBrowserRouter([
       { path: '/dashboard', element: <DashboardPage /> },
       { path: '/components', element: <CommonComponentsGuide /> },
       { path: '/mypage', element: <MyPage /> },
+      { path: '/mypage/:section', element: <MyPage /> },
       { path: '/attendance', element: <AttendancePage /> },
       { path: '/attendance/status', element: <AttendancePage /> },
       { path: '/mail', element: <MailPage /> },

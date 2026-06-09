@@ -18,6 +18,7 @@ import mergeBoardSections from '../../../utils/boardMenuUtil'
 import DriveSubSidebarContent from './DriveSubSidebarContent'
 import EducationSubSidebarContent from './EducationSubSidebarContent'
 import ProjectSubSidebarContent from './ProjectSubSideBarContent'
+import MyPageSubSidebarContent from './MyPageSubSidebarContent'
 
 interface SubSidebarProps {
   isOpen: boolean
@@ -45,6 +46,7 @@ const customSidebarContentMap: Record<string, ComponentType> = {
   attendance: AttendanceSubSidebarContent,
   project: ProjectSubSidebarContent,
   education: EducationSubSidebarContent,
+  mypage: MyPageSubSidebarContent,
 }
 
 const hiddenSubSidebarKeys = new Set(['organization'])
