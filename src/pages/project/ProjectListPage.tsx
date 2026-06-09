@@ -17,6 +17,7 @@ import Textarea from '../../components/common/form/textarea/Textarea'
 import { useApi, useApiList } from '../../hooks/useApi'
 import { useToast } from '../../components/common/toast/useToast'
 import type { ProjectCreateRequestDto, ProjectListResponseDto } from '../../types/project'
+import { ApiError } from '../../api/axiosInstance'
 
 // ── 상태코드 설정 ─────────────────────────────────────────────────
 type ProjectStatCd = '01' | '02' | '03' | '04'
@@ -37,6 +38,35 @@ const statGroups: { statCd: ProjectStatCd; label: string }[] = [
   { statCd: '03', label: '완료' },
   { statCd: '04', label: '중단' },
 ]
+
+// ── 진척률 바 ─────────────────────────────────────────────────────
+const ProgressBar = ({ value }: { value: number }) => {
+  const clamped = Math.min(Math.max(value ?? 0, 0), 100)
+
+  const barColor =
+    clamped >= 100
+      ? 'bg-emerald-500'
+      : clamped >= 60
+      ? 'bg-blue-500'
+      : clamped >= 30
+      ? 'bg-amber-400'
+      : 'bg-slate-300'
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-400">진척률</span>
+        <span className="text-xs font-semibold text-slate-600">{clamped}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
+    </div>
+  )
+}
 
 // ── 프로젝트 카드 ─────────────────────────────────────────────────
 const ProjectCard = ({
@@ -63,12 +93,13 @@ const ProjectCard = ({
         {project.projNm}
       </h3>
       <div className="flex flex-col gap-1.5 text-xs text-slate-400">
-        <span className="font-medium text-slate-500"> Leader: {project.projLdrNm}</span>
+        <span className="font-medium text-slate-500">Leader: {project.projLdrNm}</span>
         <div className="flex items-center gap-1">
           <Calendar size={12} />
           <span>{project.projBgngYmd} ~ {project.projEndYmd}</span>
         </div>
       </div>
+      <ProgressBar value={project.projPrgrsRt ?? 0} />
     </div>
   )
 }
@@ -156,7 +187,11 @@ const RegisterDrawer = ({
       onSuccess()
       onClose()
     } catch (err) {
-      showToast({ title: '프로젝트 등록에 실패했습니다.', variant: 'danger' })
+      if (err instanceof ApiError && err.httpStatus === 403) {
+        showToast({ title: '프로젝트 등록 권한이 없습니다.', variant: 'danger' })
+      } else {
+        showToast({ title: '프로젝트 등록에 실패했습니다.', variant: 'danger' })
+      }
       console.error(err)
     }
   }
@@ -187,7 +222,6 @@ const RegisterDrawer = ({
           </button>
         </div>
 
-        {/* 폼 본문 */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="flex flex-col gap-5">
             <FormField
