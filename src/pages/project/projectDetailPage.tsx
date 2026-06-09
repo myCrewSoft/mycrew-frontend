@@ -153,7 +153,7 @@ const ProjectDetailPage = () => {
       actions={
         <>
           <Button variant="outline" leftIcon={<Share2 size={15} />}>
-            공유하기
+            회의 생성
           </Button>
           <Button variant="primary" leftIcon={<Plus size={15} />}>
             업무 추가
