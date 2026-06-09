@@ -1,4 +1,4 @@
-// src/pages/project/ProjectDetailPage.tsx
+﻿// src/pages/project/ProjectDetailPage.tsx
 // 라우터에서 /project/:id 경로로 연결하세요
 
 import { useState } from 'react'
@@ -19,6 +19,12 @@ import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Button from '../../components/common/button/Button'
 import Tabs from '../../components/common/tabs/Tabs'
+import {
+  PROJECT_TASKS,
+  ProjectTasksTab,
+  type ProjectTaskStatusCode,
+  type ProjectTaskViewMode,
+} from './task'
 
 // ── 더미 데이터 ──────────────────────────────────────────────────
 const PROJECT_DETAIL = {
@@ -135,6 +141,9 @@ const TaskStatusBadge = ({ status }: { status: string }) => {
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const [tab, setTab] = useState('overview')
+  const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
+  const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
+  const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
 
   const project = PROJECT_DETAIL // 실제에서는 id 기반으로 API 조회
 
@@ -146,6 +155,12 @@ const ProjectDetailPage = () => {
     { value: 'drive', label: '프로젝트 드라이브' },
   ]
 
+  const handleOpenTaskCreateModal = (status: ProjectTaskStatusCode = '00') => {
+    setTab('tasks')
+    setTaskCreateStatus(status)
+    setTaskCreateModalOpen(true)
+  }
+
   return (
     <PageComponent
       title={project.name}
@@ -155,7 +170,11 @@ const ProjectDetailPage = () => {
           <Button variant="outline" leftIcon={<Share2 size={15} />}>
             회의 생성
           </Button>
-          <Button variant="primary" leftIcon={<Plus size={15} />}>
+          <Button
+            variant="primary"
+            leftIcon={<Plus size={15} />}
+            onClick={() => handleOpenTaskCreateModal()}
+          >
             업무 추가
           </Button>
         </>
@@ -405,8 +424,20 @@ const ProjectDetailPage = () => {
         </div>
       )}
 
+      {tab === 'tasks' && (
+        <ProjectTasksTab
+          tasks={PROJECT_TASKS}
+          viewMode={taskViewMode}
+          createModalOpen={taskCreateModalOpen}
+          createStatus={taskCreateStatus}
+          onViewModeChange={setTaskViewMode}
+          onOpenCreateModal={handleOpenTaskCreateModal}
+          onCloseCreateModal={() => setTaskCreateModalOpen(false)}
+        />
+      )}
+
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
-      {tab !== 'overview' && (
+      {tab !== 'overview' && tab !== 'tasks' && (
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">
@@ -419,3 +450,5 @@ const ProjectDetailPage = () => {
 }
 
 export default ProjectDetailPage
+
+
