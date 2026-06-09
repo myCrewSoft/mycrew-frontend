@@ -4,7 +4,8 @@ export interface ProjectListResponseDto {
     projBgngYmd : string,
     projEndYmd : string,
     projStatCd : string,
-    projLdrNm : string
+    projLdrNm : string,
+    projPrgrsRt : number
 }
 
 export interface ProjectCreateRequestDto {
