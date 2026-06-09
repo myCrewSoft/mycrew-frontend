@@ -1,5 +1,5 @@
 import { Building2, ClipboardList, FolderKanban, Globe2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError } from '../../api/axiosInstance'
 import { scheduleApi } from '../../api/scheduleApi'
 import Button from '../../components/common/button/Button'
@@ -15,6 +15,7 @@ import type { ScheduleRequestDto } from '../../types'
 import {
   scheduleTypeColorMap,
   scheduleTypeLabelMap,
+  type CalendarSelectedRange,
   type CalendarEventItem,
   type RepeatTypeCode,
   type ScheduleFormValues,
@@ -25,6 +26,7 @@ import { useCalendar } from './CalendarContext'
 interface CalendarScheduleDrawerProps {
   open: boolean
   selectedDate: string
+  selectedRange?: CalendarSelectedRange | null
   schedule?: CalendarEventItem | null
   onClose: () => void
 }
@@ -65,6 +67,7 @@ const taskOptions: OptionItem[] = []
 const createInitialFormValues = (
   selectedDate: string,
   schedule?: CalendarEventItem | null,
+  selectedRange?: CalendarSelectedRange | null,
 ): ScheduleFormValues => ({
   title: schedule?.title ?? '',
   detail: schedule?.detail ?? '',
@@ -72,9 +75,9 @@ const createInitialFormValues = (
   color: schedule
     ? scheduleTypeColorMap[schedule.scheduleTypeCode]
     : scheduleTypeColorMap.C002,
-  beginDate: schedule?.start ?? `${selectedDate}T09:00`,
-  endDate: schedule?.end ?? `${selectedDate}T10:00`,
-  allDay: schedule?.allDay ?? false,
+  beginDate: schedule?.start ?? selectedRange?.start ?? `${selectedDate}T09:00`,
+  endDate: schedule?.end ?? selectedRange?.end ?? `${selectedDate}T10:00`,
+  allDay: schedule?.allDay ?? selectedRange?.allDay ?? false,
   deptCd: schedule?.deptCd,
   projId: schedule?.projId,
   repeatYn: schedule?.repeat ?? false,
@@ -196,12 +199,13 @@ const getScheduleScopeNotice = (
 const CalendarScheduleDrawer = ({
   open,
   selectedDate,
+  selectedRange,
   schedule,
   onClose,
 }: CalendarScheduleDrawerProps) => {
   const isEditMode = !!schedule
   const [formValues, setFormValues] = useState<ScheduleFormValues>(() =>
-    createInitialFormValues(selectedDate, schedule),
+    createInitialFormValues(selectedDate, schedule, selectedRange),
   )
   const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<
     Array<string | number>
@@ -240,6 +244,29 @@ const CalendarScheduleDrawer = ({
     projectId: relatedProjectId,
     taskId: relatedTaskId,
   })
+
+  useEffect(() => {
+    if (isEditMode) return
+
+    const nextInitialValues = createInitialFormValues(
+      selectedDate,
+      null,
+      selectedRange,
+    )
+
+    setFormValues((current) => ({
+      ...current,
+      beginDate: nextInitialValues.beginDate,
+      endDate: nextInitialValues.endDate,
+      allDay: nextInitialValues.allDay,
+    }))
+  }, [
+    isEditMode,
+    selectedDate,
+    selectedRange?.allDay,
+    selectedRange?.end,
+    selectedRange?.start,
+  ])
 
   const handleScheduleTypeChange = (nextTypeCode: ScheduleTypeCode) => {
     setFormValues((current) => ({

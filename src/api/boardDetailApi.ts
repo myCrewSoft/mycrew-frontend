@@ -24,7 +24,7 @@ export const boardDetailApi = {
   }: GetBoardDetailParams): Promise<AxiosResponse<ApiResponse<BoardResponse>>> => {
     if (boardType === 'department' && deptCd) {
       return axiosInstance.get(
-        `/api/boards/dept/${encodeURIComponent(deptCd)}/${boardId}`,
+        `/api/boards/DEPT/${encodeURIComponent(deptCd)}/${boardId}`,
       )
     }
 
