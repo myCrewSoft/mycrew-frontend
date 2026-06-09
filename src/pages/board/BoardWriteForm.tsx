@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlignCenter,
   AlignJustify,
@@ -27,6 +27,7 @@ import { ApiError } from '../../api/axiosInstance'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
 import type { BoardMutationRequest } from '../../api/boardApi'
+import type { BoardSideBarResponse } from '../../types'
 
 interface BoardWriteFormProps {
   mode?: 'create' | 'edit'
@@ -50,6 +51,18 @@ interface ToolbarItem {
   className?: string
 }
 
+interface DepartmentOption {
+  code: string
+  name: string
+}
+
+type DepartmentBoardSideBarResponse = BoardSideBarResponse & {
+  deptCd?: string
+  deptCode?: string
+  departmentCode?: string
+  code?: string
+}
+
 const boardOptions: Array<{ value: BoardKind; label: string }> = [
   { value: 'notice', label: '공지사항' },
   { value: 'department', label: '부서게시판' },
@@ -62,6 +75,48 @@ const boardTypeCdByKind: Record<BoardKind, string> = {
   department: 'DEPT',
   free: 'FREE',
   anonymous: 'ANON',
+}
+
+const departmentCodeByName: Record<string, string> = {
+  개발팀: 'DEV',
+  운영팀: 'OPS',
+  디자인팀: 'DESIGN',
+  인사팀: 'HR',
+  마케팅팀: 'MARKETING',
+}
+
+const getDepartmentCode = (board: DepartmentBoardSideBarResponse) => {
+  const candidates = [
+    board.deptCd,
+    board.deptCode,
+    board.departmentCode,
+    board.code,
+    departmentCodeByName[board.boardName],
+    board.boardTypeCd?.toUpperCase() === 'DEPT' ? undefined : board.boardTypeCd,
+  ]
+
+  return candidates.find((value): value is string => Boolean(value?.trim()))?.toUpperCase() ?? ''
+}
+
+const getDepartmentOptions = (boards: BoardSideBarResponse[]): DepartmentOption[] => {
+  const departmentBoard = boards.find(
+    (board) => board.boardTypeCd?.toUpperCase() === 'DEPT',
+  )
+
+  if (!Array.isArray(departmentBoard?.underlevel)) return []
+
+  return departmentBoard.underlevel
+    .map((board) => {
+      const code = getDepartmentCode(board)
+
+      return code
+        ? {
+            code,
+            name: board.boardName,
+          }
+        : null
+    })
+    .filter((option): option is DepartmentOption => Boolean(option))
 }
 
 const toolbarGroups: ToolbarItem[][] = [
@@ -126,6 +181,8 @@ const BoardWriteForm = ({
   const [content, setContent] = useState(initialContent)
   const [isImportant, setIsImportant] = useState(initialImportantYn.toUpperCase() === 'Y')
   const [allowComments, setAllowComments] = useState(initialCommentUseYn.toUpperCase() !== 'N')
+  const [selectedDepartmentCode, setSelectedDepartmentCode] = useState(departmentCode)
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([])
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
 
   const { loading: creating, execute: createBoard } = useApi<
@@ -150,6 +207,29 @@ const BoardWriteForm = ({
     [content],
   )
 
+  useEffect(() => {
+    if (boardType !== 'department') return
+
+    let ignore = false
+
+    boardApi.getBoardSideBar()
+      .then((response) => {
+        if (ignore) return
+
+        const boards = response.data.data ?? []
+        setDepartmentOptions(getDepartmentOptions(boards))
+      })
+      .catch(() => {
+        if (ignore) return
+
+        setDepartmentOptions([])
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [boardType])
+
   const handleSubmit = async () => {
     const trimmedTitle = title.trim()
     const trimmedContent = content.trim()
@@ -164,8 +244,8 @@ const BoardWriteForm = ({
       return
     }
 
-    if (boardType === 'department' && !departmentCode.trim()) {
-      setValidationMessage('부서게시판은 부서를 선택한 뒤 작성할 수 있습니다.')
+    if (boardType === 'department' && !selectedDepartmentCode.trim()) {
+      setValidationMessage('부서게시판은 하위 부서를 선택한 뒤 작성할 수 있습니다.')
       return
     }
 
@@ -179,7 +259,7 @@ const BoardWriteForm = ({
       boardSj: trimmedTitle,
       boardCn: trimmedContent,
       boardAtchFileId: initialAttachmentFileId ?? 0,
-      deptCd: boardType === 'department' ? departmentCode : '',
+      deptCd: boardType === 'department' ? selectedDepartmentCode : '',
       projId: 0,
       imprtntYn: isImportant ? 'Y' : 'N',
       cmntUseYn: boardType === 'notice' || allowComments ? 'Y' : 'N',
@@ -192,7 +272,7 @@ const BoardWriteForm = ({
         await updateBoard({
           type: boardType,
           boardId,
-          departmentCode,
+          departmentCode: selectedDepartmentCode,
           request,
         })
         onUpdated?.(request)
@@ -249,6 +329,25 @@ const BoardWriteForm = ({
                 </option>
               ))}
             </select>
+
+            {boardType === 'department' && (
+              <select
+                value={selectedDepartmentCode}
+                onChange={(event) => {
+                  setSelectedDepartmentCode(event.target.value)
+                  setValidationMessage(null)
+                }}
+                disabled={isEditMode}
+                className="h-11 w-40 rounded-md border border-slate-300 bg-white pl-2 pr-7 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+              >
+                <option value="">부서 선택</option>
+                {departmentOptions.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <input
               value={title}
