@@ -31,9 +31,13 @@ const ProjectTaskCard = ({ task, onOpenTask }: ProjectTaskCardProps) => {
         </h3>
       </button>
 
+      <p className="mt-2 line-clamp-2 min-h-[36px] text-xs leading-5 text-slate-500">
+        {task.taskCn}
+      </p>
+
       <div className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-500">
         <CalendarDays size={13} />
-        {task.taskEndDt}
+        {task.taskBgngDt} ~ {task.taskEndDt}
       </div>
 
       <div className="mt-4">

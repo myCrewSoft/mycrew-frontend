@@ -15,13 +15,13 @@ interface ProjectTaskListProps {
 const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <div className="min-w-[920px]">
-        <div className="grid grid-cols-[1.4fr_0.6fr_0.6fr_0.75fr_0.75fr_0.6fr_0.6fr_40px] items-center bg-slate-50 px-5 py-3 text-xs font-bold text-slate-500">
+      <div className="min-w-[980px]">
+        <div className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_0.6fr_40px] items-center bg-slate-50 px-5 py-3 text-xs font-bold text-slate-500">
           <span>업무명</span>
           <span>업무 유형</span>
           <span>상태</span>
           <span>담당자</span>
-          <span>마감일</span>
+          <span>기간</span>
           <span>진척률</span>
           <span>우선순위</span>
           <span />
@@ -30,7 +30,7 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
           {tasks.map((task) => (
             <div
               key={task.taskId}
-              className="grid grid-cols-[1.4fr_0.6fr_0.6fr_0.75fr_0.75fr_0.6fr_0.6fr_40px] items-center px-5 py-3 text-sm transition-colors hover:bg-slate-50"
+              className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_0.6fr_40px] items-center px-5 py-3 text-sm transition-colors hover:bg-slate-50"
             >
               <button
                 type="button"
@@ -41,7 +41,7 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
                 <div className="min-w-0">
                   <p className="truncate font-bold text-slate-900">{task.taskNm}</p>
                   <p className="truncate text-xs font-medium text-slate-400">
-                    TASK-{task.taskId}
+                    {task.taskCn}
                   </p>
                 </div>
               </button>
@@ -49,7 +49,7 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
               <ProjectTaskStatusBadge status={task.taskStatCd} />
               <ProjectTaskManagerAvatar name={task.taskMngrNm} />
               <span className="text-xs font-medium text-slate-600">
-                {task.taskEndDt}
+                {task.taskBgngDt} ~ {task.taskEndDt}
               </span>
               <div className="pr-4">
                 <div className="mb-1 flex justify-end text-xs font-bold text-slate-600">

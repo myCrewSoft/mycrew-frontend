@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertCircle, CalendarDays, LayoutGrid, List, Search, SlidersHorizontal } from 'lucide-react'
-import { taskApi } from '../../../api/taskApi'
 import { ApiError } from '../../../api/axiosInstance'
+import { taskApi } from '../../../api/taskApi'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
 import { taskColumns, taskStatusConfig } from './task.config'
 import ProjectTaskBoard from './ProjectTaskBoard'
@@ -62,14 +62,14 @@ const ProjectTasksTab = ({
     if (!keyword) return tasks
 
     return tasks.filter((task) =>
-      `${task.taskNm} ${task.taskMngrNm} ${task.taskId}`
+      `${task.taskNm} ${task.taskCn} ${task.taskMngrNm} ${task.taskId}`
         .toLowerCase()
         .includes(keyword),
     )
   }, [query, tasks])
 
   const highPriorityCount = filteredTasks.filter((task) => task.taskPriorityCd === '01').length
-  const dueTaskCount = filteredTasks.filter((task) => task.taskStatCd !== '02').length
+  const incompleteTaskCount = filteredTasks.filter((task) => task.taskStatCd !== '02').length
 
   return (
     <div className="mt-5 space-y-4">
@@ -102,7 +102,7 @@ const ProjectTasksTab = ({
             <CalendarDays size={15} />
             미완료
             <Badge size="count" variant="neutral">
-              {dueTaskCount}
+              {incompleteTaskCount}
             </Badge>
           </button>
         </div>
@@ -117,7 +117,7 @@ const ProjectTasksTab = ({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="업무명, 담당자, 업무 ID 검색"
+            placeholder="업무명, 상세내용, 담당자, 업무 ID 검색"
             className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>

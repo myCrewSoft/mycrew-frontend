@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, ClipboardList, UserRound } from 'lucide-react'
-import { taskApi } from '../../../api/taskApi'
 import { ApiError } from '../../../api/axiosInstance'
+import { taskApi } from '../../../api/taskApi'
 import Button from '../../../components/common/button/Button'
 import Modal from '../../../components/common/overlay/modal/Modal'
 import {
@@ -66,8 +66,6 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
 
   const visibleTask = detail ?? task
   const status = getTaskStatusConfig(visibleTask.taskStatCd)
-  const taskDescription = String(detail?.taskCn ?? '')
-  const taskStartDate = String(detail?.taskBgngDt ?? '-')
   const employeeList = (
     Array.isArray(detail?.employeeList) ? detail.employeeList : []
   ) as Array<{ empId: number; empNm: string }>
@@ -105,8 +103,8 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
             <ProjectTaskTypeBadge typeCd={visibleTask.taskTypeCd} />
           </div>
           <h3 className="text-lg font-bold leading-7 text-slate-950">{visibleTask.taskNm}</h3>
-          {taskDescription && (
-            <p className="mt-2 text-sm leading-6 text-slate-600">{taskDescription}</p>
+          {visibleTask.taskCn && (
+            <p className="mt-2 text-sm leading-6 text-slate-600">{visibleTask.taskCn}</p>
           )}
         </div>
 
@@ -124,7 +122,7 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
               업무 기간
             </div>
             <p className="text-sm font-bold text-slate-800">
-              {taskStartDate} ~ {visibleTask.taskEndDt}
+              {visibleTask.taskBgngDt} ~ {visibleTask.taskEndDt}
             </p>
           </div>
           <div className="rounded-lg border border-slate-100 bg-white p-4">
