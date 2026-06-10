@@ -1,4 +1,4 @@
-import { RefreshCcw, Star } from 'lucide-react'
+import { RefreshCcw, Send, Star } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import Button from '../../components/common/button/Button'
@@ -7,7 +7,9 @@ import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyStat
 import { useToast } from '../../components/common/toast/useToast'
 import type { ApprovalTemplateResponse } from '../../types/approval'
 import { getApiErrorMessage } from './approval.utils'
-import './ApprovalPage.css'
+import ApprovalDraftModal from './ApprovalDraftModal'
+import ApprovalHtmlDocument from './ApprovalHtmlDocument'
+import { useDraftModal } from './useDraftModal'
 
 export default function ApprovalFavoriteTemplatePage() {
   const { showToast } = useToast()
@@ -18,6 +20,18 @@ export default function ApprovalFavoriteTemplatePage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+
+  const {
+    draftOpen,
+    draftForm,
+    setDraftForm,
+    draftApprovers,
+    setDraftApprovers,
+    draftError,
+    draftSaving,
+    handleSaveDraft,
+    closeDraft,
+  } = useDraftModal()
 
   const favoriteTemplates = useMemo(
     () => templates.filter((t) => t.favoriteYn === 'Y'),
@@ -119,6 +133,13 @@ export default function ApprovalFavoriteTemplatePage() {
             >
               새로고침
             </Button>
+            <Button
+              variant="outline"
+              leftIcon={<Send size={16} />}
+              onClick={() => window.dispatchEvent(new Event('approval:open-draft'))}
+            >
+              기안서 작성
+            </Button>
           </div>
         </div>
       </section>
@@ -212,19 +233,12 @@ export default function ApprovalFavoriteTemplatePage() {
                 </div>
                 <div>
                   <span>첨부파일</span>
-                  <strong>{selectedTemplate.atchFileId ?? '-'}</strong>
-                </div>
+                  <strong>{selectedTemplate.atchFileId ?? '-'}</strong></div>
               </div>
 
               <section className="approval-page__detail-section">
                 <h3>문서 보기</h3>
-                <article
-                  className="approval-page__html-document"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      selectedTemplate.tmplatCn || '<p>결재 양식 내용이 없습니다.</p>',
-                  }}
-                />
+                <ApprovalHtmlDocument html={selectedTemplate.tmplatCn} />
               </section>
             </>
           ) : (
@@ -235,6 +249,18 @@ export default function ApprovalFavoriteTemplatePage() {
           )}
         </div>
       </section>
+
+      <ApprovalDraftModal
+        open={draftOpen}
+        saving={draftSaving}
+        form={draftForm}
+        approvers={draftApprovers}
+        error={draftError}
+        onChange={setDraftForm}
+        onApproversChange={setDraftApprovers}
+        onClose={closeDraft}
+        onSubmit={handleSaveDraft}
+      />
     </div>
   )
 }

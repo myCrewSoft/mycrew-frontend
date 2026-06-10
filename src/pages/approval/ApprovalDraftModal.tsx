@@ -1,4 +1,4 @@
-import { Send } from 'lucide-react'
+import { Search, Send, UserPlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import { employeeApi } from '../../api/employeeApi'
@@ -38,7 +38,12 @@ export default function ApprovalDraftModal({
   const [employeeResults, setEmployeeResults] = useState<EmployeeLookupResponse[]>([])
   const [employeeLoading, setEmployeeLoading] = useState(false)
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
+  // iframe 에디터: ref + 최신 form/onChange를 ref로 보관해 stale closure 방지
+  const editorFrameRef = useRef<HTMLIFrameElement>(null)
+  const formRef = useRef(form)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { formRef.current = form }, [form])
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // 모달 열릴 때 템플릿 목록 로드
@@ -53,12 +58,38 @@ export default function ApprovalDraftModal({
       .finally(() => setTemplatesLoading(false))
   }, [open])
 
-  // 템플릿 선택 시 contenteditable에 HTML 삽입
+  // 템플릿 선택 or 모달 열릴 때 iframe에 HTML을 직접 기록 (style 격리)
   useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.innerHTML = form.aprvlFullCn
-    }
-  }, [form.tmplatCd]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!open) return
+    const frame = editorFrameRef.current
+    if (!frame) return
+    const doc = frame.contentDocument
+    if (!doc) return
+    const html = formRef.current.aprvlFullCn
+    doc.open()
+    doc.write(html || '<p></p>')
+    doc.close()
+    const body = doc.body
+    if (!body) return
+    body.contentEditable = 'true'
+    body.style.outline = 'none'
+    body.style.cursor = 'text'
+    const controller = new AbortController()
+    doc.addEventListener(
+      'input',
+      () => {
+        // head 스타일을 보존하면서 body 내용만 갱신
+        const headHtml = doc.head?.innerHTML ?? ''
+        const bodyHtml = body.innerHTML
+        const fullHtml = headHtml
+          ? `<!DOCTYPE html><html><head>${headHtml}</head><body>${bodyHtml}</body></html>`
+          : bodyHtml
+        onChangeRef.current({ ...formRef.current, aprvlFullCn: fullHtml })
+      },
+      { signal: controller.signal },
+    )
+    return () => controller.abort()
+  }, [form.tmplatCd, open])
 
   // 사원 검색 디바운스
   useEffect(() => {
@@ -95,12 +126,6 @@ export default function ApprovalDraftModal({
     onChange({ ...form, tmplatCd, aprvlFullCn: content })
   }
 
-  const handleContentInput = () => {
-    if (contentRef.current) {
-      onChange({ ...form, aprvlFullCn: contentRef.current.innerHTML })
-    }
-  }
-
   const addApprover = (emp: EmployeeLookupResponse) => {
     if (approvers.some((a) => a.id === emp.id)) return
     onApproversChange([
@@ -120,9 +145,10 @@ export default function ApprovalDraftModal({
     <Modal
       open={open}
       title="기안서 작성"
-      description="결재 양식을 선택하면 내용이 자동으로 채워집니다. 내용을 직접 수정하고 결재자를 지정하세요."
+      description="결재 양식을 선택하고 내용을 작성한 뒤, 오른쪽에서 결재자를 순서대로 지정하세요."
       onClose={onClose}
       size="xl"
+      maxWidthClassName="max-w-7xl"
       footer={
         <>
           <Button variant="outline" onClick={onClose}>
@@ -134,125 +160,158 @@ export default function ApprovalDraftModal({
         </>
       }
     >
-      <div className="approval-draft-form">
-        <FormField
-          label="기안서 제목"
-          placeholder="예: 신규 장비 구매 품의"
-          value={form.docTtl}
-          onChange={(event) => onChange({ ...form, docTtl: event.target.value })}
-        />
+      {/* 2-컬럼 레이아웃: 왼쪽 = 내용 작성, 오른쪽 = 결재자 선택 */}
+      <div className="approval-draft-layout">
 
-        <div className="approval-draft-form__grid">
-          {/* 템플릿 셀렉트박스 */}
-          <div>
-            <label className="approval-draft-form__label">결재 양식</label>
-            <select
-              className="approval-draft-form__select"
-              value={form.tmplatCd}
-              disabled={templatesLoading}
-              onChange={(e) => handleTemplateChange(e.target.value)}
-            >
-              <option value="">
-                {templatesLoading ? '양식 불러오는 중...' : '양식을 선택하세요'}
-              </option>
-              {templates.map((t) => (
-                <option key={t.tmplatCd} value={t.tmplatCd}>
-                  {t.tmplatNm} ({t.tmplatCd})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <FormField
-            label="결재 희망 일시"
-            type="datetime-local"
-            value={form.aprvlHopeDt}
-            onChange={(event) => onChange({ ...form, aprvlHopeDt: event.target.value })}
-          />
-        </div>
-
-        {/* 결재 내용 – contenteditable HTML 편집 */}
-        <div>
-          <label className="approval-draft-form__label">결재 내용</label>
-          <div
-            ref={contentRef}
-            className="approval-draft-form__content-editor approval-page__html-document"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleContentInput}
-            data-placeholder="양식을 선택하거나 직접 내용을 입력하세요."
-          />
-        </div>
-
-        {/* 결재자 선택 */}
-        <div>
-          <label className="approval-draft-form__label">결재자</label>
-
-          {approvers.length > 0 && (
-            <div className="approval-draft-form__approver-chips">
-              {approvers.map((a, idx) => (
-                <span key={a.id} className="approval-draft-form__approver-chip">
-                  <span className="approval-draft-form__approver-chip-order">{idx + 1}</span>
-                  {a.name} · {a.position}
-                  <button
-                    type="button"
-                    className="approval-draft-form__approver-chip-remove"
-                    onClick={() => removeApprover(a.id)}
-                    aria-label={`${a.name} 제거`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          <div className="approval-draft-form__employee-search" ref={dropdownRef}>
-            <input
-              type="text"
-              className="approval-draft-form__employee-input"
-              placeholder="이름으로 사원 검색"
-              value={employeeSearch}
-              onChange={(e) => {
-                setEmployeeSearch(e.target.value)
-                setShowEmployeeDropdown(true)
-              }}
-              onFocus={() => setShowEmployeeDropdown(true)}
+        {/* ── 왼쪽: 기안서 내용 ── */}
+        <div className="approval-draft-layout__main">
+          <div className="approval-draft-form">
+            <FormField
+              label="기안서 제목"
+              placeholder="예: 신규 장비 구매 품의"
+              value={form.docTtl}
+              onChange={(event) => onChange({ ...form, docTtl: event.target.value })}
             />
-            {showEmployeeDropdown && (employeeLoading || employeeResults.length > 0) && (
-              <div className="approval-draft-form__employee-dropdown">
-                {employeeLoading ? (
-                  <div className="approval-draft-form__employee-option approval-draft-form__employee-option--loading">
-                    검색 중...
-                  </div>
-                ) : (
-                  employeeResults.map((emp) => {
-                    const alreadyAdded = approvers.some((a) => a.id === emp.id)
-                    return (
-                      <button
-                        key={emp.id}
-                        type="button"
-                        className={`approval-draft-form__employee-option${alreadyAdded ? ' approval-draft-form__employee-option--added' : ''}`}
-                        onClick={() => addApprover(emp)}
-                        disabled={alreadyAdded}
-                      >
-                        <span className="approval-draft-form__employee-name">{emp.name}</span>
-                        <span className="approval-draft-form__employee-meta">
-                          {emp.department} · {emp.position}
-                        </span>
-                        {alreadyAdded && (
-                          <span className="approval-draft-form__employee-added-badge">추가됨</span>
-                        )}
-                      </button>
-                    )
-                  })
-                )}
+
+            <div className="approval-draft-form__grid">
+              {/* 템플릿 셀렉트박스 */}
+              <div>
+                <label className="approval-draft-form__label">결재 양식</label>
+                <select
+                  className="approval-draft-form__select"
+                  value={form.tmplatCd}
+                  disabled={templatesLoading}
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                >
+                  <option value="">
+                    {templatesLoading ? '양식 불러오는 중...' : '양식을 선택하세요'}
+                  </option>
+                  {templates.map((t) => (
+                    <option key={t.tmplatCd} value={t.tmplatCd}>
+                      {t.tmplatNm} ({t.tmplatCd})
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              <FormField
+                label="결재 희망 일시"
+                type="datetime-local"
+                value={form.aprvlHopeDt}
+                onChange={(event) => onChange({ ...form, aprvlHopeDt: event.target.value })}
+              />
+            </div>
+
+            {/* 결재 내용 – iframe 에디터 (style 태그 격리) */}
+            <div>
+              <label className="approval-draft-form__label">결재 내용</label>
+              <iframe
+                ref={editorFrameRef}
+                className="approval-draft-form__content-editor"
+                title="결재 내용 편집기"
+                sandbox="allow-same-origin"
+              />
+            </div>
+
+            {error ? <p className="approval-draft-form__error">{error}</p> : null}
+          </div>
+        </div>
+
+        {/* ── 오른쪽: 결재선 패널 ── */}
+        <div className="approval-draft-layout__approver-panel">
+          <div className="approval-approver-panel">
+            <div className="approval-approver-panel__header">
+              <UserPlus size={16} />
+              <span>결재선 설정</span>
+            </div>
+
+            <p className="approval-approver-panel__desc">
+              결재자를 검색해 추가하면 위에서부터 1순위로 순차 결재됩니다.
+            </p>
+
+            {/* 사원 검색 */}
+            <div className="approval-approver-panel__search" ref={dropdownRef}>
+              <div className="approval-approver-panel__search-input-wrap">
+                <Search size={14} className="approval-approver-panel__search-icon" />
+                <input
+                  type="text"
+                  className="approval-approver-panel__search-input"
+                  placeholder="이름으로 결재자 검색"
+                  value={employeeSearch}
+                  onChange={(e) => {
+                    setEmployeeSearch(e.target.value)
+                    setShowEmployeeDropdown(true)
+                  }}
+                  onFocus={() => setShowEmployeeDropdown(true)}
+                />
+              </div>
+              {showEmployeeDropdown && (employeeLoading || employeeResults.length > 0) && (
+                <div className="approval-approver-panel__dropdown">
+                  {employeeLoading ? (
+                    <div className="approval-approver-panel__dropdown-item approval-approver-panel__dropdown-item--loading">
+                      검색 중...
+                    </div>
+                  ) : (
+                    employeeResults.map((emp) => {
+                      const alreadyAdded = approvers.some((a) => a.id === emp.id)
+                      return (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          className={`approval-approver-panel__dropdown-item${alreadyAdded ? ' approval-approver-panel__dropdown-item--added' : ''}`}
+                          onClick={() => addApprover(emp)}
+                          disabled={alreadyAdded}
+                        >
+                          <span className="approval-approver-panel__emp-name">{emp.name}</span>
+                          <span className="approval-approver-panel__emp-meta">
+                            {emp.department} · {emp.position}
+                          </span>
+                          {alreadyAdded && (
+                            <span className="approval-approver-panel__badge">추가됨</span>
+                          )}
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 결재선 목록 */}
+            {approvers.length === 0 ? (
+              <div className="approval-approver-panel__empty">
+                <UserPlus size={28} strokeWidth={1.5} />
+                <p>결재자를 추가하세요</p>
+              </div>
+            ) : (
+              <ol className="approval-approver-panel__list">
+                {approvers.map((a, idx) => (
+                  <li key={a.id} className="approval-approver-panel__item">
+                    <span className="approval-approver-panel__order">{idx + 1}</span>
+                    {idx < approvers.length - 1 && (
+                      <span className="approval-approver-panel__connector" />
+                    )}
+                    <div className="approval-approver-panel__info">
+                      <span className="approval-approver-panel__name">{a.name}</span>
+                      <span className="approval-approver-panel__sub">
+                        {a.department} · {a.position}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="approval-approver-panel__remove"
+                      onClick={() => removeApprover(a.id)}
+                      aria-label={`${a.name} 제거`}
+                    >
+                      <X size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ol>
             )}
           </div>
         </div>
 
-        {error ? <p className="approval-draft-form__error">{error}</p> : null}
       </div>
     </Modal>
   )

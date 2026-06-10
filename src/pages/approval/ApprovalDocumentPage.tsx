@@ -25,14 +25,11 @@ import { useToast } from '../../components/common/toast/useToast'
 import type {
   ApprovalActionRequestDTO,
   ApprovalDocumentDetailResponse,
-  ApprovalDraftRequestDTO,
   ApprovalDraftSummaryResponse,
 } from '../../types/approval'
 import {
-  defaultDraftForm,
   PAGE_SIZE,
 } from './approval.types'
-import type { DraftFormState, SelectedApprover } from './approval.types'
 import {
   formatDateTime,
   getApiErrorMessage,
@@ -45,8 +42,9 @@ import {
 } from './approval.utils'
 import ApprovalActionModal from './ApprovalActionModal'
 import ApprovalDraftModal from './ApprovalDraftModal'
+import ApprovalHtmlDocument from './ApprovalHtmlDocument'
 import ApprovalPagination from './ApprovalPagination'
-import './ApprovalPage.css'
+import { useDraftModal } from './useDraftModal'
 
 type Props = {
   folder?: string
@@ -68,10 +66,6 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
   const [listLoading, setListLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [draftOpen, setDraftOpen] = useState(false)
-  const [draftForm, setDraftForm] = useState<DraftFormState>(defaultDraftForm)
-  const [draftApprovers, setDraftApprovers] = useState<SelectedApprover[]>([])
-  const [draftError, setDraftError] = useState('')
   const [reason, setReason] = useState('')
   const [actionMode, setActionMode] = useState<'approve' | 'reject' | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
@@ -133,6 +127,19 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     }
   }, [currentBox, selectedDocumentId, showToast])
 
+  const {
+    draftOpen,
+    setDraftOpen,
+    draftForm,
+    setDraftForm,
+    draftApprovers,
+    setDraftApprovers,
+    draftError,
+    draftSaving,
+    handleSaveDraft,
+    closeDraft,
+  } = useDraftModal(loadList)
+
   useEffect(() => {
     if (!currentBox) {
       navigate('/approval/sent/progress', { replace: true })
@@ -162,12 +169,6 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     void loadDetail()
   }, [loadDetail])
 
-  useEffect(() => {
-    const openDraft = () => setDraftOpen(true)
-    window.addEventListener('approval:open-draft', openDraft)
-    return () => window.removeEventListener('approval:open-draft', openDraft)
-  }, [])
-
   const selectedSummary = useMemo(
     () => documents.find((d) => d.drftDocSn === selectedDocumentId) ?? null,
     [documents, selectedDocumentId],
@@ -185,50 +186,6 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     setDetail(null)
   }
 
-  const handleSaveDraft = async () => {
-    if (!draftForm.docTtl.trim()) {
-      setDraftError('기안서 제목을 입력하세요.')
-      return
-    }
-    if (!draftForm.aprvlFullCn.trim()) {
-      setDraftError('결재 내용을 입력하세요.')
-      return
-    }
-    if (draftApprovers.length === 0) {
-      setDraftError('결재자를 한 명 이상 선택하세요.')
-      return
-    }
-    setActionLoading(true)
-    setDraftError('')
-    const request: ApprovalDraftRequestDTO = {
-      docTtl: draftForm.docTtl.trim(),
-      tmplatCd: draftForm.tmplatCd.trim() || undefined,
-      aprvlHopeDt: draftForm.aprvlHopeDt
-        ? new Date(draftForm.aprvlHopeDt).toISOString()
-        : undefined,
-      aprvlFullCn: draftForm.aprvlFullCn,
-      approvalLines: [
-        {
-          aprvlMthdCd: '01',
-          aprvlOrd: 1,
-          aprvrEmpIds: draftApprovers.map((a) => a.id),
-        },
-      ],
-    }
-    try {
-      await approvalApi.saveTemporaryDraft(request)
-      setDraftOpen(false)
-      setDraftForm(defaultDraftForm)
-      setDraftApprovers([])
-      showToast({ title: '기안서를 임시저장했습니다.', variant: 'success' })
-      navigate('/approval/sent/temporary')
-      await loadList()
-    } catch (error) {
-      setDraftError(getApiErrorMessage(error, '기안서 임시저장에 실패했습니다.'))
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
   const mutateAndReload = async (action: () => Promise<unknown>, successTitle: string) => {
     setActionLoading(true)
@@ -493,14 +450,7 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
 
               <section className="approval-page__detail-section">
                 <h3>결재 내용</h3>
-                <article
-                  className="approval-page__html-document"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      detail.aprvlFullCn ||
-                      '<p style="color:#94a3b8">결재 내용이 없습니다.</p>',
-                  }}
-                />
+                <ApprovalHtmlDocument html={detail.aprvlFullCn} />
               </section>
             </>
           ) : (
@@ -514,17 +464,13 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
 
       <ApprovalDraftModal
         open={draftOpen}
-        saving={actionLoading}
+        saving={draftSaving}
         form={draftForm}
         approvers={draftApprovers}
         error={draftError}
         onChange={setDraftForm}
         onApproversChange={setDraftApprovers}
-        onClose={() => {
-          setDraftOpen(false)
-          setDraftError('')
-          setDraftApprovers([])
-        }}
+        onClose={closeDraft}
         onSubmit={handleSaveDraft}
       />
 

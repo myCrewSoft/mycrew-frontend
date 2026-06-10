@@ -5,6 +5,7 @@ import FormField from '../../components/common/form/formField/FormField'
 import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import type { TemplateFormState } from './approval.types'
+import ApprovalHtmlDocument from './ApprovalHtmlDocument'
 
 type Props = {
   open: boolean
@@ -103,12 +104,7 @@ export default function ApprovalTemplateEditorModal({
         ) : (
           <div className="approval-template-form__preview-wrap">
             <span className="approval-template-form__preview-label">문서 미리보기</span>
-            <article
-              className="approval-page__html-document"
-              dangerouslySetInnerHTML={{
-                __html: form.tmplatCn || '<p>미리보기할 HTML 양식이 없습니다.</p>',
-              }}
-            />
+            <ApprovalHtmlDocument html={form.tmplatCn} />
           </div>
         )}
         {error ? <p className="approval-draft-form__error">{error}</p> : null}

@@ -137,6 +137,21 @@ export const getListRequest = (box: ApprovalBox, params?: ApprovalPageParams) =>
   }
 }
 
+/**
+ * contenteditable 편집 영역에 삽입하기 전 HTML을 정제합니다.
+ * <html>, <head>, <body>, <style> 태그를 제거하여
+ * 부모 페이지 스타일이 오염되지 않도록 합니다.
+ */
+export const sanitizeHtmlForEdit = (html: string): string =>
+  html
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .trim()
+
 export const stripHtml = (html: string) =>
   html
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')

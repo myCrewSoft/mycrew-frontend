@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import ApprovalDocumentPage from './ApprovalDocumentPage'
 import ApprovalFavoriteTemplatePage from './ApprovalFavoriteTemplatePage'
 import ApprovalTemplatePage from './ApprovalTemplatePage'
+import './ApprovalPage.css'
 
 export default function ApprovalPage() {
   const { folder, status } = useParams<{ folder?: string; status?: string }>()

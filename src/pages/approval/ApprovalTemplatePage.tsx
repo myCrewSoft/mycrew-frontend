@@ -1,4 +1,4 @@
-import { FilePlus2, PenLine, RefreshCcw, Search, Star } from 'lucide-react'
+import { FilePlus2, PenLine, RefreshCcw, Search, Send, Star } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import Button from '../../components/common/button/Button'
@@ -14,8 +14,10 @@ import type {
 import { defaultTemplateForm, toTemplateForm } from './approval.types'
 import type { TemplateFormState } from './approval.types'
 import { getApiErrorMessage } from './approval.utils'
+import ApprovalDraftModal from './ApprovalDraftModal'
+import ApprovalHtmlDocument from './ApprovalHtmlDocument'
 import ApprovalTemplateEditorModal from './ApprovalTemplateEditorModal'
-import './ApprovalPage.css'
+import { useDraftModal } from './useDraftModal'
 
 export default function ApprovalTemplatePage() {
   const { showToast } = useToast()
@@ -33,6 +35,18 @@ export default function ApprovalTemplatePage() {
   const [templateError, setTemplateError] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
+
+  const {
+    draftOpen,
+    draftForm,
+    setDraftForm,
+    draftApprovers,
+    setDraftApprovers,
+    draftError,
+    draftSaving,
+    handleSaveDraft,
+    closeDraft,
+  } = useDraftModal()
 
   const filteredTemplates = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase()
@@ -216,6 +230,13 @@ export default function ApprovalTemplatePage() {
             >
               새로고침
             </Button>
+            <Button
+              variant="outline"
+              leftIcon={<Send size={16} />}
+              onClick={() => window.dispatchEvent(new Event('approval:open-draft'))}
+            >
+              기안서 작성
+            </Button>
             <Button leftIcon={<FilePlus2 size={16} />} onClick={openCreateEditor}>
               양식 만들기
             </Button>
@@ -343,13 +364,7 @@ export default function ApprovalTemplatePage() {
 
               <section className="approval-page__detail-section">
                 <h3>문서 보기</h3>
-                <article
-                  className="approval-page__html-document"
-                  dangerouslySetInnerHTML={{
-                    __html:
-                      selectedTemplate.tmplatCn || '<p>결재 양식 내용이 없습니다.</p>',
-                  }}
-                />
+                <ApprovalHtmlDocument html={selectedTemplate.tmplatCn} />
               </section>
 
               <section className="approval-page__detail-section">
@@ -361,8 +376,7 @@ export default function ApprovalTemplatePage() {
             </>
           ) : (
             <EmptyState
-              title="결재 양식을 선택하세요."
-              description="왼쪽 목록에서 결재 양식을 선택하면 문서 미리보기와 수정 버튼이 표시됩니다."
+              title="결재 양식을 선택하세요."description="왼쪽 목록에서 결재 양식을 선택하면 문서 미리보기와 수정 버튼이 표시됩니다."
             />
           )}
         </div>
@@ -380,6 +394,18 @@ export default function ApprovalTemplatePage() {
           setTemplateError('')
         }}
         onSubmit={handleSaveTemplate}
+      />
+
+      <ApprovalDraftModal
+        open={draftOpen}
+        saving={draftSaving}
+        form={draftForm}
+        approvers={draftApprovers}
+        error={draftError}
+        onChange={setDraftForm}
+        onApproversChange={setDraftApprovers}
+        onClose={closeDraft}
+        onSubmit={handleSaveDraft}
       />
     </div>
   )
