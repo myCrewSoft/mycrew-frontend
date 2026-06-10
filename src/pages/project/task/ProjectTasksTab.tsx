@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { CalendarDays, LayoutGrid, List, Search, SlidersHorizontal, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertCircle, CalendarDays, LayoutGrid, List, Search, SlidersHorizontal } from 'lucide-react'
+import { taskApi } from '../../../api/taskApi'
+import { ApiError } from '../../../api/axiosInstance'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
 import { taskColumns, taskStatusConfig } from './task.config'
 import ProjectTaskBoard from './ProjectTaskBoard'
@@ -9,7 +11,7 @@ import ProjectTaskList from './ProjectTaskList'
 import type { ProjectTask, ProjectTaskStatusCode, ProjectTaskViewMode } from './task.types'
 
 interface ProjectTasksTabProps {
-  tasks: ProjectTask[]
+  projectId: string | number
   viewMode: ProjectTaskViewMode
   createModalOpen: boolean
   createStatus: ProjectTaskStatusCode
@@ -19,7 +21,7 @@ interface ProjectTasksTabProps {
 }
 
 const ProjectTasksTab = ({
-  tasks,
+  projectId,
   viewMode,
   createModalOpen,
   createStatus,
@@ -28,29 +30,46 @@ const ProjectTasksTab = ({
   onCloseCreateModal,
 }: ProjectTasksTabProps) => {
   const [query, setQuery] = useState('')
-  const [taskList, setTaskList] = useState<ProjectTask[]>(tasks)
+  const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const filteredTasks = taskList.filter((task) =>
-    `${task.taskNm} ${task.taskCn} ${task.taskMngrName}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase()),
-  )
+  const fetchTasks = useCallback(async () => {
+    setLoading(true)
+    setErrorMessage('')
+
+    try {
+      const response = await taskApi.getProjectTasks(projectId)
+      setTasks(response.data.data ?? [])
+    } catch (error) {
+      setErrorMessage(
+        error instanceof ApiError
+          ? error.message
+          : '업무 목록 조회 중 오류가 발생했습니다.',
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void fetchTasks()
+  }, [fetchTasks])
+
+  const filteredTasks = useMemo(() => {
+    const keyword = query.trim().toLowerCase()
+    if (!keyword) return tasks
+
+    return tasks.filter((task) =>
+      `${task.taskNm} ${task.taskMngrNm} ${task.taskId}`
+        .toLowerCase()
+        .includes(keyword),
+    )
+  }, [query, tasks])
 
   const highPriorityCount = filteredTasks.filter((task) => task.taskPriorityCd === '01').length
-  const myTaskCount = filteredTasks.filter((task) =>
-    task.taskMngrName.includes('이보라'),
-  ).length
-
-  const handleCreateTask = (task: Omit<ProjectTask, 'taskId'>) => {
-    setTaskList((prev) => [
-      {
-        ...task,
-        taskId: Math.max(0, ...prev.map((item) => item.taskId)) + 1,
-      },
-      ...prev,
-    ])
-  }
+  const dueTaskCount = filteredTasks.filter((task) => task.taskStatCd !== '02').length
 
   return (
     <div className="mt-5 space-y-4">
@@ -62,15 +81,8 @@ const ProjectTasksTab = ({
           >
             <LayoutGrid size={15} />
             전체
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-600"
-          >
-            <Users size={15} />
-            내 업무
             <Badge size="count" variant="neutral">
-              {myTaskCount}
+              {filteredTasks.length}
             </Badge>
           </button>
           <button
@@ -88,12 +100,11 @@ const ProjectTasksTab = ({
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-600"
           >
             <CalendarDays size={15} />
-            마감 임박
+            미완료
+            <Badge size="count" variant="neutral">
+              {dueTaskCount}
+            </Badge>
           </button>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
-          <Users size={15} />
-          참여자 5명
         </div>
       </div>
 
@@ -106,7 +117,7 @@ const ProjectTasksTab = ({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="업무명, 상세내용, 담당자 검색..."
+            placeholder="업무명, 담당자, 업무 ID 검색"
             className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
@@ -156,10 +167,21 @@ const ProjectTasksTab = ({
         })}
       </div>
 
-      {filteredTasks.length === 0 ? (
+      {errorMessage && (
+        <div className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+          <AlertCircle size={16} />
+          {errorMessage}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-400">
+          업무 목록을 불러오는 중입니다.
+        </div>
+      ) : filteredTasks.length === 0 ? (
         <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-slate-400">
           <Search size={28} className="mb-2 text-slate-300" />
-          <p className="text-sm font-bold">검색 결과가 없습니다.</p>
+          <p className="text-sm font-bold">조회된 업무가 없습니다.</p>
         </div>
       ) : viewMode === 'list' ? (
         <ProjectTaskList tasks={filteredTasks} onOpenTask={setSelectedTask} />
@@ -173,11 +195,13 @@ const ProjectTasksTab = ({
 
       <ProjectTaskCreateModal
         open={createModalOpen}
+        projectId={projectId}
         initialStatus={createStatus}
         onClose={onCloseCreateModal}
-        onCreate={handleCreateTask}
+        onCreated={fetchTasks}
       />
       <ProjectTaskDetailModal
+        projectId={projectId}
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
       />

@@ -1,84 +1,59 @@
 import { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
-import { employeeApi } from '../../../api/employeeApi'
+import { taskApi } from '../../../api/taskApi'
 import Button from '../../../components/common/button/Button'
-import EmployeeSearchPicker, {
-  type EmployeeSearchItem,
-} from '../../../components/common/employeeSearch/EmployeeSearchPicker'
 import FormField from '../../../components/common/form/formField/FormField'
 import Select from '../../../components/common/form/select/Select'
 import Textarea from '../../../components/common/form/textarea/Textarea'
 import Modal from '../../../components/common/overlay/modal/Modal'
-import { useApiList } from '../../../hooks/useApi'
+import { ApiError } from '../../../api/axiosInstance'
 import {
   taskPriorityConfig,
-  taskScopeConfig,
-  taskStatusConfig,
   taskTypeConfig,
 } from './task.config'
-import type {
-  ProjectTask,
-  ProjectTaskPriorityCode,
-  ProjectTaskScopeCode,
-  ProjectTaskStatusCode,
-  ProjectTaskTypeCode,
-} from './task.types'
-
-type TaskCreateForm = Omit<ProjectTask, 'taskId'>
+import type { ProjectTaskCreateForm, ProjectTaskStatusCode } from './task.types'
 
 interface ProjectTaskCreateModalProps {
   open: boolean
+  projectId: string | number
   initialStatus: ProjectTaskStatusCode
   onClose: () => void
-  onCreate: (task: TaskCreateForm) => void
+  onCreated: () => void
 }
 
-const defaultForm: TaskCreateForm = {
-  projId: 1,
-  taskTypeCd: '01',
-  taskScopeCd: '01',
-  taskMngrId: 1000,
-  taskMngrName: '',
-  taskStatCd: '00',
-  taskPriorityCd: '02',
+const createDefaultForm = (projectId: string | number): ProjectTaskCreateForm => ({
+  projId: Number(projectId),
   taskNm: '',
   taskCn: '',
+  taskTypeCd: '01',
+  taskMngrId: 0,
+  taskPriorityCd: '02',
+  taskImprtncCd: '02',
   taskBgngDt: '',
   taskEndDt: '',
-  taskProgressRate: 0,
-}
+  empIdList: [],
+})
 
 const ProjectTaskCreateModal = ({
   open,
+  projectId,
   initialStatus,
   onClose,
-  onCreate,
+  onCreated,
 }: ProjectTaskCreateModalProps) => {
-  const [form, setForm] = useState<TaskCreateForm>(defaultForm)
-  const [selectedManagerIds, setSelectedManagerIds] = useState<Array<string | number>>([])
+  const [form, setForm] = useState<ProjectTaskCreateForm>(() => createDefaultForm(projectId))
   const [taskNameError, setTaskNameError] = useState('')
-
-  const { data: employeeData, execute: fetchEmployees } = useApiList(
-    employeeApi.lookupEmployees,
-    { immediate: false },
-  )
-  const employees: EmployeeSearchItem[] = employeeData ?? []
-  const departments = [...new Set(employees.map((employee) => employee.department).filter(Boolean))]
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!open) return
-
-    setForm({ ...defaultForm, taskStatCd: initialStatus })
-    setSelectedManagerIds([])
+    setForm(createDefaultForm(projectId))
     setTaskNameError('')
-    void fetchEmployees({})
-  }, [fetchEmployees, initialStatus, open])
+    setSubmitError('')
+  }, [open, projectId, initialStatus])
 
-  const handleManagerChange = (nextEmployeeIds: Array<string | number>) => {
-    setSelectedManagerIds(nextEmployeeIds.slice(-1))
-  }
-
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const taskNm = form.taskNm.trim()
 
     if (!taskNm) {
@@ -86,29 +61,44 @@ const ProjectTaskCreateModal = ({
       return
     }
 
-    const selectedManagerId = selectedManagerIds[0]
-    const selectedManager = employees.find(
-      (employee) => String(employee.id) === String(selectedManagerId),
-    )
+    setSubmitting(true)
+    setSubmitError('')
 
-    onCreate({
-      ...form,
-      projId: form.taskScopeCd === '01' ? 1 : null,
-      taskMngrId: selectedManager ? Number(selectedManager.id) : 0,
-      taskMngrName: selectedManager?.name ?? '담당자 미지정',
-      taskNm,
-      taskCn: form.taskCn.trim() || '업무 상세내용이 없습니다.',
-      taskBgngDt: form.taskBgngDt || '미정',
-      taskEndDt: form.taskEndDt || '미정',
-    })
-    onClose()
+    try {
+      await taskApi.createProjectTask(projectId, {
+        ...form,
+        taskNm,
+        taskCn: form.taskCn.trim(),
+        projId: Number(projectId),
+        empIdList: form.empIdList.filter((empId) => Number.isFinite(empId)),
+      })
+      onCreated()
+      onClose()
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError
+          ? error.message
+          : '업무 등록 중 오류가 발생했습니다.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleParticipantIdsChange = (value: string) => {
+    const empIdList = value
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isFinite(item))
+
+    setForm((prev) => ({ ...prev, empIdList }))
   }
 
   return (
     <Modal
       open={open}
       title="업무 추가"
-      description="TB_TASK 기준으로 프로젝트 업무를 등록합니다."
+      description="백엔드 TaskCreateRequest DTO 형식 그대로 전송합니다."
       size="md"
       onClose={onClose}
       footer={
@@ -116,7 +106,12 @@ const ProjectTaskCreateModal = ({
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          <Button variant="primary" leftIcon={<Plus size={15} />} onClick={handleCreate}>
+          <Button
+            variant="primary"
+            leftIcon={<Plus size={15} />}
+            loading={submitting}
+            onClick={handleCreate}
+          >
             등록하기
           </Button>
         </>
@@ -137,7 +132,7 @@ const ProjectTaskCreateModal = ({
 
         <Textarea
           label="업무 상세내용"
-          placeholder="업무 목적이나 처리해야 할 내용을 간단히 적어주세요."
+          placeholder="업무 목적이나 처리해야 할 내용을 입력해주세요."
           rows={3}
           value={form.taskCn}
           onChange={(event) =>
@@ -147,48 +142,14 @@ const ProjectTaskCreateModal = ({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Select
-            label="업무 타입"
+            label="업무 유형"
             value={form.taskTypeCd}
             options={Object.entries(taskTypeConfig).map(([value, config]) => ({
               value,
               label: config.label,
             }))}
             onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                taskTypeCd: event.target.value as ProjectTaskTypeCode,
-              }))
-            }
-          />
-          <Select
-            label="업무 구분"
-            value={form.taskScopeCd}
-            options={Object.entries(taskScopeConfig).map(([value, config]) => ({
-              value,
-              label: config.label,
-            }))}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                taskScopeCd: event.target.value as ProjectTaskScopeCode,
-              }))
-            }
-          />
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Select
-            label="상태"
-            value={form.taskStatCd}
-            options={Object.entries(taskStatusConfig).map(([value, config]) => ({
-              value,
-              label: config.label,
-            }))}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                taskStatCd: event.target.value as ProjectTaskStatusCode,
-              }))
+              setForm((prev) => ({ ...prev, taskTypeCd: event.target.value }))
             }
           />
           <Select
@@ -201,7 +162,8 @@ const ProjectTaskCreateModal = ({
             onChange={(event) =>
               setForm((prev) => ({
                 ...prev,
-                taskPriorityCd: event.target.value as ProjectTaskPriorityCode,
+                taskPriorityCd: event.target.value,
+                taskImprtncCd: event.target.value,
               }))
             }
           />
@@ -209,8 +171,26 @@ const ProjectTaskCreateModal = ({
 
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
+            label="담당자 사번"
+            type="number"
+            min={0}
+            value={form.taskMngrId}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, taskMngrId: Number(event.target.value) }))
+            }
+          />
+          <FormField
+            label="참여자 사번 목록"
+            placeholder="예: 1001,1002"
+            value={form.empIdList.join(',')}
+            onChange={(event) => handleParticipantIdsChange(event.target.value)}
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
             label="시작 일시"
-            type="date"
+            type="datetime-local"
             value={form.taskBgngDt}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, taskBgngDt: event.target.value }))
@@ -218,7 +198,7 @@ const ProjectTaskCreateModal = ({
           />
           <FormField
             label="종료 일시"
-            type="date"
+            type="datetime-local"
             value={form.taskEndDt}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, taskEndDt: event.target.value }))
@@ -226,34 +206,11 @@ const ProjectTaskCreateModal = ({
           />
         </div>
 
-        <FormField
-          label="진척률"
-          type="number"
-          min={0}
-          max={100}
-          value={form.taskProgressRate}
-          rightSlot={<span className="text-xs font-bold text-slate-400">%</span>}
-          onChange={(event) =>
-            setForm((prev) => ({
-              ...prev,
-              taskProgressRate: Math.min(100, Math.max(0, Number(event.target.value))),
-            }))
-          }
-        />
-
-        <div>
-          <label className="mb-2 block text-sm font-semibold text-slate-700">
-            업무 담당자
-          </label>
-          <EmployeeSearchPicker
-            variant="detailed"
-            employees={employees}
-            departments={departments}
-            selectedEmployeeIds={selectedManagerIds}
-            onChange={handleManagerChange}
-            emptyText="담당자로 지정할 사원을 검색해주세요."
-          />
-        </div>
+        {submitError && (
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+            {submitError}
+          </div>
+        )}
       </div>
     </Modal>
   )
