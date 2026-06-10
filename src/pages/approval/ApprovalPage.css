@@ -402,3 +402,425 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.approval-template-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.approval-template-form__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.approval-template-form__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.approval-template-form__editor {
+  min-height: 28rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.approval-template-form__preview-wrap {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.approval-template-form__preview-label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.approval-page__html-document {
+  /* layout containment — prevents margin collapse leaking to parent (상단 들뜸 방지) */
+  display: flow-root;
+  min-height: 18rem;
+  /* horizontal overflow clipped; vertical scroll handled by parent panel */
+  overflow-x: hidden;
+  overflow-y: visible;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  padding: 1.5rem;
+  color: #0f172a;
+  line-height: 1.7;
+  /* prevent any child from expanding the container width */
+  box-sizing: border-box;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+/* Constrain all descendant elements so wide HTML content doesn't cause overflow */
+.approval-page__html-document * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset any browser margin on first/last children inside the document */
+.approval-page__html-document > *:first-child {
+  margin-top: 0;
+}
+
+.approval-page__html-document > *:last-child {
+  margin-bottom: 0;
+}
+
+.approval-page__html-document table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.approval-page__html-document th,
+.approval-page__html-document td {
+  border: 1px solid #cbd5e1;
+  padding: 0.5rem;
+  vertical-align: top;
+}
+
+.approval-page__html-document img {
+  max-width: 100%;
+  height: auto;
+}
+
+.approval-page__html-source {
+  max-height: 24rem;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .approval-template-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 페이지네이션 ── */
+.approval-page__pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0 4px;
+  flex-shrink: 0;
+}
+
+.approval-page__pagination-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1a202c);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.approval-page__pagination-btn:hover:not(:disabled) {
+  background: var(--color-primary-subtle, #ebf4ff);
+  border-color: var(--color-primary, #3b82f6);
+  color: var(--color-primary, #3b82f6);
+}
+
+.approval-page__pagination-btn--active {
+  background: var(--color-primary, #3b82f6);
+  border-color: var(--color-primary, #3b82f6);
+  color: #fff;
+  font-weight: 600;
+}
+
+.approval-page__pagination-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── 즐겨찾기 버튼 ── */
+.approval-page__favorite-btn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.approval-page__favorite-btn:hover:not(:disabled) {
+  background-color: #fefce8;
+  border-color: #fde68a;
+  color: #f59e0b;
+}
+
+.approval-page__favorite-btn--active {
+  color: #f59e0b;
+}
+
+.approval-page__favorite-btn--active svg {
+  fill: #f59e0b;
+}
+
+.approval-page__favorite-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── 즐겨찾기 섹션 ── */
+.approval-page__favorites-section {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0;
+}
+
+.approval-page__favorites-title {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #fefce8;
+  padding: 0.5rem 1rem;
+  color: #92400e;
+  font-size: 0.8125rem;
+  font-weight: 900;
+}
+
+.approval-page__favorites-title svg {
+  fill: #f59e0b;
+  color: #f59e0b;
+}
+
+/* ── 기안서 작성 모달 – 추가 스타일 ── */
+.approval-draft-form__label {
+  display: block;
+  margin-bottom: 0.375rem;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.approval-draft-form__select {
+  width: 100%;
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+
+.approval-draft-form__select:focus {
+  border-color: #3b82f6;
+  outline: 2px solid #bfdbfe;
+  outline-offset: 0px;
+}
+
+.approval-draft-form__select:disabled {
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* 결재 내용 편집 영역 */
+.approval-draft-form__content-editor {
+  min-height: 20rem;
+  cursor: text;
+  outline: none;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  transition: border-color 0.15s;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: #0f172a;
+  overflow-y: auto;
+}
+
+.approval-draft-form__content-editor:focus {
+  border-color: #3b82f6;
+  outline: 2px solid #bfdbfe;
+  outline-offset: 0px;
+}
+
+.approval-draft-form__content-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* 결재자 칩 */
+.approval-draft-form__approver-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.approval-draft-form__approver-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background-color: #eff6ff;
+  padding: 0.25rem 0.5rem 0.25rem 0.3rem;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.approval-draft-form__approver-chip-order {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 900;
+}
+
+.approval-draft-form__approver-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.approval-draft-form__approver-chip-remove:hover {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* 사원 검색 드롭다운 */
+.approval-draft-form__employee-search {
+  position: relative;
+}
+
+.approval-draft-form__employee-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  padding: 0.5rem 0.75rem;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: border-color 0.15s;
+}
+
+.approval-draft-form__employee-input:focus {
+  border-color: #3b82f6;
+  outline: 2px solid #bfdbfe;
+  outline-offset: 0px;
+}
+
+.approval-draft-form__employee-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  box-shadow: 0 4px 16px 0 rgb(15 23 42 / 0.12);
+}
+
+.approval-draft-form__employee-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background-color: transparent;
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.approval-draft-form__employee-option:last-child {
+  border-bottom: 0;
+}
+
+.approval-draft-form__employee-option:hover:not(:disabled) {
+  background-color: #f0f9ff;
+}
+
+.approval-draft-form__employee-option--loading {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: default;
+}
+
+.approval-draft-form__employee-option--added {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.approval-draft-form__employee-name {
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.approval-draft-form__employee-meta {
+  flex: 1;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.approval-draft-form__employee-added-badge {
+  border-radius: 999px;
+  background-color: #dcfce7;
+  padding: 0.1rem 0.45rem;
+  color: #166534;
+  font-size: 0.75rem;
+  font-weight: 800;
+}

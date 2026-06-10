@@ -12,6 +12,7 @@
 export type LocalDateTimeString = string;
 export type Nullable<T> = T | null;
 
+
 /** 결재 처리 사유 요청 */
 export interface ApprovalActionRequestDTO {
   /** 승인 또는 반려 사유 */
@@ -217,4 +218,37 @@ export interface ApprovalTemplateResponse {
 
   /** 현재 사원의 즐겨찾기 여부 */
   favoriteYn: string;
+}
+
+/** 결재 템플릿 생성 요청 */
+export interface ApprovalTemplateCreateRequestDTO {
+  /** 템플릿명 */
+  tmplatNm: string;
+
+  /** HTML 템플릿 내용 */
+  tmplatCn: string;
+
+  /** 사용 여부 */
+  useYn?: string;
+
+  /** 첨부파일 ID */
+  atchFileId?: Nullable<number>;
+}
+
+/** 결재 템플릿 수정 요청 */
+export interface ApprovalTemplateUpdateRequestDTO {
+  /** 템플릿 코드 */
+  tmplatCd: string;
+
+  /** 템플릿명 */
+  tmplatNm?: string;
+
+  /** HTML 템플릿 내용 */
+  tmplatCn?: string;
+
+  /** 사용 여부 */
+  useYn?: string;
+
+  /** 첨부파일 ID */
+  atchFileId?: Nullable<number>;
 }

@@ -2,9 +2,11 @@ import {
   CheckCircle2,
   ClipboardCheck,
   FilePenLine,
+  FilePlus2,
   History,
   Inbox,
   Send,
+  Star,
   XCircle,
 } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
@@ -53,6 +55,19 @@ const receivedItems = [
   },
 ]
 
+const templateItems = [
+  {
+    icon: FilePlus2,
+    label: '결재 양식',
+    path: '/approval/templates/list',
+  },
+  {
+    icon: Star,
+    label: '즐겨찾기 양식',
+    path: '/approval/templates/favorites',
+  },
+]
+
 const ApprovalSubSidebarContent = () => {
   const location = useLocation()
 
@@ -87,6 +102,18 @@ const ApprovalSubSidebarContent = () => {
 
       <SubSidebarSection title="결재 수신함">
         {receivedItems.map((item) => (
+          <SubSidebarMenuItem
+            key={item.path}
+            icon={item.icon}
+            label={item.label}
+            path={item.path}
+            active={location.pathname === item.path}
+          />
+        ))}
+      </SubSidebarSection>
+
+      <SubSidebarSection title="결재 양식">
+        {templateItems.map((item) => (
           <SubSidebarMenuItem
             key={item.path}
             icon={item.icon}

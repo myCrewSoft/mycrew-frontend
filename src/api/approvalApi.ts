@@ -10,24 +10,32 @@ import type {
   ApprovalDraftSummaryResponse,
   ApprovalMutationResponse,
   ApprovalStepRequestDTO,
+  ApprovalTemplateCreateRequestDTO,
   ApprovalTemplateResponse,
+  ApprovalTemplateUpdateRequestDTO,
 } from '../types/approval';
 
-export type ApprovalKeywordSearchParams = {
+export type ApprovalPageParams = {
   keyword?: string;
+  page?: number;
+  size?: number;
 };
 
-export type ApprovalDraftSearchParams = ApprovalKeywordSearchParams & {
+export type ApprovalDraftSearchParams = ApprovalPageParams & {
   documentStatus?: string;
 };
 
+/** @deprecated keyword 전용 파라미터는 ApprovalPageParams로 대체되었습니다. */
+export type ApprovalKeywordSearchParams = ApprovalPageParams;
+
 export type ApprovalApproverListType = 'request' | 'history' | 'completed';
 
-type ApprovalListResponse = AxiosResponse<ApiResponse<ApprovalDraftSummaryResponse[]>>;
+type ApprovalPagedListResponse = AxiosResponse<ApiResponse<ApprovalDraftSummaryResponse[]>>;
 type ApprovalDetailResponse = AxiosResponse<ApiResponse<ApprovalDocumentDetailResponse>>;
 type ApprovalMutationAxiosResponse = AxiosResponse<ApiResponse<ApprovalMutationResponse>>;
 type ApprovalAvailabilityAxiosResponse = AxiosResponse<ApiResponse<ApprovalAvailabilityResponse>>;
 type ApprovalTemplateAxiosResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse>>;
+type ApprovalTemplateListResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse[]>>;
 
 const APPROVAL_BASE_URL = '/api/approval';
 
@@ -59,7 +67,7 @@ export const approvalApi = {
    */
   getMyApprovalList: (
     params?: ApprovalDraftSearchParams,
-  ): Promise<ApprovalListResponse> => {
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/drafts`, { params });
   },
 
@@ -68,8 +76,8 @@ export const approvalApi = {
    * GET /api/approval/drafts/progress
    */
   getProgressApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/drafts/progress`, { params });
   },
 
@@ -78,8 +86,8 @@ export const approvalApi = {
    * GET /api/approval/drafts/completed
    */
   getCompletedApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/drafts/completed`, { params });
   },
 
@@ -88,8 +96,8 @@ export const approvalApi = {
    * GET /api/approval/drafts/rejected
    */
   getRejectedApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/drafts/rejected`, { params });
   },
 
@@ -98,8 +106,8 @@ export const approvalApi = {
    * GET /api/approval/drafts/temporary
    */
   getTemporaryApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/drafts/temporary`, { params });
   },
 
@@ -128,8 +136,8 @@ export const approvalApi = {
    * GET /api/approval/requests
    */
   getRequestedApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/requests`, { params });
   },
 
@@ -138,8 +146,8 @@ export const approvalApi = {
    * GET /api/approval/history
    */
   getHistoryApprovalList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/history`, { params });
   },
 
@@ -148,8 +156,8 @@ export const approvalApi = {
    * GET /api/approval/completed-documents
    */
   getCompletedApprovalDocumentList: (
-    params?: ApprovalKeywordSearchParams,
-  ): Promise<ApprovalListResponse> => {
+    params?: ApprovalPageParams,
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/completed-documents`, { params });
   },
 
@@ -158,10 +166,10 @@ export const approvalApi = {
    * GET /api/approval/approver-documents
    */
   searchApprovalDocumentsForApprover: (
-    params: ApprovalKeywordSearchParams & {
+    params: ApprovalPageParams & {
       listType: ApprovalApproverListType;
     },
-  ): Promise<ApprovalListResponse> => {
+  ): Promise<ApprovalPagedListResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/approver-documents`, { params });
   },
 
@@ -225,6 +233,35 @@ export const approvalApi = {
     drftDocSn: number,
   ): Promise<ApprovalAvailabilityAxiosResponse> => {
     return axiosInstance.get(`${APPROVAL_BASE_URL}/documents/${drftDocSn}/reject`);
+  },
+
+
+  /**
+   * 결재 템플릿 목록 조회
+   * GET /api/approval/templates
+   */
+  getApprovalTemplates: (): Promise<ApprovalTemplateListResponse> => {
+    return axiosInstance.get(`${APPROVAL_BASE_URL}/templates`);
+  },
+
+  /**
+   * 결재 템플릿 생성
+   * POST /api/approval/templates
+   */
+  createApprovalTemplate: (
+    data: ApprovalTemplateCreateRequestDTO,
+  ): Promise<ApprovalTemplateAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/templates`, data);
+  },
+
+  /**
+   * 결재 템플릿 수정
+   * PATCH /api/approval/templates
+   */
+  updateApprovalTemplate: (
+    data: ApprovalTemplateUpdateRequestDTO,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.patch(`${APPROVAL_BASE_URL}/templates`, data);
   },
 
   /**
