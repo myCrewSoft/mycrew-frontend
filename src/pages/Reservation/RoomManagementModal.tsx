@@ -4,9 +4,11 @@ import Button from '../../components/common/button/Button'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Modal from '../../components/common/overlay/modal/Modal'
-import type { MeetingRoom } from '../../types/Reservation'
-
-type RoomManagementRoom = MeetingRoom & {
+type RoomManagementRoom = {
+  roomId: number
+  roomName: string
+  floor: string | number
+  capacity?: number
   confRmColor?: string
   useYn?: string
   status?: string
@@ -102,8 +104,8 @@ const getRoomStatus = (room: RoomManagementRoom) => {
 
 const toFormValues = (room: RoomManagementRoom): RoomFormValues => ({
   roomName: room.roomName,
-  capacity: String(room.capacity),
-  floor: room.floor,
+  capacity: String(room.capacity ?? ''),
+  floor: String(room.floor),
   confRmColor: getRoomColor(room),
   useYn: room.useYn === 'N' ? 'N' : 'Y',
 })

@@ -2,7 +2,7 @@
 // 라우터에서 /project/:id 경로로 연결하세요
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Share2,
   Plus,
@@ -20,7 +20,6 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Button from '../../components/common/button/Button'
 import Tabs from '../../components/common/tabs/Tabs'
 import {
-  PROJECT_TASKS,
   ProjectTasksTab,
   type ProjectTaskStatusCode,
   type ProjectTaskViewMode,
@@ -140,12 +139,14 @@ const TaskStatusBadge = ({ status }: { status: string }) => {
 // ── 메인 페이지 ──────────────────────────────────────────────────
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
+  const { id } = useParams()
   const [tab, setTab] = useState('overview')
   const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
 
   const project = PROJECT_DETAIL // 실제에서는 id 기반으로 API 조회
+  const projectId = id ?? String(project.id)
 
   const tabItems = [
     { value: 'overview', label: '개요' },
@@ -426,7 +427,7 @@ const ProjectDetailPage = () => {
 
       {tab === 'tasks' && (
         <ProjectTasksTab
-          tasks={PROJECT_TASKS}
+          projectId={projectId}
           viewMode={taskViewMode}
           createModalOpen={taskCreateModalOpen}
           createStatus={taskCreateStatus}
@@ -450,5 +451,4 @@ const ProjectDetailPage = () => {
 }
 
 export default ProjectDetailPage
-
 
