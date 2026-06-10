@@ -8,3 +8,4 @@ export type ProjectTaskViewMode = 'list' | 'card'
 export type ProjectTask = TaskListResponse
 export type ProjectTaskDetail = TaskDetailResponse
 export type ProjectTaskCreateForm = TaskCreateRequest
+export type TaskCreateForm = TaskCreateRequest

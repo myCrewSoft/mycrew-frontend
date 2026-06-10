@@ -54,6 +54,7 @@ const ProjectTasksTab = ({
   }, [projectId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchTasks()
   }, [fetchTasks])
 
@@ -193,13 +194,16 @@ const ProjectTasksTab = ({
         />
       )}
 
-      <ProjectTaskCreateModal
-        open={createModalOpen}
-        projectId={projectId}
-        initialStatus={createStatus}
-        onClose={onCloseCreateModal}
-        onCreated={fetchTasks}
-      />
+      {createModalOpen && (
+        <ProjectTaskCreateModal
+          key={`${projectId}-${createStatus}`}
+          open={createModalOpen}
+          initialStatus={createStatus}
+          projId={Number(projectId)}
+          onClose={onCloseCreateModal}
+          onCreated={fetchTasks}
+        />
+      )}
       <ProjectTaskDetailModal
         projectId={projectId}
         task={selectedTask}

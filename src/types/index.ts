@@ -18,9 +18,6 @@ export type BoardResponse = components['schemas']['BoardResponse'];
 export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
 export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
 export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
-export type BoardCommentCreateRequest = components['schemas']['BoardCommentCreateRequest'];
-export type BoardCommentUpdateRequest = components['schemas']['BoardCommentUpdateRequest'];
-
 
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
@@ -62,6 +59,9 @@ export type TaskCreateRequest = components['schemas']['TaskCreateRequest'];
 export type TaskUpdateRequest = components['schemas']['TaskUpdateRequest'];
 export type TaskDetailResponse = components['schemas']['TaskDetailResponse'];
 export type TaskListResponse = components['schemas']['TaskListResponse'];
+export type TaskDashboardResponse = components['schemas']['TaskDashboardResponse'];
+export type TaskDashboardSummaryResponse = components['schemas']['TaskDashboardSummaryResponse'];
+export type TaskUpcomingResponse = components['schemas']['TaskUpcomingResponse'];
 
 // 화상회의
 export type VideoConfCreateRequest = components['schemas']['VideoConfCreateRequest'];
