@@ -113,3 +113,54 @@ export interface RankAssignRequest {
 export interface RankRevokeRequest {
   empIds: number[];
 }
+
+export interface AdminDepartmentResponseDTO {
+  deptCd: string;
+  deptNm: string;
+  parentDeptCd: string | null;
+  parentDeptNm: string | null;
+  useYn: string;
+  memberCount: number;
+}
+
+export interface DepartmentCreateRequestDTO {
+  parentDeptCd?: string | null;
+  deptNm: string;
+}
+
+export interface DepartmentUpdateRequestDTO {
+  parentDeptCd?: string | null;
+  deptNm: string;
+}
+
+export interface DepartmentDeleteRequestDTO {
+  replacementDeptCd?: string | null;
+}
+
+export interface AdminDepartmentMemberResponseDTO {
+  empId: number;
+  empNm: string;
+  deptCd: string;
+  deptNm: string;
+  jobGrdCd: string | null;
+  jobGrdNm: string | null;
+  jobPstnCd: string | null;
+  jobPstnNm: string | null;
+  empStatCd: string | null;
+  empStatNm: string | null;
+}
+
+export interface DepartmentMemberAssignRequestDTO {
+  empIds: number[];
+}
+
+export interface DepartmentMemberTransferRequestDTO {
+  targetDeptCd: string;
+  empIds: number[];
+}
+
+export interface DepartmentMemberMutationResponseDTO {
+  sourceDeptCd: string | null;
+  targetDeptCd: string;
+  affectedEmployeeCount: number;
+}

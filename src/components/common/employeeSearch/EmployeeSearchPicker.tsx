@@ -28,6 +28,7 @@ interface EmployeeSearchPickerProps {
   variant: EmployeeSearchVariant
   employees?: EmployeeSearchItem[]
   selectedEmployeeIds: Array<string | number>
+  selectedEmployeeItems?: EmployeeSearchItem[]
   onChange: (nextEmployeeIds: Array<string | number>) => void
   keyword?: string
   onKeywordChange?: (keyword: string) => void
@@ -118,6 +119,7 @@ const EmployeeSearchPicker = ({
   variant,
   employees = [],
   selectedEmployeeIds,
+  selectedEmployeeItems = [],
   onChange,
   keyword,
   onKeywordChange,
@@ -216,6 +218,9 @@ const EmployeeSearchPicker = ({
 
   const selectedEmployees = useMemo(() => {
     const cache = new Map<string, EmployeeSearchItem>()
+    selectedEmployeeItems.forEach((employee) =>
+      cache.set(getEmployeeIdKey(employee.id), employee),
+    )
     selectedEmployeeCache.forEach((employee) =>
       cache.set(getEmployeeIdKey(employee.id), employee),
     )
@@ -226,7 +231,12 @@ const EmployeeSearchPicker = ({
     return selectedEmployeeIds
       .map((id) => cache.get(getEmployeeIdKey(id)))
       .filter((employee): employee is EmployeeSearchItem => Boolean(employee))
-  }, [employeeOptions, selectedEmployeeCache, selectedEmployeeIds])
+  }, [
+    employeeOptions,
+    selectedEmployeeCache,
+    selectedEmployeeIds,
+    selectedEmployeeItems,
+  ])
 
   const visibleEmployees = useMemo(() => {
     const selectedDepartmentLabel =

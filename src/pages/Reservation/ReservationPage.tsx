@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import PageComponent from '../../components/layouts/PageComponent'
 import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
-import type {
-  CreateReservationRequest,
-  MeetingRoomReservation,
-} from '../../types/Reservation'
+import type { ReservationCreateRequest, ReservationResponse } from '../../types'
 import { formatDateKey } from '../../utils/date'
 import {
   SLOT_WIDTH,
@@ -21,6 +24,8 @@ import { useReservation } from './ReservationContext'
 import ReservationCreateModal from './ReservationCreateModal'
 import ReservationLegend from './reservationLegend'
 
+const RESERVATION_RANGE_DAYS = 15
+
 const addMinutesToDateTime = (dateTime: string, minutes: number) => {
   const date = new Date(dateTime)
   date.setMinutes(date.getMinutes() + minutes)
@@ -28,6 +33,49 @@ const addMinutesToDateTime = (dateTime: string, minutes: number) => {
   return `${formatDateKey(date)}T${String(date.getHours()).padStart(2, '0')}:${String(
     date.getMinutes(),
   ).padStart(2, '0')}:00`
+}
+
+const getReservationRange = (dateKey: string) => {
+  const begin = new Date(dateKey)
+  begin.setDate(begin.getDate() - RESERVATION_RANGE_DAYS)
+
+  const end = new Date(dateKey)
+  end.setDate(end.getDate() + RESERVATION_RANGE_DAYS)
+
+  return {
+    begin: formatDateKey(begin),
+    end: formatDateKey(end),
+  }
+}
+
+const isReservationVisibleOnDate = (
+  reservation: ReservationResponse,
+  dateKey: string,
+) => {
+  const dayStart = new Date(`${dateKey}T00:00:00`)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+
+  return (
+    new Date(reservation.startDateTime) < dayEnd &&
+    new Date(reservation.endDateTime) > dayStart
+  )
+}
+
+const getReservationBlockStyle = (
+  reservation: ReservationResponse,
+): CSSProperties => {
+  if (reservation.intgRsrvYn === 'Y') {
+    return { left: '0%', width: '100%' }
+  }
+
+  return {
+    left: `${getReservationLeftPercent(reservation.startDateTime)}%`,
+    width: `${getReservationWidthPercent(
+      reservation.startDateTime,
+      reservation.endDateTime,
+    )}%`,
+  }
 }
 
 const ReservationPage = () => {
@@ -40,24 +88,22 @@ const ReservationPage = () => {
     roomsErrorMessage,
   } = useReservation()
 
-  // 예약 등록 모달을 열고 닫기 위한 상태입니다.
   const [modalOpen, setModalOpen] = useState(false)
 
-  // 예약 등록 폼에서 사용할 입력값입니다.
-  const [formValues, setFormValues] = useState<CreateReservationRequest>({
+  const [formValues, setFormValues] = useState<ReservationCreateRequest>({
     roomId: 0,
     title: '',
+    intgRsrvYn: 'N',
     startDateTime: '',
     endDateTime: '',
   })
 
-  // 선택한 날짜의 예약 목록 조회 API입니다.
   const {
     data: reservations,
     loading: reservationsLoading,
     error: reservationsError,
     execute: fetchReservations,
-  } = useApi<MeetingRoomReservation[], [string]>(
+  } = useApi<ReservationResponse[], [string, string]>(
     meetingRoomReservationApi.getReservations,
     {
       immediate: false,
@@ -65,10 +111,9 @@ const ReservationPage = () => {
     },
   )
 
-  // 예약 등록 API입니다. 등록 버튼을 눌렀을 때만 호출합니다.
   const { loading: createLoading, execute: createReservation } = useApi<
-    MeetingRoomReservation,
-    [CreateReservationRequest]
+    ReservationResponse,
+    [ReservationCreateRequest]
   >(meetingRoomReservationApi.createReservation, {
     immediate: false,
   })
@@ -82,25 +127,34 @@ const ReservationPage = () => {
     [checkedRoomIds, rooms],
   )
 
-  const reservationList = reservations ?? []
+  const reservationList = useMemo(
+    () =>
+      (reservations ?? []).filter((reservation) =>
+        isReservationVisibleOnDate(reservation, selectedDate),
+      ),
+    [reservations, selectedDate],
+  )
+
   const loading = roomsLoading || reservationsLoading
   const errorMessage = roomsErrorMessage ?? reservationsError?.message ?? null
-
-  // 왼쪽 회의실 칸을 제외하고 시간 칸 전체를 차지하도록 gridColumn을 계산합니다.
   const timelineGridColumn = `span ${timelineHours.length} / span ${timelineHours.length}`
 
-  // 선택 날짜가 바뀌면 예약 목록을 다시 불러옵니다.
-  useEffect(() => {
-    void fetchReservations(selectedDate)
+  const refreshReservations = useCallback(async () => {
+    const { begin, end } = getReservationRange(selectedDate)
+    await fetchReservations(begin, end)
   }, [fetchReservations, selectedDate])
 
-  // 예약 등록 모달을 열면서 기본 회의실과 기본 시간을 세팅합니다.
+  useEffect(() => {
+    void refreshReservations()
+  }, [refreshReservations])
+
   const openCreateModal = (roomId?: number, startDateTime?: string) => {
     const resolvedStartDateTime = startDateTime || `${selectedDate}T09:00:00`
 
     setFormValues({
       roomId: roomId ?? filteredRooms[0]?.roomId ?? rooms[0]?.roomId ?? 0,
       title: '',
+      intgRsrvYn: 'N',
       startDateTime: resolvedStartDateTime,
       endDateTime: addMinutesToDateTime(resolvedStartDateTime, 30),
     })
@@ -108,7 +162,6 @@ const ReservationPage = () => {
     setModalOpen(true)
   }
 
-  // 빈 타임라인 영역을 클릭하면 클릭한 x좌표를 예약 시작 시간으로 바꿉니다.
   const handleTimelineClick = (
     roomId: number,
     event: React.MouseEvent<HTMLDivElement>,
@@ -134,12 +187,11 @@ const ReservationPage = () => {
     setSelectedDate(formatDateKey(date))
   }
 
-  // 예약을 등록한 뒤 현재 날짜의 예약 목록을 다시 조회해서 화면을 갱신합니다.
-  const handleCreateReservation = async (values: CreateReservationRequest) => {
+  const handleCreateReservation = async (values: ReservationCreateRequest) => {
     await createReservation(values)
 
     setModalOpen(false)
-    await fetchReservations(selectedDate)
+    await refreshReservations()
   }
 
   return (
@@ -247,10 +299,10 @@ const ReservationPage = () => {
                     <div key={room.roomId} className="contents">
                       <div className="border-r border-t border-slate-200 p-3">
                         <p className="text-sm font-bold text-slate-900">
-                          {room.roomName} ({room.capacity}인)
+                          {room.roomName}
                         </p>
                         <p className="text-xs font-semibold text-slate-500">
-                          {room.floor}
+                          {room.floor}층{room.ho ? ` · ${room.ho}` : ''}
                         </p>
                       </div>
 
@@ -278,19 +330,8 @@ const ReservationPage = () => {
                                 ? 'border-blue-300 bg-blue-100 text-blue-700'
                                 : 'border-slate-300 bg-stone-50 text-slate-700'
                             }`}
-                            style={
-                              {
-                                left: `${getReservationLeftPercent(
-                                  reservation.startDateTime,
-                                )}%`,
-                                width: `${getReservationWidthPercent(
-                                  reservation.startDateTime,
-                                  reservation.endDateTime,
-                                )}%`,
-                              } as CSSProperties
-                            }
+                            style={getReservationBlockStyle(reservation)}
                             onClick={(event) => {
-                              // 예약 블록 클릭 시 빈 영역 클릭 이벤트가 같이 실행되지 않도록 막습니다.
                               event.stopPropagation()
                             }}
                           >

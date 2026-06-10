@@ -7,9 +7,12 @@ import AdminLayout from '../../components/layouts/admin/AdminLayout';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import AdminEmployeesPage from './AdminEmployeesPage';
+import AdminDepartmentsPage from './AdminDepartmentsPage';
+import AdminOrgChartPage from './AdminOrgChartPage';
 import AdminPage from './AdminPage';
 import AdminRanksPage from './AdminRanksPage';
 import AdminRolesPage from './AdminRolesPage';
+import { AdminDepartmentsProvider } from './adminDepartmentsContext';
 import { AdminRanksProvider } from './adminRanksContext';
 import { AdminRolesProvider } from './adminRolesContext';
 import type { AdminAccessResponse } from '../../types/admin';
@@ -134,6 +137,24 @@ export default function AdminAccessGate() {
           <AdminRanksPage />
         </AdminLayout>
       </AdminRanksProvider>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/departments')) {
+    return (
+      <AdminDepartmentsProvider>
+        <AdminLayout access={access}>
+          <AdminDepartmentsPage />
+        </AdminLayout>
+      </AdminDepartmentsProvider>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/org')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminOrgChartPage />
+      </AdminLayout>
     );
   }
 

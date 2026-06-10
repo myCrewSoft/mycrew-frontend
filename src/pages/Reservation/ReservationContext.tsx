@@ -1,10 +1,10 @@
 import { createContext, useContext } from 'react'
-import type { MeetingRoom } from '../../types/Reservation'
+import type { RoomResponse } from '../../types'
 
 export interface ReservationContextValue {
   selectedDate: string
   setSelectedDate: (date: string) => void
-  rooms: MeetingRoom[]
+  rooms: RoomResponse[]
   checkedRoomIds: number[]
   setCheckedRoomIds: (roomIds: number[]) => void
   roomsLoading: boolean
