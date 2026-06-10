@@ -804,3 +804,21 @@
     position: static;
   }
 }
+
+.approval-page__favorite-btn {
+  color: #94a3b8;
+}
+
+.approval-page__favorite-btn svg {
+  fill: none;
+  stroke: currentColor;
+}
+
+.approval-page__favorite-btn--active {
+  color: #f59e0b;
+}
+
+.approval-page__favorite-btn--active svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
