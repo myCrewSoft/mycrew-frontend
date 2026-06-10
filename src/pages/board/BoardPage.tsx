@@ -11,6 +11,7 @@ import {
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import BoardWriteForm from './BoardWriteForm'
+import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import { boardApi } from '../../api/boardApi'
@@ -101,6 +102,63 @@ const formatBoardAuthor = (board: BoardResponse, boardType: BoardKind) => {
   return `사원(${board.frstRgtrId})`
 }
 
+const isImportantBoard = (board: BoardResponse) =>
+  board.imprtntYn?.trim().toUpperCase() === 'Y'
+
+interface BoardPageMetadata {
+  totalPages?: number
+  totalElements?: number
+  size?: number
+}
+
+const getFinitePositiveNumber = (...values: Array<number | undefined>) =>
+  values.find((value): value is number => (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0
+  ))
+
+const getBoardTotalPages = (
+  pageData?: BoardPageMetadata | null,
+  pagination?: BoardPageMetadata | null,
+) => {
+  const totalElements = getFinitePositiveNumber(
+    pageData?.totalElements,
+    pagination?.totalElements,
+  )
+  const pageSize = getFinitePositiveNumber(
+    pageData?.size,
+    pagination?.size,
+    10,
+  )
+
+  if (totalElements && pageSize) {
+    return Math.max(1, Math.ceil(totalElements / pageSize))
+  }
+
+  return getFinitePositiveNumber(
+    pageData?.totalPages,
+    pagination?.totalPages,
+    1,
+  ) ?? 1
+}
+
+const getVerifiedNoticeTotalPages = async (
+  candidateTotalPages: number,
+  keyword: string,
+) => {
+  if (candidateTotalPages <= 1) return candidateTotalPages
+
+  const response = await boardApi.getBoards({
+    type: 'notice',
+    page: candidateTotalPages,
+    keyword,
+  })
+  const content = response.data.data?.content ?? []
+
+  return content.length > 0 ? candidateTotalPages : candidateTotalPages - 1
+}
+
 const BoardPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -114,6 +172,7 @@ const BoardPage = () => {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [lastPageOverride, setLastPageOverride] = useState<number | null>(null)
 
   const boardType = getBoardTypeFromPath(location.pathname)
   const isCreateMode = searchParams.get('mode') === 'create'
@@ -146,9 +205,40 @@ const BoardPage = () => {
 
         if (response.data?.success) {
           const pageData = response.data.data
+          const content = pageData?.content ?? []
+          const calculatedTotalPages = getBoardTotalPages(pageData, response.data.pagination)
+          const verifiedNoticeTotalPages = boardType === 'notice' && !lastPageOverride
+            ? await getVerifiedNoticeTotalPages(calculatedTotalPages, keyword)
+            : calculatedTotalPages
+          const nextTotalPages = lastPageOverride
+            ? Math.min(calculatedTotalPages, lastPageOverride)
+            : verifiedNoticeTotalPages
 
-          setBoardList(pageData?.content ?? [])
-          setTotalPages(pageData?.totalPages ?? response.data.pagination?.totalPages ?? 1)
+          if (verifiedNoticeTotalPages < calculatedTotalPages) {
+            setLastPageOverride(verifiedNoticeTotalPages)
+          }
+
+          setTotalPages(nextTotalPages)
+
+          if (page > nextTotalPages) {
+            setPage(nextTotalPages)
+            return
+          }
+
+          if (content.length === 0 && page > 1) {
+            const correctedPage = page - 1
+
+            setLastPageOverride((currentOverride) => (
+              currentOverride
+                ? Math.min(currentOverride, correctedPage)
+                : correctedPage
+            ))
+            setTotalPages(correctedPage)
+            setPage(correctedPage)
+            return
+          }
+
+          setBoardList(content)
         }
       } catch (err) {
         if (err instanceof ApiError) {
@@ -162,11 +252,12 @@ const BoardPage = () => {
     }
 
     void fetchBoardData()
-  }, [boardType, keyword, deptCd, page, reloadKey])
+  }, [boardType, keyword, deptCd, page, reloadKey, lastPageOverride])
 
   useEffect(() => {
     setPage(1)
-  }, [boardType, deptCd])
+    setLastPageOverride(null)
+  }, [boardType, deptCd, keyword])
 
   if (isCreateMode) {
     return (
@@ -275,6 +366,11 @@ const BoardPage = () => {
               >
                 <div className="w-24 text-slate-600">{board.boardId}</div>
                 <div className="flex flex-1 items-center gap-1 font-medium text-slate-800">
+                  {isImportantBoard(board) && (
+                    <Badge variant="warning" size="sm" className="shrink-0 rounded-md">
+                      중요
+                    </Badge>
+                  )}
                   <span>{board.boardSj}</span>
                   {board.boardAtchFileId !== null && (
                     <Paperclip size={14} className="text-slate-400" />

@@ -18,6 +18,9 @@ export type BoardResponse = components['schemas']['BoardResponse'];
 export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
 export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
 export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
+export type BoardCommentCreateRequest = components['schemas']['BoardCommentCreateRequest'];
+export type BoardCommentUpdateRequest = components['schemas']['BoardCommentUpdateRequest'];
+
 
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];

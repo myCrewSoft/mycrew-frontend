@@ -27,6 +27,31 @@ const isMenuActive = (pathname: string, search: string, item: any) =>
     ? `${pathname}${search}` === item.activeKey
     : isPathActive(pathname, item.path)
 
+const getBoardCreatePath = (pathname: string) => {
+  const departmentMatch = pathname.match(/^\/boards\/dept\/([^/]+)/)
+
+  if (departmentMatch) {
+    return `/boards/dept/${departmentMatch[1]}?mode=create`
+  }
+
+  if (pathname.startsWith('/boards/departments')) {
+    return '/boards/departments?mode=create'
+  }
+
+  if (pathname.startsWith('/boards/free')) {
+    return '/boards/free?mode=create'
+  }
+
+  if (
+    pathname.startsWith('/boards/anonymous') ||
+    pathname.startsWith('/boards/anon')
+  ) {
+    return '/boards/anonymous?mode=create'
+  }
+
+  return '/boards/notices?mode=create'
+}
+
 // 특정 메뉴에서 기본 메뉴 목록이 아니라 전용 UI를 보여주고 싶을 때 사용하는 매핑입니다.
 // 추가할 경우 아래와 동일하게 추가할 것
 // 예: /calendar 경로에서는 CalendarSubSidebarContent를 렌더링합니다.
@@ -56,7 +81,7 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
 
   const handleActionClick = (actionLabel: string) => {
     if (sidebarKey === 'board' && actionLabel.includes('글')) {
-      navigate(`${location.pathname}?mode=create`)
+      navigate(getBoardCreatePath(location.pathname))
     }
   }
 
