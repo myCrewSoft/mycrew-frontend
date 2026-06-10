@@ -301,8 +301,6 @@ const ProjectListPage = () => {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-50">
-
-      {/* 상단 헤더 */}
       <div className="flex h-14 shrink-0 items-center justify-between bg-white px-6 shadow-sm">
         <h1 className="text-lg font-bold text-slate-900">프로젝트 목록</h1>
         <Button
