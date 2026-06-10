@@ -13,14 +13,19 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
+import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Textarea from '../../components/common/form/textarea/Textarea'
 import BoardWriteForm from './BoardWriteForm'
-import { boardDetailApi } from '../../api/boardDetailApi'
+import { boardApi, type BoardMutationRequest } from '../../api/boardApi'
+import {
+  boardDetailApi,
+  type BoardCommentMutationRequest,
+} from '../../api/boardDetailApi'
+import { profileApi } from '../../api/profileApi'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
-import type { BoardMutationRequest } from '../../api/boardApi'
-import type { BoardResponse } from '../../types'
+import type { BoardCommentUpdateRequest, BoardResponse } from '../../types'
 
 const boardLabelByType: Record<BoardKind, string> = {
   notice: '공지사항',
@@ -41,6 +46,17 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
   if (pathname.includes('/free')) return 'free'
   if (pathname.includes('/anonymous') || pathname.includes('/anon')) return 'anonymous'
   return 'notice'
+}
+
+const getBoardTypeFromCode = (boardTypeCd?: string, fallback: BoardKind = 'notice'): BoardKind => {
+  const normalizedCode = boardTypeCd?.trim().toUpperCase()
+
+  if (normalizedCode === 'DEPT') return 'department'
+  if (normalizedCode === 'FREE') return 'free'
+  if (normalizedCode === 'ANON') return 'anonymous'
+  if (normalizedCode === 'NOTICE') return 'notice'
+
+  return fallback
 }
 
 const formatDateTime = (value?: string) => {
@@ -84,6 +100,46 @@ const formatBoardAuthor = (detail: BoardResponse, boardType: BoardKind) => {
   return `사원(${detail.frstRgtrId})`
 }
 
+const isImportantBoard = (detail: BoardResponse) =>
+  detail.imprtntYn?.trim().toUpperCase() === 'Y'
+
+const getCurrentEmployeeId = () => {
+  const employeeId = Number(localStorage.getItem('empId'))
+
+  return Number.isFinite(employeeId) && employeeId > 0 ? employeeId : null
+}
+
+const formatCommentAuthor = (
+  writerEmployeeId: number | undefined,
+  boardType: BoardKind,
+  currentEmployeeId: number | null,
+  currentEmployeeName: string,
+) => {
+  if (boardType === 'anonymous') return '익명'
+
+  if (
+    writerEmployeeId === currentEmployeeId &&
+    currentEmployeeName
+  ) {
+    return `${currentEmployeeName}(${writerEmployeeId})`
+  }
+
+  return `사원(${writerEmployeeId ?? '-'})`
+}
+
+const getBoardListPath = (boardType: BoardKind, deptCd?: string) => {
+  if (boardType === 'department') {
+    return deptCd
+      ? `/boards/dept/${encodeURIComponent(deptCd)}`
+      : '/boards/departments'
+  }
+
+  if (boardType === 'free') return '/boards/free'
+  if (boardType === 'anonymous') return '/boards/anonymous'
+
+  return '/boards/notices'
+}
+
 const BoardDetailPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -92,6 +148,10 @@ const BoardDetailPage = () => {
   const numericBoardId = Number(boardId)
   const detailStateKey = getDetailStateKey(boardType, numericBoardId, deptCd)
   const [commentContent, setCommentContent] = useState('')
+  const [replyTargetId, setReplyTargetId] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
+  const [editingCommentContent, setEditingCommentContent] = useState('')
   const [editModeKey, setEditModeKey] = useState<string | null>(null)
   const [updatedDetail, setUpdatedDetail] = useState<{
     key: string
@@ -105,10 +165,40 @@ const BoardDetailPage = () => {
     execute: fetchBoardDetail,
   } = useApi(boardDetailApi.getBoardDetail, { immediate: false })
 
+  const {
+    loading: deleting,
+    execute: deleteBoard,
+  } = useApi<null, [number]>(boardApi.deleteBoard, { immediate: false })
+
+  const {
+    loading: creatingComment,
+    error: commentError,
+    execute: createBoardComment,
+  } = useApi<number, [BoardCommentMutationRequest]>(
+    boardDetailApi.createBoardComment,
+    { immediate: false },
+  )
+
+  const {
+    loading: updatingComment,
+    error: updateCommentError,
+    execute: updateBoardComment,
+  } = useApi<number, [BoardCommentUpdateRequest]>(
+    boardDetailApi.updateBoardComment,
+    { immediate: false },
+  )
+
+  const {
+    data: currentProfile,
+  } = useApi(profileApi.getMyProfile)
+
   const detail = updatedDetail?.key === detailStateKey
     ? updatedDetail.detail
     : fetchedDetail
   const isEditMode = editModeKey === detailStateKey
+  const currentEmployeeId = getCurrentEmployeeId()
+  const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  const canDeletePost = detail ? currentEmployeeId === detail.frstRgtrId : false
 
   useEffect(() => {
     if (!Number.isFinite(numericBoardId)) return
@@ -128,9 +218,208 @@ const BoardDetailPage = () => {
   const hasAttachment = Boolean(detail?.boardAtchFileId)
   const commentsEnabled = detail ? isCommentEnabled(detail, boardType) : false
   const trimmedComment = commentContent.trim()
+  const trimmedReply = replyContent.trim()
+  const trimmedEditingComment = editingCommentContent.trim()
 
-  const handleCommentSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCommentSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (
+      !detail ||
+      !commentsEnabled ||
+      !trimmedComment ||
+      !Number.isFinite(numericBoardId)
+    ) {
+      return
+    }
+
+    try {
+      const response = await createBoardComment({
+        boardId: numericBoardId,
+        commentCn: trimmedComment,
+        commentPrtId: null,
+        commentDepth: 0,
+        commentOrder: 1,
+      })
+      const createdCommentId = response.data
+
+      setUpdatedDetail((currentDetailState) => {
+        const baseDetail = currentDetailState?.key === detailStateKey
+          ? currentDetailState.detail
+          : detail
+
+        return {
+          key: detailStateKey,
+          detail: {
+            ...baseDetail,
+            commentList: [
+              ...(baseDetail.commentList ?? []),
+              {
+                commentId: createdCommentId,
+                boardId: numericBoardId,
+                commentCn: trimmedComment,
+                wrterEmpId: currentEmployeeId ?? undefined,
+                wrteDt: new Date().toISOString(),
+                commentDepth: 0,
+                commentOrder: (baseDetail.commentList?.length ?? 0) + 1,
+              },
+            ],
+          },
+        }
+      })
+      setCommentContent('')
+    } catch {
+      // useApi의 error 상태를 입력 영역 아래에 표시합니다.
+    }
+  }
+
+  const handleReplyToggle = (commentId?: number) => {
+    if (!commentId) return
+
+    if (replyTargetId === commentId) {
+      setReplyTargetId(null)
+      setReplyContent('')
+      return
+    }
+
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setReplyTargetId(commentId)
+    setReplyContent('')
+  }
+
+  const handleReplySubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+    parentCommentId: number,
+  ) => {
+    event.preventDefault()
+
+    if (
+      !detail ||
+      !commentsEnabled ||
+      !trimmedReply ||
+      !Number.isFinite(numericBoardId)
+    ) {
+      return
+    }
+
+    const siblingReplies = comments.filter(
+      (comment) => comment.commentPrtId === parentCommentId,
+    )
+    const nextReplyOrder = siblingReplies.length + 1
+
+    try {
+      const response = await createBoardComment({
+        boardId: numericBoardId,
+        commentCn: trimmedReply,
+        commentPrtId: parentCommentId,
+        commentDepth: 1,
+        commentOrder: nextReplyOrder,
+      })
+      const createdCommentId = response.data
+
+      setUpdatedDetail((currentDetailState) => {
+        const baseDetail = currentDetailState?.key === detailStateKey
+          ? currentDetailState.detail
+          : detail
+        const nextCommentList = [...(baseDetail.commentList ?? [])]
+        const parentIndex = nextCommentList.findIndex(
+          (comment) => comment.commentId === parentCommentId,
+        )
+        let insertIndex = parentIndex + 1
+
+        while (
+          insertIndex < nextCommentList.length &&
+          nextCommentList[insertIndex].commentPrtId === parentCommentId
+        ) {
+          insertIndex += 1
+        }
+
+        nextCommentList.splice(insertIndex, 0, {
+          commentId: createdCommentId,
+          boardId: numericBoardId,
+          commentCn: trimmedReply,
+          wrterEmpId: currentEmployeeId ?? undefined,
+          wrteDt: new Date().toISOString(),
+          commentPrtId: parentCommentId,
+          commentDepth: 1,
+          commentOrder: nextReplyOrder,
+        })
+
+        return {
+          key: detailStateKey,
+          detail: {
+            ...baseDetail,
+            commentList: nextCommentList,
+          },
+        }
+      })
+      setReplyTargetId(null)
+      setReplyContent('')
+    } catch {
+      // useApi의 error 상태를 답글 입력 영역 아래에 표시합니다.
+    }
+  }
+
+  const handleCommentEditToggle = (
+    commentId: number | undefined,
+    commentContentValue: string | undefined,
+  ) => {
+    if (!commentId) return
+
+    if (editingCommentId === commentId) {
+      setEditingCommentId(null)
+      setEditingCommentContent('')
+      return
+    }
+
+    setReplyTargetId(null)
+    setReplyContent('')
+    setEditingCommentId(commentId)
+    setEditingCommentContent(commentContentValue ?? '')
+  }
+
+  const handleCommentUpdate = async (
+    event: React.FormEvent<HTMLFormElement>,
+    commentId: number,
+  ) => {
+    event.preventDefault()
+
+    if (!trimmedEditingComment) return
+
+    try {
+      await updateBoardComment({
+        commentId,
+        commentCn: trimmedEditingComment,
+      })
+
+      setUpdatedDetail((currentDetailState) => {
+        const baseDetail = currentDetailState?.key === detailStateKey
+          ? currentDetailState.detail
+          : detail
+
+        if (!baseDetail) return currentDetailState
+
+        return {
+          key: detailStateKey,
+          detail: {
+            ...baseDetail,
+            commentList: (baseDetail.commentList ?? []).map((comment) =>
+              comment.commentId === commentId
+                ? {
+                    ...comment,
+                    commentCn: trimmedEditingComment,
+                  }
+                : comment,
+            ),
+          },
+        }
+      })
+      setEditingCommentId(null)
+      setEditingCommentContent('')
+    } catch {
+      // useApi의 error 상태를 댓글 수정 영역 아래에 표시합니다.
+    }
   }
 
   const handleEditClick = () => {
@@ -164,17 +453,39 @@ const BoardDetailPage = () => {
     })
   }
 
-  const handleDeleteClick = () => {
-    window.alert('게시글 삭제 기능은 API 연결 후 사용할 수 있습니다.')
+  const handleDeleteClick = async () => {
+    if (!detail || !Number.isFinite(numericBoardId)) return
+
+    if (!canDeletePost) {
+      window.alert('본인이 작성한 게시글만 삭제할 수 있습니다.')
+      return
+    }
+
+    if (!window.confirm('게시글을 삭제할까요?')) return
+
+    try {
+      await deleteBoard(numericBoardId)
+      navigate(getBoardListPath(boardType, deptCd), { replace: true })
+    } catch (deleteError) {
+      const message = deleteError instanceof Error
+        ? deleteError.message
+        : '게시글 삭제에 실패했습니다.'
+
+      window.alert(message)
+    }
   }
 
   if (isEditMode && detail && Number.isFinite(numericBoardId)) {
+    const detailBoardType = getBoardTypeFromCode(detail.boardTypeCd, boardType)
+    const detailDepartmentCode = detail.deptCd?.trim() || deptCd
+
     return (
       <BoardWriteForm
         mode="edit"
         boardId={numericBoardId}
-        initialBoardType={boardType}
-        departmentCode={deptCd}
+        initialBoardType={detailBoardType}
+        initialBoardTypeCd={detail.boardTypeCd}
+        departmentCode={detailDepartmentCode}
         initialTitle={detail.boardSj}
         initialContent={detail.boardCn}
         initialImportantYn={detail.imprtntYn}
@@ -250,6 +561,11 @@ const BoardDetailPage = () => {
                     >
                       {boardLabelByType[boardType]}
                     </span>
+                    {isImportantBoard(detail) && (
+                      <Badge variant="warning" size="sm" className="shrink-0 rounded-md">
+                        중요
+                      </Badge>
+                    )}
                     <h1 className="min-w-0 break-words text-2xl font-bold text-slate-950">
                       {detail.boardSj}
                     </h1>
@@ -266,16 +582,19 @@ const BoardDetailPage = () => {
                     >
                       수정
                     </Button>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      className="h-9 rounded-md px-3"
-                      leftIcon={<Trash2 size={15} />}
-                      onClick={handleDeleteClick}
-                    >
-                      삭제
-                    </Button>
+                    {canDeletePost && (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        className="h-9 rounded-md px-3"
+                        leftIcon={<Trash2 size={15} />}
+                        loading={deleting}
+                        onClick={handleDeleteClick}
+                      >
+                        삭제
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -335,23 +654,29 @@ const BoardDetailPage = () => {
                     <Textarea
                       value={commentContent}
                       onChange={(event) => setCommentContent(event.target.value)}
-                      maxLength={500}
+                      maxLength={1000}
                       placeholder="댓글을 입력하세요."
                       className="min-h-24 resize-none rounded-lg"
                     />
                     <div className="mt-3 flex items-center justify-between gap-3">
                       <span className="text-xs font-medium text-slate-400">
-                        {commentContent.length}/500
+                        {commentContent.length}/1000
                       </span>
                       <Button
                         type="submit"
                         size="sm"
+                        loading={creatingComment}
                         disabled={!trimmedComment}
                         leftIcon={<Send size={15} />}
                       >
                         등록
                       </Button>
                     </div>
+                    {commentError && (
+                      <p className="mt-2 text-sm font-semibold text-red-500">
+                        {commentError.message}
+                      </p>
+                    )}
                   </form>
 
                   <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
@@ -366,14 +691,20 @@ const BoardDetailPage = () => {
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-xs font-bold text-white">
                             {boardType === 'anonymous'
                               ? '익'
-                              : String(comment.wrterEmpId ?? '?').slice(0, 1)}
+                              : comment.wrterEmpId === currentEmployeeId &&
+                                  currentEmployeeName
+                                ? currentEmployeeName.slice(0, 1)
+                                : String(comment.wrterEmpId ?? '?').slice(0, 1)}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-wrap items-center gap-2 text-sm">
                               <span className="font-bold text-slate-800">
-                                {boardType === 'anonymous'
-                                  ? '익명'
-                                  : `사원(${comment.wrterEmpId ?? '-'})`}
+                                {formatCommentAuthor(
+                                  comment.wrterEmpId,
+                                  boardType,
+                                  currentEmployeeId,
+                                  currentEmployeeName,
+                                )}
                               </span>
                               {Boolean(comment.commentDepth) && (
                                 <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-500">
@@ -381,15 +712,129 @@ const BoardDetailPage = () => {
                                 </span>
                               )}
                             </div>
-                            <p className="whitespace-pre-wrap break-words text-sm font-medium leading-6 text-slate-700">
-                              {comment.commentCn}
-                            </p>
+                            {editingCommentId === comment.commentId &&
+                            comment.commentId ? (
+                              <form
+                                onSubmit={(event) =>
+                                  handleCommentUpdate(event, comment.commentId as number)
+                                }
+                                className="mt-2 rounded-md border border-slate-200 bg-white p-3"
+                              >
+                                <Textarea
+                                  value={editingCommentContent}
+                                  onChange={(event) =>
+                                    setEditingCommentContent(event.target.value)
+                                  }
+                                  maxLength={1000}
+                                  autoFocus
+                                  placeholder="댓글을 수정하세요."
+                                  className="min-h-20 resize-none rounded-md"
+                                />
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                  <span className="text-xs font-medium text-slate-400">
+                                    {editingCommentContent.length}/1000
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleCommentEditToggle(
+                                          comment.commentId,
+                                          comment.commentCn,
+                                        )
+                                      }
+                                    >
+                                      취소
+                                    </Button>
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      loading={updatingComment}
+                                      disabled={!trimmedEditingComment}
+                                    >
+                                      수정 완료
+                                    </Button>
+                                  </div>
+                                </div>
+                                {updateCommentError && (
+                                  <p className="mt-2 text-sm font-semibold text-red-500">
+                                    {updateCommentError.message}
+                                  </p>
+                                )}
+                              </form>
+                            ) : (
+                              <p className="whitespace-pre-wrap break-words text-sm font-medium leading-6 text-slate-700">
+                                {comment.commentCn}
+                              </p>
+                            )}
                             <div className="mt-2 flex items-center gap-3 text-xs font-medium text-slate-500">
                               <span>{formatDateTime(comment.wrteDt)}</span>
-                              <button type="button" className="font-semibold text-slate-600 hover:text-blue-600">
-                                답글
-                              </button>
+                              {!comment.commentDepth &&
+                                editingCommentId !== comment.commentId && (
+                                <button
+                                  type="button"
+                                  className="font-semibold text-slate-600 hover:text-blue-600"
+                                  onClick={() => handleReplyToggle(comment.commentId)}
+                                >
+                                  {replyTargetId === comment.commentId ? '취소' : '답글'}
+                                </button>
+                              )}
+                              {comment.wrterEmpId === currentEmployeeId &&
+                                editingCommentId !== comment.commentId && (
+                                  <button
+                                    type="button"
+                                    className="font-semibold text-slate-600 hover:text-blue-600"
+                                    onClick={() =>
+                                      handleCommentEditToggle(
+                                        comment.commentId,
+                                        comment.commentCn,
+                                      )
+                                    }
+                                  >
+                                    수정
+                                  </button>
+                                )}
                             </div>
+                            {!comment.commentDepth &&
+                              replyTargetId === comment.commentId &&
+                              comment.commentId && (
+                                <form
+                                  onSubmit={(event) =>
+                                    handleReplySubmit(event, comment.commentId as number)
+                                  }
+                                  className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+                                >
+                                  <Textarea
+                                    value={replyContent}
+                                    onChange={(event) => setReplyContent(event.target.value)}
+                                    maxLength={1000}
+                                    autoFocus
+                                    placeholder="답글을 입력하세요."
+                                    className="min-h-20 resize-none rounded-md"
+                                  />
+                                  <div className="mt-2 flex items-center justify-between gap-3">
+                                    <span className="text-xs font-medium text-slate-400">
+                                      {replyContent.length}/1000
+                                    </span>
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      loading={creatingComment}
+                                      disabled={!trimmedReply}
+                                      leftIcon={<Send size={14} />}
+                                    >
+                                      답글 등록
+                                    </Button>
+                                  </div>
+                                  {commentError && (
+                                    <p className="mt-2 text-sm font-semibold text-red-500">
+                                      {commentError.message}
+                                    </p>
+                                  )}
+                                </form>
+                              )}
                           </div>
                         </div>
                       ))

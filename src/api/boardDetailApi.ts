@@ -2,7 +2,16 @@ import type { BoardKind } from '../types/board'
 import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
-import type { BoardResponse } from '../types'
+import type {
+  BoardCommentCreateRequest,
+  BoardCommentUpdateRequest,
+  BoardResponse,
+} from '../types'
+
+export type BoardCommentMutationRequest =
+  Omit<BoardCommentCreateRequest, 'commentPrtId'> & {
+    commentPrtId: number | null
+  }
 
 const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
   notice: 'NOTICE',
@@ -65,5 +74,17 @@ export const boardDetailApi = {
     }).catch(() => undefined)
 
     return promise
+  },
+
+  createBoardComment: (
+    request: BoardCommentMutationRequest,
+  ): Promise<AxiosResponse<ApiResponse<number>>> => {
+    return axiosInstance.post('/api/boards/comments', request)
+  },
+
+  updateBoardComment: (
+    request: BoardCommentUpdateRequest,
+  ): Promise<AxiosResponse<ApiResponse<number>>> => {
+    return axiosInstance.put('/api/boards/comments', request)
   },
 }

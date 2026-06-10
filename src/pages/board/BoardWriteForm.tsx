@@ -33,6 +33,7 @@ interface BoardWriteFormProps {
   mode?: 'create' | 'edit'
   boardId?: number
   initialBoardType?: BoardKind
+  initialBoardTypeCd?: string
   departmentCode?: string
   initialTitle?: string
   initialContent?: string
@@ -76,6 +77,7 @@ const boardTypeCdByKind: Record<BoardKind, string> = {
   free: 'FREE',
   anonymous: 'ANON',
 }
+const validBoardTypeCodes = new Set(Object.values(boardTypeCdByKind))
 
 const departmentCodeByName: Record<string, string> = {
   개발팀: 'DEV',
@@ -161,10 +163,13 @@ const toolbarGroups: ToolbarItem[][] = [
 const iconButtonClass =
   'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950'
 
+const isYes = (value?: string) => value?.trim().toUpperCase() === 'Y'
+
 const BoardWriteForm = ({
   mode = 'create',
   boardId,
   initialBoardType = 'notice',
+  initialBoardTypeCd = '',
   departmentCode = '',
   initialTitle = '',
   initialContent = '',
@@ -179,7 +184,7 @@ const BoardWriteForm = ({
   const [boardType, setBoardType] = useState<BoardKind>(initialBoardType)
   const [title, setTitle] = useState(initialTitle)
   const [content, setContent] = useState(initialContent)
-  const [isImportant, setIsImportant] = useState(initialImportantYn.toUpperCase() === 'Y')
+  const [isImportant, setIsImportant] = useState(isYes(initialImportantYn))
   const [allowComments, setAllowComments] = useState(initialCommentUseYn.toUpperCase() !== 'N')
   const [selectedDepartmentCode, setSelectedDepartmentCode] = useState(departmentCode)
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([])
@@ -202,6 +207,9 @@ const BoardWriteForm = ({
   >(boardApi.updateBoard, { immediate: false })
 
   const saving = creating || updating
+  const originalBoardTypeCd = initialBoardTypeCd.trim().toUpperCase()
+  const resolvedBoardTypeCd = boardTypeCdByKind[boardType]
+  const originalDepartmentCode = departmentCode.trim()
   const contentByteLength = useMemo(
     () => new Blob([content]).size,
     [content],
@@ -255,11 +263,15 @@ const BoardWriteForm = ({
     }
 
     const request: BoardMutationRequest = {
-      boardTypeCd: boardTypeCdByKind[boardType],
+      boardTypeCd: isEditMode && validBoardTypeCodes.has(originalBoardTypeCd)
+        ? originalBoardTypeCd
+        : resolvedBoardTypeCd,
       boardSj: trimmedTitle,
       boardCn: trimmedContent,
       boardAtchFileId: initialAttachmentFileId ?? 0,
-      deptCd: boardType === 'department' ? selectedDepartmentCode : '',
+      deptCd: isEditMode
+        ? originalDepartmentCode
+        : boardType === 'department' ? selectedDepartmentCode : '',
       projId: 0,
       imprtntYn: isImportant ? 'Y' : 'N',
       cmntUseYn: boardType === 'notice' || allowComments ? 'Y' : 'N',

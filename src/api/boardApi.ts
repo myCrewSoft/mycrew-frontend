@@ -69,6 +69,13 @@ export const boardApi = {
   },
 
   /**
+   * 게시글 삭제
+   */
+  deleteBoard: (boardId: number): Promise<AxiosResponse<ApiResponse<null>>> => {
+    return axiosInstance.delete(`/api/boards/${boardId}`)
+  },
+
+  /**
    * 현재 사용자가 권한을 가진 사이드바용 게시판 목록 조회
    */
   getBoardSideBar: (): Promise<AxiosResponse<ApiResponse<BoardSideBarResponse[]>>> => {
