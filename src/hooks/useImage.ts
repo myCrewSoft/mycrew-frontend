@@ -1,24 +1,33 @@
-import { useEffect, useState } from "react"
-import { getImage } from "../api/fileApi";
+import { useEffect, useState } from 'react'
+import { getImage } from '../api/fileApi'
 
-const useImage = (atchFileDtlId: number) => {
-    const [imageSrc, setImageSrc] = useState<string | null>(null);
+const useImage = (atchFileDtlId?: number | null) => {
+  const [imageSrc, setImageSrc] = useState<string | null>(null)
 
-    useEffect(() => {
-        let objectUrl: string;
+  useEffect(() => {
+    if (!atchFileDtlId) return
 
-        getImage(atchFileDtlId)
-            .then(res => {
-                objectUrl = URL.createObjectURL(res.data);
-                setImageSrc(objectUrl);
-            });
+    let active = true
+    let objectUrl: string | null = null
 
-        return () => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl); // 클로저 문제 해결
-        };
-    }, [atchFileDtlId]);
+    getImage(atchFileDtlId)
+      .then((response) => {
+        if (!active) return
 
-    return imageSrc;
+        objectUrl = URL.createObjectURL(response.data)
+        setImageSrc(objectUrl)
+      })
+      .catch(() => {
+        if (active) setImageSrc(null)
+      })
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [atchFileDtlId])
+
+  return atchFileDtlId ? imageSrc : null
 }
 
-export default useImage;
+export default useImage

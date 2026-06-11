@@ -24,6 +24,7 @@ import {
   type ProjectTaskStatusCode,
   type ProjectTaskViewMode,
 } from './task'
+import ProjectBoardTab from './ProjectBoardTab'
 
 // ── 더미 데이터 ──────────────────────────────────────────────────
 const PROJECT_DETAIL = {
@@ -437,8 +438,12 @@ const ProjectDetailPage = () => {
         />
       )}
 
+      {tab === 'board' && (
+        <ProjectBoardTab projectId={Number(projectId)} />
+      )}
+
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
-      {tab !== 'overview' && tab !== 'tasks' && (
+      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && (
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">
@@ -451,4 +456,3 @@ const ProjectDetailPage = () => {
 }
 
 export default ProjectDetailPage
-

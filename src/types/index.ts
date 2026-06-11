@@ -17,10 +17,14 @@ export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'
 export type BoardResponse = components['schemas']['BoardResponse'];
 export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
 export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
+export type BoardCommentCreateRequest = components['schemas']['BoardCommentCreateRequest'];
 export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
+export type BoardCommentUpdateRequest = components['schemas']['BoardCommentUpdateRequest'];
 
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
+export type PageBoardResponse = components['schemas']['PageBoardResponse'];
+export type BoardCommentVO = components['schemas']['BoardCommentVO'];
   
 // 일정 관리
 export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
