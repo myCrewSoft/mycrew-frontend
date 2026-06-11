@@ -72,3 +72,8 @@ export type VideoMomAprvlResponse = components['schemas']['VideoMomAprvlResponse
 export type VideoMomResponse = components['schemas']['VideoMomResponse'];
 export type VideoPtcptResponse = components['schemas']['VideoPtcptResponse'];
 export type VideoTokenResponse = components['schemas']['VideoTokenResponse'];
+
+// 알림
+export type NotificationResponse = components['schemas']['NotificationResponse'];
+export type NotificationUnreadCountResponse =
+  components['schemas']['NotificationUnreadCountResponse'];
