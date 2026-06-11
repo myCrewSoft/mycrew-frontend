@@ -1,14 +1,12 @@
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
-import { taskPriorityConfig, taskScopeConfig, taskStatusConfig, taskTypeConfig } from './task.config'
-import type {
-  ProjectTaskPriorityCode,
-  ProjectTaskScopeCode,
-  ProjectTaskStatusCode,
-  ProjectTaskTypeCode,
-} from './task.types'
+import {
+  getTaskPriorityConfig,
+  getTaskStatusConfig,
+  getTaskTypeConfig,
+} from './task.config'
 
-export const ProjectTaskStatusBadge = ({ status }: { status: ProjectTaskStatusCode }) => {
-  const config = taskStatusConfig[status]
+export const ProjectTaskStatusBadge = ({ status }: { status: string }) => {
+  const config = getTaskStatusConfig(status)
 
   return (
     <Badge
@@ -23,9 +21,9 @@ export const ProjectTaskStatusBadge = ({ status }: { status: ProjectTaskStatusCo
 export const ProjectTaskPriorityIndicator = ({
   priority,
 }: {
-  priority: ProjectTaskPriorityCode
+  priority: string
 }) => {
-  const config = taskPriorityConfig[priority]
+  const config = getTaskPriorityConfig(priority)
 
   return (
     <Badge
@@ -38,21 +36,8 @@ export const ProjectTaskPriorityIndicator = ({
   )
 }
 
-export const ProjectTaskTypeBadge = ({ typeCd }: { typeCd: ProjectTaskTypeCode }) => {
-  const config = taskTypeConfig[typeCd]
-
-  return (
-    <Badge
-      variant="outline"
-      className={`w-fit justify-self-start whitespace-nowrap ${config.badge}`}
-    >
-      {config.label}
-    </Badge>
-  )
-}
-
-export const ProjectTaskScopeBadge = ({ scopeCd }: { scopeCd: ProjectTaskScopeCode }) => {
-  const config = taskScopeConfig[scopeCd]
+export const ProjectTaskTypeBadge = ({ typeCd }: { typeCd: string }) => {
+  const config = getTaskTypeConfig(typeCd)
 
   return (
     <Badge
@@ -65,14 +50,15 @@ export const ProjectTaskScopeBadge = ({ scopeCd }: { scopeCd: ProjectTaskScopeCo
 }
 
 export const ProjectTaskManagerAvatar = ({ name }: { name: string }) => {
-  const label = name.slice(0, 2)
+  const resolvedName = name || '미정'
+  const label = resolvedName.trim().slice(0, 2) || '미정'
 
   return (
     <div className="flex items-center gap-2">
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-blue-600">
         {label}
       </span>
-      <span className="text-xs font-bold text-slate-700">{name}</span>
+      <span className="text-xs font-bold text-slate-700">{resolvedName}</span>
     </div>
   )
 }

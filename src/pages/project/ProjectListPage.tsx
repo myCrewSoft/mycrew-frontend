@@ -1,16 +1,13 @@
 // src/pages/project/ProjectListPage.tsx
 
 import { Calendar, Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { employeeApi } from '../../api/employeeApi'
 import { projectApi } from '../../api/projectApi'
 import Button from '../../components/common/button/Button'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
-import EmployeeSearchPicker, {
-  type EmployeeSearchItem,
-} from '../../components/common/employeeSearch/EmployeeSearchPicker'
+import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import DatePickerField from '../../components/common/form/datePicker/DatePickerField'
 import FormField from '../../components/common/form/formField/FormField'
 import Textarea from '../../components/common/form/textarea/Textarea'
@@ -18,6 +15,7 @@ import { useApi, useApiList } from '../../hooks/useApi'
 import { useToast } from '../../components/common/toast/useToast'
 import type { ProjectCreateRequestDto, ProjectListResponseDto } from '../../types/project'
 import { ApiError } from '../../api/axiosInstance'
+import { useAuth } from '../../store/AuthContext'
 
 // ── 상태코드 설정 ─────────────────────────────────────────────────
 type ProjectStatCd = '01' | '02' | '03' | '04'
@@ -114,25 +112,13 @@ const RegisterDrawer = ({
   onClose: () => void
   onSuccess: () => void
 }) => {
+  const { auth } = useAuth()
   const [projNm, setProjNm] = useState('')
   const [projCn, setProjCn] = useState('')
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
   const [selectedMemberIds, setSelectedMemberIds] = useState<Array<string | number>>([])
-
-  // 사원 목록 조회
-  const { data: employeeData, execute: fetchEmployees } = useApiList(
-    employeeApi.lookupEmployees,
-    { immediate: false },
-  )
-  const employees: EmployeeSearchItem[] = employeeData ?? []
-  const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
-
-  // Drawer 열릴 때 사원 목록 조회
-  useEffect(() => {
-    if (!open) return
-    void fetchEmployees({})
-  }, [open, fetchEmployees])
+  const currentEmpId = auth.payload?.sub ? Number(auth.payload.sub) : undefined
 
   // 프로젝트 등록
   const { execute: createProject, loading: creating } = useApi(
@@ -166,13 +152,15 @@ const RegisterDrawer = ({
       const d = String(date.getDate()).padStart(2, '0')
       return `${y}-${m}-${d}`
     }
-
     const reqDto: ProjectCreateRequestDto = {
       projNm,
       projCn,
       projBgngYmd: formatDate(startDate),
       projEndYmd: formatDate(endDate),
-      projMemberList: selectedMemberIds.map((id) => ({ empId: Number(id) })),
+      projMemberList: [
+        ...(currentEmpId ? [{ empId: currentEmpId }] : []),  // 본인 자동 추가
+        ...selectedMemberIds.map((id) => ({ empId: Number(id) })),
+      ],
     }
 
     try {
@@ -262,8 +250,10 @@ const RegisterDrawer = ({
               </label>
               <EmployeeSearchPicker
                 variant="detailed"
-                employees={employees}
-                departments={departments}
+                remoteSearch
+                showAllOnEmpty
+                showDepartmentFilter
+                fixedParams={{ excludeEmpId: currentEmpId }}  
                 selectedEmployeeIds={selectedMemberIds}
                 onChange={setSelectedMemberIds}
               />
@@ -301,8 +291,6 @@ const ProjectListPage = () => {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-50">
-
-      {/* 상단 헤더 */}
       <div className="flex h-14 shrink-0 items-center justify-between bg-white px-6 shadow-sm">
         <h1 className="text-lg font-bold text-slate-900">프로젝트 목록</h1>
         <Button

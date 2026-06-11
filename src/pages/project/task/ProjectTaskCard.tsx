@@ -1,9 +1,8 @@
 import { CalendarDays } from 'lucide-react'
-import { taskStatusConfig } from './task.config'
+import { getTaskStatusConfig } from './task.config'
 import {
   ProjectTaskManagerAvatar,
   ProjectTaskPriorityIndicator,
-  ProjectTaskScopeBadge,
   ProjectTaskTypeBadge,
 } from './TaskBadges'
 import type { ProjectTask } from './task.types'
@@ -14,13 +13,12 @@ interface ProjectTaskCardProps {
 }
 
 const ProjectTaskCard = ({ task, onOpenTask }: ProjectTaskCardProps) => {
-  const status = taskStatusConfig[task.taskStatCd]
+  const status = getTaskStatusConfig(task.taskStatCd)
 
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-200">
       <div className="mb-3 flex flex-wrap gap-1.5">
         <ProjectTaskTypeBadge typeCd={task.taskTypeCd} />
-        <ProjectTaskScopeBadge scopeCd={task.taskScopeCd} />
       </div>
 
       <button
@@ -45,18 +43,18 @@ const ProjectTaskCard = ({ task, onOpenTask }: ProjectTaskCardProps) => {
       <div className="mt-4">
         <div className="mb-1.5 flex items-center justify-between text-xs text-slate-500">
           <span>진척률</span>
-          <span className="font-bold text-slate-700">{task.taskProgressRate}%</span>
+          <span className="font-bold text-slate-700">{task.taskPrgrsSmry}%</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full ${status.bar}`}
-            style={{ width: `${task.taskProgressRate}%` }}
+            style={{ width: `${task.taskPrgrsSmry}%` }}
           />
         </div>
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <ProjectTaskManagerAvatar name={task.taskMngrName} />
+        <ProjectTaskManagerAvatar name={task.taskMngrNm} />
         <ProjectTaskPriorityIndicator priority={task.taskPriorityCd} />
       </div>
     </article>
