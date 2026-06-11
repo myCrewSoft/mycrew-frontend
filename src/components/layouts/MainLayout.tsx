@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Header from './Header'
 import { MessengerSocketProvider } from './headerPopover/messenger/MessengerSocketProvider'
+import { useNotificationStream } from './headerPopover/useNotificationStream'
 import MainSidebar from './sidebar/MainSidebar'
 import SubSidebar from './sidebar/SubSidebar'
 
 export default function MainLayout() {
   const [isSubOpen, setIsSubOpen] = useState(true)
+  useNotificationStream()
 
   return (
     <MessengerSocketProvider>
