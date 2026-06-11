@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ArrowLeft,
   ChevronRight,
   FileArchive,
-  Menu,
   Megaphone,
   MessageSquare,
   Paperclip,
@@ -21,6 +21,7 @@ import { boardApi, type BoardMutationRequest } from '../../api/boardApi'
 import {
   boardDetailApi,
   type BoardCommentMutationRequest,
+  type BoardLikeResponse,
 } from '../../api/boardDetailApi'
 import { profileApi } from '../../api/profileApi'
 import { useApi } from '../../hooks/useApi'
@@ -127,6 +128,23 @@ const formatCommentAuthor = (
   return `사원(${writerEmployeeId ?? '-'})`
 }
 
+const parseBoardLikeState = (
+  response: BoardLikeResponse,
+  fallback: { isLiked: boolean; likeCnt: number },
+) => {
+  const likedValue = response.isLiked ?? response.liked
+  const countValue = response.likeCnt ?? response.likeCount ?? response.count
+
+  return {
+    isLiked: typeof likedValue === 'boolean'
+      ? likedValue
+      : fallback.isLiked,
+    likeCnt: typeof countValue === 'number' && Number.isFinite(countValue)
+      ? countValue
+      : fallback.likeCnt,
+  }
+}
+
 const getBoardListPath = (boardType: BoardKind, deptCd?: string) => {
   if (boardType === 'department') {
     return deptCd
@@ -152,6 +170,12 @@ const BoardDetailPage = () => {
   const [replyContent, setReplyContent] = useState('')
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentContent, setEditingCommentContent] = useState('')
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
+  const [likeState, setLikeState] = useState<{
+    key: string
+    isLiked: boolean
+    likeCnt: number
+  } | null>(null)
   const [editModeKey, setEditModeKey] = useState<string | null>(null)
   const [updatedDetail, setUpdatedDetail] = useState<{
     key: string
@@ -189,6 +213,29 @@ const BoardDetailPage = () => {
   )
 
   const {
+    loading: deletingComment,
+    execute: deleteBoardComment,
+  } = useApi<string, [number]>(
+    boardDetailApi.deleteBoardComment,
+    { immediate: false },
+  )
+
+  const {
+    execute: fetchBoardLike,
+  } = useApi<BoardLikeResponse, [number, number]>(
+    boardDetailApi.getBoardLike,
+    { immediate: false },
+  )
+
+  const {
+    loading: togglingLike,
+    execute: toggleBoardLike,
+  } = useApi<boolean, [number, number]>(
+    boardDetailApi.toggleBoardLike,
+    { immediate: false },
+  )
+
+  const {
     data: currentProfile,
   } = useApi(profileApi.getMyProfile)
 
@@ -199,6 +246,18 @@ const BoardDetailPage = () => {
   const currentEmployeeId = getCurrentEmployeeId()
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
   const canDeletePost = detail ? currentEmployeeId === detail.frstRgtrId : false
+  const currentLikeState = likeState?.key === detailStateKey
+    ? likeState
+    : {
+        key: detailStateKey,
+        isLiked: detail?.isLiked ?? false,
+        likeCnt: detail?.likeCnt ?? 0,
+      }
+  const boardListPath = `${getBoardListPath(boardType, deptCd)}${location.search}`
+
+  const navigateToBoardList = () => {
+    navigate(boardListPath)
+  }
 
   useEffect(() => {
     if (!Number.isFinite(numericBoardId)) return
@@ -209,6 +268,37 @@ const BoardDetailPage = () => {
       deptCd,
     })
   }, [boardType, deptCd, fetchBoardDetail, numericBoardId])
+
+  useEffect(() => {
+    if (!Number.isFinite(numericBoardId) || !currentEmployeeId) return
+
+    let active = true
+
+    void fetchBoardLike(numericBoardId, currentEmployeeId)
+      .then((response) => {
+        if (!active) return
+
+        const nextLikeState = parseBoardLikeState(response.data ?? {}, {
+          isLiked: false,
+          likeCnt: 0,
+        })
+
+        setLikeState({
+          key: detailStateKey,
+          ...nextLikeState,
+        })
+      })
+      .catch(() => undefined)
+
+    return () => {
+      active = false
+    }
+  }, [
+    currentEmployeeId,
+    detailStateKey,
+    fetchBoardLike,
+    numericBoardId,
+  ])
 
   const comments = useMemo(
     () => detail?.commentList ?? [],
@@ -422,6 +512,116 @@ const BoardDetailPage = () => {
     }
   }
 
+  const handleCommentDelete = async (
+    commentId: number | undefined,
+    isReply: boolean,
+  ) => {
+    if (!commentId || deletingComment) return
+
+    const confirmMessage = isReply
+      ? '이 답글을 삭제할까요?'
+      : '이 댓글을 삭제할까요? 연결된 답글도 함께 삭제될 수 있습니다.'
+
+    if (!window.confirm(confirmMessage)) return
+
+    setDeletingCommentId(commentId)
+
+    try {
+      await deleteBoardComment(commentId)
+
+      setUpdatedDetail((currentDetailState) => {
+        const baseDetail = currentDetailState?.key === detailStateKey
+          ? currentDetailState.detail
+          : detail
+
+        if (!baseDetail) return currentDetailState
+
+        return {
+          key: detailStateKey,
+          detail: {
+            ...baseDetail,
+            commentList: (baseDetail.commentList ?? []).filter((comment) =>
+              isReply
+                ? comment.commentId !== commentId
+                : comment.commentId !== commentId &&
+                  comment.commentPrtId !== commentId,
+            ),
+          },
+        }
+      })
+
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null)
+        setEditingCommentContent('')
+      }
+
+      if (replyTargetId === commentId) {
+        setReplyTargetId(null)
+        setReplyContent('')
+      }
+    } catch (deleteError) {
+      const message = deleteError instanceof Error
+        ? deleteError.message
+        : '댓글 삭제에 실패했습니다.'
+
+      window.alert(message)
+    } finally {
+      setDeletingCommentId(null)
+    }
+  }
+
+  const handleLikeToggle = async () => {
+    if (
+      !currentEmployeeId ||
+      !Number.isFinite(numericBoardId) ||
+      togglingLike
+    ) {
+      return
+    }
+
+    try {
+      const toggleResponse = await toggleBoardLike(
+        numericBoardId,
+        currentEmployeeId,
+      )
+      const nextLiked = toggleResponse.data ?? !currentLikeState.isLiked
+      const fallbackLikeState = {
+        isLiked: nextLiked,
+        likeCnt: Math.max(
+          0,
+          currentLikeState.likeCnt + (nextLiked ? 1 : -1),
+        ),
+      }
+
+      try {
+        const likeResponse = await fetchBoardLike(
+          numericBoardId,
+          currentEmployeeId,
+        )
+        const nextLikeState = parseBoardLikeState(
+          likeResponse.data ?? {},
+          fallbackLikeState,
+        )
+
+        setLikeState({
+          key: detailStateKey,
+          ...nextLikeState,
+        })
+      } catch {
+        setLikeState({
+          key: detailStateKey,
+          ...fallbackLikeState,
+        })
+      }
+    } catch (likeError) {
+      const message = likeError instanceof Error
+        ? likeError.message
+        : '좋아요 처리에 실패했습니다.'
+
+      window.alert(message)
+    }
+  }
+
   const handleEditClick = () => {
     setEditModeKey(detailStateKey)
   }
@@ -502,14 +702,16 @@ const BoardDetailPage = () => {
       <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 px-6 text-sm font-semibold text-slate-500">
         <button
           type="button"
-          aria-label="게시판 메뉴"
+          aria-label="목록으로 돌아가기"
+          title="목록으로 돌아가기"
+          onClick={navigateToBoardList}
           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100"
         >
-          <Menu size={19} />
+          <ArrowLeft size={19} />
         </button>
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={navigateToBoardList}
           className="text-slate-500 transition-colors hover:text-slate-900"
         >
           게시판
@@ -533,7 +735,7 @@ const BoardDetailPage = () => {
               title="게시글을 불러오지 못했습니다."
               description={error.message}
               actions={
-                <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
+                <Button size="sm" variant="secondary" onClick={navigateToBoardList}>
                   목록으로
                 </Button>
               }
@@ -544,7 +746,7 @@ const BoardDetailPage = () => {
             <EmptyState
               title="게시글 정보가 없습니다."
               actions={
-                <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
+                <Button size="sm" variant="secondary" onClick={navigateToBoardList}>
                   목록으로
                 </Button>
               }
@@ -634,19 +836,31 @@ const BoardDetailPage = () => {
                 )}
               </section>
 
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-5 text-sm font-bold">
+                <button
+                  type="button"
+                  aria-pressed={currentLikeState.isLiked}
+                  disabled={togglingLike}
+                  onClick={handleLikeToggle}
+                  className={`inline-flex items-center gap-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                    currentLikeState.isLiked
+                      ? 'text-blue-600'
+                      : 'text-slate-500 hover:text-blue-600'
+                  }`}
+                >
+                  <ThumbsUp size={17} />
+                  좋아요 {currentLikeState.likeCnt}
+                </button>
+                {commentsEnabled && (
+                  <span className="inline-flex items-center gap-2 text-slate-700">
+                    <MessageSquare size={17} />
+                    댓글 {getCommentCount(detail)}
+                  </span>
+                )}
+              </div>
+
               {commentsEnabled ? (
                 <section className="pt-5">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm font-bold">
-                    <button type="button" className="inline-flex items-center gap-2 text-blue-600">
-                      <ThumbsUp size={17} />
-                      좋아요 {detail.likeCnt ?? 0}
-                    </button>
-                    <span className="inline-flex items-center gap-2 text-slate-700">
-                      <MessageSquare size={17} />
-                      댓글 {getCommentCount(detail)}
-                    </span>
-                  </div>
-
                   <form
                     onSubmit={handleCommentSubmit}
                     className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4"
@@ -783,18 +997,36 @@ const BoardDetailPage = () => {
                               )}
                               {comment.wrterEmpId === currentEmployeeId &&
                                 editingCommentId !== comment.commentId && (
-                                  <button
-                                    type="button"
-                                    className="font-semibold text-slate-600 hover:text-blue-600"
-                                    onClick={() =>
-                                      handleCommentEditToggle(
-                                        comment.commentId,
-                                        comment.commentCn,
-                                      )
-                                    }
-                                  >
-                                    수정
-                                  </button>
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="font-semibold text-slate-600 hover:text-blue-600"
+                                      onClick={() =>
+                                        handleCommentEditToggle(
+                                          comment.commentId,
+                                          comment.commentCn,
+                                        )
+                                      }
+                                    >
+                                      수정
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                      disabled={deletingComment}
+                                      onClick={() =>
+                                        handleCommentDelete(
+                                          comment.commentId,
+                                          Boolean(comment.commentDepth),
+                                        )
+                                      }
+                                    >
+                                      <Trash2 size={12} />
+                                      {deletingCommentId === comment.commentId
+                                        ? '삭제 중'
+                                        : '삭제'}
+                                    </button>
+                                  </>
                                 )}
                             </div>
                             {!comment.commentDepth &&

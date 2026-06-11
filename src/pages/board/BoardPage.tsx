@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Building2,
   FileText,
@@ -90,6 +89,12 @@ const getBoardDetailPath = (boardType: BoardKind, boardId: number, deptCd?: stri
   return `/boards/notices/${boardId}`
 }
 
+const getPageFromSearchParams = (searchParams: URLSearchParams) => {
+  const page = Number(searchParams.get('page'))
+
+  return Number.isInteger(page) && page > 0 ? page : 1
+}
+
 const formatBoardAuthor = (board: BoardResponse, boardType: BoardKind) => {
   if (boardType === 'anonymous') return '익명'
 
@@ -165,9 +170,9 @@ const BoardPage = () => {
   const { deptCd } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => getPageFromSearchParams(searchParams))
   const [totalPages, setTotalPages] = useState(1)
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useState(() => searchParams.get('keyword') ?? '')
   const [boardList, setBoardList] = useState<BoardVo[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -181,6 +186,53 @@ const BoardPage = () => {
   const departmentName = deptCd
     ? departmentNameMap[deptCd.toLowerCase()] ?? deptCd
     : ''
+  const boardContextKey = `${boardType}:${deptCd ?? ''}`
+  const previousBoardContextKey = useRef(boardContextKey)
+  const boardCreatedRef = useRef(false)
+
+  const updateListSearchParams = useCallback((
+    nextPage: number,
+    nextKeyword: string,
+    createMode = false,
+  ) => {
+    const nextSearchParams = new URLSearchParams()
+
+    if (nextPage > 1) {
+      nextSearchParams.set('page', String(nextPage))
+    }
+
+    if (nextKeyword.trim()) {
+      nextSearchParams.set('keyword', nextKeyword.trim())
+    }
+
+    if (createMode) {
+      nextSearchParams.set('mode', 'create')
+    }
+
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [setSearchParams])
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage)
+    updateListSearchParams(nextPage, keyword)
+  }
+
+  const openBoardDetail = (boardId: number) => {
+    const detailPath = getBoardDetailPath(boardType, boardId, deptCd)
+    const listSearch = new URLSearchParams()
+
+    if (page > 1) {
+      listSearch.set('page', String(page))
+    }
+
+    if (keyword.trim()) {
+      listSearch.set('keyword', keyword.trim())
+    }
+
+    const queryString = listSearch.toString()
+
+    navigate(queryString ? `${detailPath}?${queryString}` : detailPath)
+  }
 
   useEffect(() => {
     const fetchBoardData = async () => {
@@ -222,6 +274,7 @@ const BoardPage = () => {
 
           if (page > nextTotalPages) {
             setPage(nextTotalPages)
+            updateListSearchParams(nextTotalPages, keyword)
             return
           }
 
@@ -235,6 +288,7 @@ const BoardPage = () => {
             ))
             setTotalPages(correctedPage)
             setPage(correctedPage)
+            updateListSearchParams(correctedPage, keyword)
             return
           }
 
@@ -252,21 +306,44 @@ const BoardPage = () => {
     }
 
     void fetchBoardData()
-  }, [boardType, keyword, deptCd, page, reloadKey, lastPageOverride])
+  }, [
+    boardType,
+    keyword,
+    deptCd,
+    page,
+    reloadKey,
+    lastPageOverride,
+    updateListSearchParams,
+  ])
 
   useEffect(() => {
+    if (previousBoardContextKey.current === boardContextKey) return
+
+    previousBoardContextKey.current = boardContextKey
     setPage(1)
+    setKeyword('')
     setLastPageOverride(null)
-  }, [boardType, deptCd, keyword])
+    updateListSearchParams(1, '')
+  }, [boardContextKey, updateListSearchParams])
 
   if (isCreateMode) {
     return (
       <BoardWriteForm
         initialBoardType={boardType}
         departmentCode={deptCd}
-        onClose={() => setSearchParams({})}
+        onClose={() => {
+          if (boardCreatedRef.current) {
+            boardCreatedRef.current = false
+            return
+          }
+
+          updateListSearchParams(page, keyword)
+        }}
         onCreated={() => {
+          boardCreatedRef.current = true
           setPage(1)
+          setKeyword('')
+          updateListSearchParams(1, '')
           setReloadKey((current) => current + 1)
         }}
       />
@@ -297,8 +374,11 @@ const BoardPage = () => {
             placeholder="제목 검색"
             value={keyword}
             onChange={(event) => {
-              setKeyword(event.target.value)
+              const nextKeyword = event.target.value
+
+              setKeyword(nextKeyword)
               setPage(1)
+              updateListSearchParams(1, nextKeyword)
             }}
           />
         </div>
@@ -356,10 +436,10 @@ const BoardPage = () => {
                 key={board.boardId}
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(getBoardDetailPath(boardType, board.boardId, deptCd))}
+                onClick={() => openBoardDetail(board.boardId)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    navigate(getBoardDetailPath(boardType, board.boardId, deptCd))
+                    openBoardDetail(board.boardId)
                   }
                 }}
                 className="flex h-14 cursor-pointer items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50"
@@ -390,7 +470,7 @@ const BoardPage = () => {
 
       {!loading && !errorMsg && boardList.length > 0 && (
         <div className="mt-6 flex justify-center">
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={handlePageChange} />
         </div>
       )}
     </section>

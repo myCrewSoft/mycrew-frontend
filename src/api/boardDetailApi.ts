@@ -13,6 +13,8 @@ export type BoardCommentMutationRequest =
     commentPrtId: number | null
   }
 
+export type BoardLikeResponse = Record<string, unknown>
+
 const boardTypeCdByKind: Record<Exclude<BoardKind, 'department'>, string> = {
   notice: 'NOTICE',
   free: 'FREE',
@@ -86,5 +88,29 @@ export const boardDetailApi = {
     request: BoardCommentUpdateRequest,
   ): Promise<AxiosResponse<ApiResponse<number>>> => {
     return axiosInstance.put('/api/boards/comments', request)
+  },
+
+  deleteBoardComment: (
+    commentId: number,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.delete(`/api/boards/comments/${commentId}`)
+  },
+
+  getBoardLike: (
+    boardId: number,
+    employeeId: number,
+  ): Promise<AxiosResponse<ApiResponse<BoardLikeResponse>>> => {
+    return axiosInstance.get(`/api/boards/${boardId}/like`, {
+      params: { empId: employeeId },
+    })
+  },
+
+  toggleBoardLike: (
+    boardId: number,
+    employeeId: number,
+  ): Promise<AxiosResponse<ApiResponse<boolean>>> => {
+    return axiosInstance.post(`/api/boards/${boardId}/like`, null, {
+      params: { empId: employeeId },
+    })
   },
 }
