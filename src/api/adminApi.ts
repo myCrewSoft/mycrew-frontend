@@ -3,6 +3,14 @@ import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
 import type {
   AdminAccessResponse,
+  AdminDepartmentMemberResponseDTO,
+  AdminDepartmentResponseDTO,
+  DepartmentCreateRequestDTO,
+  DepartmentDeleteRequestDTO,
+  DepartmentMemberAssignRequestDTO,
+  DepartmentMemberMutationResponseDTO,
+  DepartmentMemberTransferRequestDTO,
+  DepartmentUpdateRequestDTO,
   PermissionResponse,
   PermissionStatusUpdateRequest,
   RankAssignRequest,
@@ -161,5 +169,65 @@ export const adminApi = {
     return axiosInstance.delete(`/api/admin/ranks/${rankId}/assignments`, {
       data: request,
     });
+  },
+  getDepartments: (): Promise<
+    AxiosResponse<ApiResponse<AdminDepartmentResponseDTO[]>>
+  > => {
+    return axiosInstance.get('/api/admin/departments');
+  },
+  getDepartmentDetail: (
+    deptCd: string,
+  ): Promise<AxiosResponse<ApiResponse<AdminDepartmentResponseDTO>>> => {
+    return axiosInstance.get(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}`,
+    );
+  },
+  createDepartment: (
+    request: DepartmentCreateRequestDTO,
+  ): Promise<AxiosResponse<ApiResponse<AdminDepartmentResponseDTO>>> => {
+    return axiosInstance.post('/api/admin/departments', request);
+  },
+  updateDepartment: (
+    deptCd: string,
+    request: DepartmentUpdateRequestDTO,
+  ): Promise<AxiosResponse<ApiResponse<AdminDepartmentResponseDTO>>> => {
+    return axiosInstance.put(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}`,
+      request,
+    );
+  },
+  deleteDepartment: (
+    deptCd: string,
+    request?: DepartmentDeleteRequestDTO | null,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.delete(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}`,
+      request ? { data: request } : undefined,
+    );
+  },
+  getDepartmentMembers: (
+    deptCd: string,
+  ): Promise<AxiosResponse<ApiResponse<AdminDepartmentMemberResponseDTO[]>>> => {
+    return axiosInstance.get(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}/members`,
+    );
+  },
+  assignDepartmentMembers: (
+    deptCd: string,
+    request: DepartmentMemberAssignRequestDTO,
+  ): Promise<AxiosResponse<ApiResponse<DepartmentMemberMutationResponseDTO>>> => {
+    return axiosInstance.post(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}/members`,
+      request,
+    );
+  },
+  transferDepartmentMembers: (
+    deptCd: string,
+    request: DepartmentMemberTransferRequestDTO,
+  ): Promise<AxiosResponse<ApiResponse<DepartmentMemberMutationResponseDTO>>> => {
+    return axiosInstance.put(
+      `/api/admin/departments/${encodeURIComponent(deptCd)}/members/transfer`,
+      request,
+    );
   },
 };

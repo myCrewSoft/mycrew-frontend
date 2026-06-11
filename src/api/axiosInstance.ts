@@ -145,10 +145,16 @@ axiosInstance.interceptors.response.use(
 
   /**
    * HTTP 2xx 응답을 처리한다.
+   * responseType 이 'blob' 인 경우(파일 다운로드 등) ApiResponse 파싱 없이 그대로 반환한다.
    * 백엔드가 success: false 를 2xx 로 내려보낸 경우에도 ApiError 로 변환한다.
    * success: true 이면 response 전체를 그대로 반환한다. (Axios 규격 유지)
    */
   (response: AxiosResponse<ApiResponse>) => {
+    // blob 응답은 ApiResponse 형식이 아니므로 파싱 없이 그대로 반환
+    if (response.config.responseType === 'blob') {
+      return response;
+    }
+
     if (!response.data?.success) {
       return Promise.reject(
         new ApiError(

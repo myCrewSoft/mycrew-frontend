@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type FullCalendarComponent from '@fullcalendar/react'
 import type {
+  DateSelectArg,
   EventApi,
   EventClickArg,
   EventContentArg,
@@ -27,7 +28,10 @@ import { useCalendar } from './CalendarContext'
 import CalendarScheduleDetailModal from './CalendarScheduleDetailModal'
 import CalendarScheduleDrawer from './CalendarScheduleDrawer'
 import './calendar.css'
-import type { CalendarEventItem } from '../../types/calendar'
+import type {
+  CalendarEventItem,
+  CalendarSelectedRange,
+} from '../../types/calendar'
 
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listMonth';
 
@@ -98,6 +102,51 @@ const formatApiLocalDateTime = (date: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
 }
 
+const createSelectedRange = (selectInfo: DateSelectArg): CalendarSelectedRange => {
+  const endDate = new Date(selectInfo.end)
+
+  if (selectInfo.allDay) {
+    endDate.setDate(endDate.getDate() - 1)
+    endDate.setHours(23, 59, 0, 0)
+  }
+
+  return {
+    start: formatApiLocalDateTime(selectInfo.start),
+    end: formatApiLocalDateTime(endDate),
+    allDay: selectInfo.allDay,
+  }
+}
+
+const getCalendarSelectionEnd = (range: CalendarSelectedRange) => {
+  const endDate = new Date(range.end)
+
+  if (range.allDay) {
+    endDate.setDate(endDate.getDate() + 1)
+    endDate.setHours(0, 0, 0, 0)
+  }
+
+  return formatApiLocalDateTime(endDate)
+}
+
+const getDateOnlyTime = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+
+const isDateInSelectedRange = (
+  date: Date,
+  range: CalendarSelectedRange | null,
+) => {
+  if (!range) return false
+
+  const targetTime = getDateOnlyTime(date)
+  const startDate = new Date(range.start)
+  const endDate = new Date(range.end)
+
+  return (
+    targetTime >= getDateOnlyTime(startDate) &&
+    targetTime <= getDateOnlyTime(endDate)
+  )
+}
+
 const CalendarPage = () => {
   // visibleCalendarEvents는 체크 필터가 적용된 일정 목록입니다.
   // selectedDate는 미니 캘린더와 큰 캘린더가 공유하는 선택 날짜입니다.
@@ -123,8 +172,34 @@ const CalendarPage = () => {
   const [scheduleDetailOpen, setScheduleDetailOpen] = useState(false)
   const [selectedSchedule, setSelectedSchedule] =
     useState<CalendarEventItem | null>(null)
+  const [selectedRange, setSelectedRange] =
+    useState<CalendarSelectedRange | null>(null)
+  const selectedRangeRef = useRef<CalendarSelectedRange | null>(null)
+  const restoringSelectionRef = useRef(false)
   const [morePopover, setMorePopover] =
     useState<CalendarMorePopoverState | null>(null);
+
+  const restoreSelectedRange = () => {
+    const range = selectedRangeRef.current
+    const calendarApi = calendarRef.current?.getApi()
+
+    if (!range || !calendarApi) return
+
+    restoringSelectionRef.current = true
+    calendarApi.select({
+      start: range.start,
+      end: getCalendarSelectionEnd(range),
+      allDay: range.allDay,
+    })
+
+    window.setTimeout(() => {
+      restoringSelectionRef.current = false
+    }, 0)
+  }
+
+  useEffect(() => {
+    selectedRangeRef.current = selectedRange
+  }, [selectedRange])
 
   // selectedDate가 바뀌면 큰 캘린더를 해당 날짜로 이동시키고 제목도 갱신합니다.
   useEffect(() => {
@@ -137,8 +212,27 @@ const CalendarPage = () => {
   }, [selectedDate]);
 
   useEffect(() => {
+    if (!selectedRange || selectedSchedule) return
+
+    const timerId = window.setTimeout(() => {
+      restoreSelectedRange()
+    }, 0)
+
+    return () => window.clearTimeout(timerId)
+  }, [
+    calendarView,
+    scheduleDrawerOpen,
+    selectedRange,
+    selectedRange?.allDay,
+    selectedRange?.end,
+    selectedRange?.start,
+    selectedSchedule,
+  ])
+
+  useEffect(() => {
     const timerId = window.setTimeout(() => {
       calendarRef.current?.getApi().updateSize();
+      restoreSelectedRange()
       setMorePopover(null);
     }, 320);
 
@@ -155,6 +249,7 @@ const CalendarPage = () => {
       window.cancelAnimationFrame(frameId)
       frameId = window.requestAnimationFrame(() => {
         calendarRef.current?.getApi().updateSize()
+        restoreSelectedRange()
         setMorePopover(null)
       })
     }
@@ -243,8 +338,21 @@ const CalendarPage = () => {
 
     setSelectedDate(formatDateKey(info.event.start ?? new Date(schedule.start)))
     setSelectedSchedule(schedule)
+    setSelectedRange(null)
+    calendarRef.current?.getApi().unselect()
     setScheduleDrawerOpen(false)
     setScheduleDetailOpen(true)
+    setMorePopover(null)
+  }
+
+  const handleDateSelect = (selectInfo: DateSelectArg) => {
+    if (restoringSelectionRef.current) return
+
+    const nextRange = createSelectedRange(selectInfo)
+
+    setSelectedDate(formatDateKey(selectInfo.start))
+    setSelectedSchedule(null)
+    setSelectedRange(nextRange)
     setMorePopover(null)
   }
 
@@ -380,11 +488,15 @@ const CalendarPage = () => {
               eventOrderStrict
               expandRows
               selectable
+              unselectAuto={false}
               events={visibleCalendarEvents}
+              select={handleDateSelect}
               eventClick={handleScheduleClick}
               dateClick={(info) => {
                 setSelectedDate(info.dateStr);
                 setSelectedSchedule(null)
+                setSelectedRange(null)
+                calendarRef.current?.getApi().unselect()
                 setMorePopover(null);
               }}
               datesSet={(info) => {
@@ -406,6 +518,7 @@ const CalendarPage = () => {
                 setCalendarTitle(formatMonthTitle(info.view.currentStart))
               }}
               dayCellClassNames={(info) =>
+                isDateInSelectedRange(info.date, selectedRange) ||
                 formatDateKey(info.date) === selectedDate
                   ? ['calendar-main-selected-day']
                   : []
@@ -445,6 +558,7 @@ const CalendarPage = () => {
           key={`${selectedDate}-${selectedSchedule?.id ?? 'create'}`}
           open={scheduleDrawerOpen}
           selectedDate={selectedDate}
+          selectedRange={selectedRange}
           schedule={selectedSchedule}
           onClose={closeScheduleDrawer}
         />

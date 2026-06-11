@@ -1,26 +1,39 @@
 import { useMemo } from 'react'
 import Button from '../../components/common/button/Button'
+import Checkbox from '../../components/common/form/checkbox/Checkbox'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Modal from '../../components/common/overlay/modal/Modal'
-import type { CreateReservationRequest, MeetingRoom } from '../../types/Reservation'
+import type { ReservationCreateRequest, RoomResponse } from '../../types'
 
 interface ReservationCreateModalProps {
   open: boolean
-  rooms: MeetingRoom[]
-  formValues: CreateReservationRequest
+  rooms: RoomResponse[]
+  formValues: ReservationCreateRequest
   loading: boolean
-  onChange: (values: CreateReservationRequest) => void
+  onChange: (values: ReservationCreateRequest) => void
   onClose: () => void
-  onSubmit: (values: CreateReservationRequest) => void
+  onSubmit: (values: ReservationCreateRequest) => void
 }
 
 const toDateTimeInputValue = (dateTime: string) => {
   return dateTime ? dateTime.slice(0, 16) : ''
 }
 
+const toDateInputValue = (dateTime: string) => {
+  return dateTime ? dateTime.slice(0, 10) : ''
+}
+
 const fromDateTimeInputValue = (dateTime: string) => {
   return dateTime ? `${dateTime}:00` : ''
+}
+
+const fromStartDateInputValue = (date: string) => {
+  return date ? `${date}T00:00:00` : ''
+}
+
+const fromEndDateInputValue = (date: string) => {
+  return date ? `${date}T23:59:00` : ''
 }
 
 const ReservationCreateModal = ({
@@ -33,12 +46,13 @@ const ReservationCreateModal = ({
   onSubmit,
 }: ReservationCreateModalProps) => {
   const selectedRoom = rooms.find((room) => room.roomId === formValues.roomId)
+  const allDay = formValues.intgRsrvYn === 'Y'
 
   const roomOptions = useMemo(
     () =>
       rooms.map((room) => ({
         value: String(room.roomId),
-        label: `${room.roomName} (${room.capacity}인)`,
+        label: `${room.roomName}${room.ho ? ` (${room.ho})` : ''}`,
       })),
     [rooms],
   )
@@ -47,8 +61,8 @@ const ReservationCreateModal = ({
     if (rooms.length === 0) return '등록 가능한 회의실이 없습니다.'
     if (!formValues.roomId) return '회의실을 선택해주세요.'
     if (!formValues.title.trim()) return '예약 제목을 입력해주세요.'
-    if (!formValues.startDateTime) return '시작 시간을 선택해주세요.'
-    if (!formValues.endDateTime) return '종료 시간을 선택해주세요.'
+    if (!formValues.startDateTime) return allDay ? '시작일을 선택해주세요.' : '시작 시간을 선택해주세요.'
+    if (!formValues.endDateTime) return allDay ? '종료일을 선택해주세요.' : '종료 시간을 선택해주세요.'
 
     const start = new Date(formValues.startDateTime)
     const end = new Date(formValues.endDateTime)
@@ -58,11 +72,13 @@ const ReservationCreateModal = ({
     }
 
     if (start >= end) {
-      return '종료 시간은 시작 시간보다 늦어야 합니다.'
+      return allDay
+        ? '종료일은 시작일보다 같거나 늦어야 합니다.'
+        : '종료 시간은 시작 시간보다 늦어야 합니다.'
     }
 
     return ''
-  }, [formValues, rooms.length])
+  }, [allDay, formValues, rooms.length])
 
   const handleSubmit = () => {
     if (validationMessage) return
@@ -74,6 +90,21 @@ const ReservationCreateModal = ({
 
     onChange(nextValues)
     onSubmit(nextValues)
+  }
+
+  const handleToggleAllDay = () => {
+    const nextAllDay = !allDay
+
+    onChange({
+      ...formValues,
+      intgRsrvYn: nextAllDay ? 'Y' : 'N',
+      startDateTime: nextAllDay
+        ? fromStartDateInputValue(toDateInputValue(formValues.startDateTime))
+        : formValues.startDateTime,
+      endDateTime: nextAllDay
+        ? fromEndDateInputValue(toDateInputValue(formValues.endDateTime))
+        : formValues.endDateTime,
+    })
   }
 
   return (
@@ -117,8 +148,8 @@ const ReservationCreateModal = ({
 
         {selectedRoom && (
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-            {selectedRoom.floor} · {selectedRoom.roomName} · 최대{' '}
-            {selectedRoom.capacity}인
+            {selectedRoom.floor}층 · {selectedRoom.roomName}
+            {selectedRoom.ho ? ` · ${selectedRoom.ho}` : ''}
           </div>
         )}
 
@@ -134,27 +165,41 @@ const ReservationCreateModal = ({
           }
         />
 
+        <Checkbox label="종일" checked={allDay} onChange={handleToggleAllDay} />
+
         <div className="grid gap-4 md:grid-cols-2">
           <FormField
-            label="시작 시간"
-            type="datetime-local"
-            value={toDateTimeInputValue(formValues.startDateTime)}
+            label={allDay ? '시작일' : '시작 시간'}
+            type={allDay ? 'date' : 'datetime-local'}
+            value={
+              allDay
+                ? toDateInputValue(formValues.startDateTime)
+                : toDateTimeInputValue(formValues.startDateTime)
+            }
             onChange={(event) =>
               onChange({
                 ...formValues,
-                startDateTime: fromDateTimeInputValue(event.target.value),
+                startDateTime: allDay
+                  ? fromStartDateInputValue(event.target.value)
+                  : fromDateTimeInputValue(event.target.value),
               })
             }
           />
 
           <FormField
-            label="종료 시간"
-            type="datetime-local"
-            value={toDateTimeInputValue(formValues.endDateTime)}
+            label={allDay ? '종료일' : '종료 시간'}
+            type={allDay ? 'date' : 'datetime-local'}
+            value={
+              allDay
+                ? toDateInputValue(formValues.endDateTime)
+                : toDateTimeInputValue(formValues.endDateTime)
+            }
             onChange={(event) =>
               onChange({
                 ...formValues,
-                endDateTime: fromDateTimeInputValue(event.target.value),
+                endDateTime: allDay
+                  ? fromEndDateInputValue(event.target.value)
+                  : fromDateTimeInputValue(event.target.value),
               })
             }
           />

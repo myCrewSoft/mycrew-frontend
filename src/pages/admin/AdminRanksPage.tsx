@@ -207,6 +207,42 @@ export default function AdminRanksPage() {
     setEmployeesPage(1);
   };
 
+  const applyRankToCurrentEmployees = (empIds: number[]) => {
+    if (!selectedRank) {
+      return;
+    }
+
+    setEmployees((current) =>
+      current.map((employee) =>
+        empIds.includes(employee.empId)
+          ? {
+              ...employee,
+              jobGrdCd: selectedRank.rankId,
+              jobGrade: {
+                jobGrdCd: selectedRank.rankId,
+                jobGrdNm: selectedRank.rankName,
+                useYn: selectedRank.enabled,
+              },
+            }
+          : employee,
+      ),
+    );
+  };
+
+  const clearRankFromCurrentEmployees = (empIds: number[]) => {
+    setEmployees((current) =>
+      current.map((employee) =>
+        empIds.includes(employee.empId)
+          ? {
+              ...employee,
+              jobGrdCd: null,
+              jobGrade: null,
+            }
+          : employee,
+      ),
+    );
+  };
+
   const handleEmployeeSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setEmployeesPage(1);
@@ -463,6 +499,7 @@ export default function AdminRanksPage() {
       await adminApi.assignRank(selectedRank.rankId, {
         empIds: assignEmployeeIds,
       });
+      applyRankToCurrentEmployees(assignEmployeeIds);
       setAssignOpen(false);
       setAssignEmployeeIds([]);
       reloadAll();
@@ -512,6 +549,7 @@ export default function AdminRanksPage() {
       await adminApi.revokeRank(selectedRank.rankId, {
         empIds: selectedAssignedEmployeeIds,
       });
+      clearRankFromCurrentEmployees(selectedAssignedEmployeeIds);
       setSelectedAssignedEmployeeIds([]);
       reloadAll();
     } catch (err) {
@@ -547,7 +585,7 @@ export default function AdminRanksPage() {
   };
 
   const replacementOptions = ranks.filter(
-    (rank) => rank.rankId !== selectedRank?.rankId && rank.enabled !== 'N',
+    (rank) => rank.rankId !== selectedRank?.rankId,
   );
   const assignedEmployeeCount =
     selectedRank?.assignedEmployeeCount ?? assignedEmployees.length;
