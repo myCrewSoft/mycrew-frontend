@@ -1,17 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { ImageUp, Signature } from 'lucide-react';
 import { ApiError } from '../../api/axiosInstance';
-import { buildFileImageUrl, mypageApi } from '../../api/myPageAPi';
+import { mypageApi } from '../../api/myPageAPi';
 import Button from '../../components/common/button/Button';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
 import { useToast } from '../../components/common/toast/useToast';
 import type { MyPageState } from '../../hooks/useMyPage';
+import useImage from '../../hooks/useImage';
 
 const getErrorMessage = (error: unknown) =>
   error instanceof ApiError ? error.message : '전자서명 변경 중 문제가 발생했습니다.';
 
 interface ChangeSignatureSectionProps {
   state: MyPageState;
+}
+function SignatureImage({ fileId, alt }: { fileId: number; alt: string }) {
+  const src = useImage(fileId)
+  if (!src) return null
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-28 max-w-full object-contain"
+    />
+  )
 }
 
 export default function ChangeSignatureSection({ state }: ChangeSignatureSectionProps) {
@@ -22,7 +34,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const currentSignatureUrl = buildFileImageUrl(myPage?.mbrStampFileId);
+  const currentStampFileId = myPage?.mbrStampFileId ?? null;
 
   // 선택한 파일의 미리보기 URL을 만들고, 언마운트/변경 시 해제한다.
   useEffect(() => {
@@ -54,6 +66,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await reload();
+      
     } catch (error) {
       showToast({
         title: '전자서명 변경 실패',
@@ -64,7 +77,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       setSubmitting(false);
     }
   };
-
+  
   return (
     <ContentCard
       title="전자서명 이미지 변경"
@@ -75,12 +88,8 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
           <div className="flex flex-col gap-2">
             <span className="text-xs font-bold text-slate-500">현재 서명</span>
             <div className="flex h-32 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-              {currentSignatureUrl ? (
-                <img
-                  src={currentSignatureUrl}
-                  alt="현재 전자서명"
-                  className="max-h-28 max-w-full object-contain"
-                />
+              {currentStampFileId ? (
+                <SignatureImage fileId={currentStampFileId} alt="현재 전자서명" />
               ) : (
                 <span className="flex flex-col items-center gap-1 text-xs font-semibold text-slate-400">
                   <Signature size={24} aria-hidden="true" />
