@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { projectApi } from '../../api/projectApi'
 import { useApi } from '../../hooks/useApi'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Share2,
   Plus,
@@ -16,7 +16,6 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Button from '../../components/common/button/Button'
 import Tabs from '../../components/common/tabs/Tabs'
 import {
-  PROJECT_TASKS,
   ProjectTasksTab,
   type ProjectTaskStatusCode,
   type ProjectTaskViewMode,
@@ -44,6 +43,7 @@ const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'succes
 
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
+  const { id } = useParams()
   const [tab, setTab] = useState('overview')
   const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
@@ -107,7 +107,7 @@ const ProjectDetailPage = () => {
       actions={
         <>
           <Button variant="outline" leftIcon={<Share2 size={15} />}>
-            공유하기
+            회의 생성
           </Button>
           {tab === 'tasks' ? (
             <Button
@@ -179,7 +179,7 @@ const ProjectDetailPage = () => {
 
       {tab === 'tasks' && (
         <ProjectTasksTab
-          tasks={PROJECT_TASKS}
+          projectId={projectId}
           viewMode={taskViewMode}
           createModalOpen={taskCreateModalOpen}
           createStatus={taskCreateStatus}

@@ -1,6 +1,5 @@
 import type {
   ProjectTaskPriorityCode,
-  ProjectTaskScopeCode,
   ProjectTaskStatusCode,
   ProjectTaskTypeCode,
 } from './task.types'
@@ -15,7 +14,7 @@ export const taskStatusConfig: Record<
   }
 > = {
   '00': {
-    label: '미착수',
+    label: '해야 할 일',
     dot: 'bg-slate-400',
     badge: '!border-slate-200 !bg-slate-100 !text-slate-600',
     bar: 'bg-slate-300',
@@ -33,16 +32,10 @@ export const taskStatusConfig: Record<
     bar: 'bg-emerald-500',
   },
   '03': {
-    label: '일시중지',
+    label: '중단',
     dot: 'bg-amber-500',
     badge: '!border-amber-200 !bg-amber-100 !text-amber-700',
     bar: 'bg-amber-500',
-  },
-  '04': {
-    label: '폐기',
-    dot: 'bg-red-500',
-    badge: '!border-red-200 !bg-red-100 !text-red-700',
-    bar: 'bg-red-500',
   },
 }
 
@@ -55,11 +48,6 @@ export const taskPriorityConfig: Record<
   '03': { label: '낮음', dot: 'bg-slate-400', badge: '!border-slate-200 !bg-slate-100 !text-slate-600' },
 }
 
-export const taskScopeConfig: Record<ProjectTaskScopeCode, { label: string; badge: string }> = {
-  '01': { label: '프로젝트', badge: '!border-blue-200 !bg-blue-50 !text-blue-600' },
-  '02': { label: '개인', badge: '!border-violet-200 !bg-violet-50 !text-violet-600' },
-}
-
 export const taskTypeConfig: Record<ProjectTaskTypeCode, { label: string; badge: string }> = {
   '01': { label: '일반 업무', badge: '!border-slate-200 !bg-slate-100 !text-slate-600' },
   '02': { label: '테스트', badge: '!border-sky-200 !bg-sky-50 !text-sky-600' },
@@ -69,3 +57,24 @@ export const taskTypeConfig: Record<ProjectTaskTypeCode, { label: string; badge:
 }
 
 export const taskColumns: ProjectTaskStatusCode[] = ['00', '01', '03', '02']
+
+export const getTaskStatusConfig = (status: string) =>
+  taskStatusConfig[status as ProjectTaskStatusCode] ?? {
+    label: status,
+    dot: 'bg-slate-300',
+    badge: '!border-slate-200 !bg-white !text-slate-500',
+    bar: 'bg-slate-300',
+  }
+
+export const getTaskPriorityConfig = (priority: string) =>
+  taskPriorityConfig[priority as ProjectTaskPriorityCode] ?? {
+    label: priority,
+    dot: 'bg-slate-300',
+    badge: '!border-slate-200 !bg-white !text-slate-500',
+  }
+
+export const getTaskTypeConfig = (typeCd: string) =>
+  taskTypeConfig[typeCd as ProjectTaskTypeCode] ?? {
+    label: typeCd,
+    badge: '!border-slate-200 !bg-white !text-slate-500',
+  }
