@@ -21,8 +21,19 @@ import { dashboardMockData } from './dashboard.mock'
 import DashboardWidgetCard from './DashboardWidgetCard'
 import './dashboard.css'
 
-const STORAGE_KEY = 'mycrew.dashboard.layout'
+const DEFAULT_STORAGE_KEY = 'mycrew.dashboard.layout'
 const GridLayout = WidthProvider(ReactGridLayout)
+
+interface DashboardPageProps {
+  /** 대시보드 기본 레이아웃 (미지정 시 사용자 기본 레이아웃 사용) */
+  defaultLayout?: DashboardLayoutItem[]
+  /** 레이아웃 저장에 사용할 localStorage 키 */
+  storageKey?: string
+  /** 상단 제목 */
+  title?: string
+  /** 상단 설명 문구 */
+  description?: string
+}
 
 const isDashboardWidgetKey = (value: string): value is DashboardWidgetKey =>
   DASHBOARD_WIDGETS.some((widget) => widget.key === value)
@@ -45,16 +56,19 @@ const normalizeLayout = (layout: readonly LayoutItem[]): DashboardLayoutItem[] =
       }]
     })
 
-const getInitialLayout = (): DashboardLayoutItem[] => {
-  const savedLayout = localStorage.getItem(STORAGE_KEY)
-  if (!savedLayout) return DEFAULT_DASHBOARD_LAYOUT
+const getInitialLayout = (
+  storageKey: string,
+  fallbackLayout: DashboardLayoutItem[],
+): DashboardLayoutItem[] => {
+  const savedLayout = localStorage.getItem(storageKey)
+  if (!savedLayout) return fallbackLayout
 
   try {
     const parsed = JSON.parse(savedLayout) as LayoutItem[]
     const normalized = normalizeLayout(parsed)
-    return normalized.length ? normalized : DEFAULT_DASHBOARD_LAYOUT
+    return normalized.length ? normalized : fallbackLayout
   } catch {
-    return DEFAULT_DASHBOARD_LAYOUT
+    return fallbackLayout
   }
 }
 
@@ -63,9 +77,16 @@ const getNextPosition = (layout: DashboardLayoutItem[]) => {
   return { x: 0, y: maxY }
 }
 
-const DashboardPage = () => {
+const DashboardPage = ({
+  defaultLayout = DEFAULT_DASHBOARD_LAYOUT,
+  storageKey = DEFAULT_STORAGE_KEY,
+  title = '대시보드',
+  description = '오늘 필요한 업무 정보를 한 화면에서 확인합니다.',
+}: DashboardPageProps = {}) => {
   const [editMode, setEditMode] = useState(false)
-  const [layout, setLayout] = useState<DashboardLayoutItem[]>(getInitialLayout)
+  const [layout, setLayout] = useState<DashboardLayoutItem[]>(() =>
+    getInitialLayout(storageKey, defaultLayout),
+  )
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'local'>('idle')
   const { execute: saveLayout, loading: saving } = useApi(dashboardApi.saveLayout, {
     immediate: false,
@@ -110,7 +131,7 @@ const DashboardPage = () => {
   }
 
   const handleSave = async () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+    localStorage.setItem(storageKey, JSON.stringify(layout))
 
     try {
       await saveLayout({ layoutJson: layout })
@@ -121,8 +142,8 @@ const DashboardPage = () => {
   }
 
   const handleReset = async () => {
-    setLayout(DEFAULT_DASHBOARD_LAYOUT)
-    localStorage.removeItem(STORAGE_KEY)
+    setLayout(defaultLayout)
+    localStorage.removeItem(storageKey)
     setSaveStatus('idle')
 
     try {
@@ -140,9 +161,9 @@ const DashboardPage = () => {
     >
       <section className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-950">대시보드</h1>
+          <h1 className="text-2xl font-black text-slate-950">{title}</h1>
           <p className="mt-1 text-sm font-medium text-slate-500">
-            오늘 필요한 업무 정보를 한 화면에서 확인합니다.
+            {description}
           </p>
         </div>
 

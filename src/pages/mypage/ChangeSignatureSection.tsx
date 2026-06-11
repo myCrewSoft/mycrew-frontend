@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ImageUp, Signature } from 'lucide-react';
 import { ApiError } from '../../api/axiosInstance';
-import { mypageApi } from '../../api/myPageAPi';
+import { buildFileImageUrl, mypageApi } from '../../api/myPageAPi';
 import Button from '../../components/common/button/Button';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
 import { useToast } from '../../components/common/toast/useToast';
@@ -9,21 +9,6 @@ import type { MyPageState } from '../../hooks/useMyPage';
 
 const getErrorMessage = (error: unknown) =>
   error instanceof ApiError ? error.message : '전자서명 변경 중 문제가 발생했습니다.';
-
-// 파일 저장소에서 서명 이미지를 조회하는 URL을 만든다. (GET /api/files/{id})
-const buildFileUrl = (fileId?: number | null) => {
-  if (!fileId) return null;
-  const apiBaseUrl = import.meta.env.VITE_API_URL ?? '';
-  return `${apiBaseUrl}/api/files/${fileId}`;
-};
-
-// 업로드 응답이 number 이거나 { fileId } / { atchFileId } 형태일 수 있어 모두 처리한다.
-const extractFileId = (
-  data: number | { fileId?: number; atchFileId?: number } | undefined,
-): number | null => {
-  if (typeof data === 'number') return data;
-  return data?.fileId ?? data?.atchFileId ?? null;
-};
 
 interface ChangeSignatureSectionProps {
   state: MyPageState;
@@ -37,7 +22,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const currentSignatureUrl = buildFileUrl(myPage?.mbrStampFileId);
+  const currentSignatureUrl = buildFileImageUrl(myPage?.mbrStampFileId);
 
   // 선택한 파일의 미리보기 URL을 만들고, 언마운트/변경 시 해제한다.
   useEffect(() => {
@@ -64,14 +49,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
 
     setSubmitting(true);
     try {
-      const uploadResponse = await mypageApi.uploadStampImage(selectedFile);
-      const fileId = extractFileId(uploadResponse.data.data);
-
-      if (!fileId) {
-        throw new Error('업로드된 파일 ID를 받지 못했습니다.');
-      }
-
-      await mypageApi.changeSignature({ mbrStampFileId: fileId });
+      await mypageApi.changeSignature(selectedFile);
       showToast({ title: '전자서명 이미지가 변경되었습니다.', variant: 'success' });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';

@@ -5,9 +5,15 @@ import type {
   ChangeEmailRequest,
   ChangeJobDutyRequest,
   ChangePasswordRequest,
-  ChangeSignatureRequest,
   EmployeeMyPage,
 } from '../types/myPage';
+
+// 파일 저장소의 이미지 서빙 URL을 만든다. (GET /api/files/images/{id})
+export const buildFileImageUrl = (fileId?: number | null): string | null => {
+  if (!fileId) return null;
+  const apiBaseUrl = import.meta.env.VITE_API_URL ?? '';
+  return `${apiBaseUrl}/api/files/images/${fileId}`;
+};
 
 export const mypageApi = {
   getMyPage: () =>
@@ -19,18 +25,28 @@ export const mypageApi = {
       '/api/mypage/email',
       request,
     ),
-  changeSignature: (request: ChangeSignatureRequest) =>
-    axiosInstance.patch<ApiResponse<string>>('/api/mypage/signature', request),
   changeJobDuty: (request: ChangeJobDutyRequest) =>
     axiosInstance.patch<ApiResponse<string>>('/api/mypage/job-duty', request),
-  // 전자서명 이미지를 업로드하고 새 파일 ID를 받아온다.
-  // GET /api/files/{id} 로 조회되는 파일 저장소에 업로드하는 엔드포인트.
-  // 백엔드 업로드 경로가 다르면 이 메서드만 수정하면 된다.
-  uploadStampImage: (file: File) => {
+
+  // 전자서명 이미지를 업로드/변경한다. 백엔드가 fileService를 경유해 저장하고
+  // 새로 저장된 파일 ID(Long)를 반환한다. (PATCH /api/mypage/signature)
+  changeSignature: (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return axiosInstance.post<ApiResponse<number | { fileId?: number; atchFileId?: number }>>(
-      '/api/files',
+    return axiosInstance.patch<ApiResponse<number>>(
+      '/api/mypage/signature',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+
+  // 프로필 이미지를 업로드/변경한다. 새로 저장된 파일 ID(Long)를 반환한다.
+  // (PATCH /api/mypage/profile-image)
+  changeProfileImage: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosInstance.patch<ApiResponse<number>>(
+      '/api/mypage/profile-image',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } },
     );
