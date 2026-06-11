@@ -2,7 +2,7 @@
 
 import { Calendar, Plus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { employeeApi } from '../../api/employeeApi'
 import { projectApi } from '../../api/projectApi'
 import Button from '../../components/common/button/Button'
@@ -22,10 +22,9 @@ import { ApiError } from '../../api/axiosInstance'
 // ── 상태코드 설정 ─────────────────────────────────────────────────
 type ProjectStatCd = '01' | '02' | '03' | '04'
 
-const statusConfig: Record<
-  ProjectStatCd,
-  { label: string; badge: 'warning' | 'primary' | 'success' | 'neutral' }
-> = {
+const statusConfig: {
+  [key in ProjectStatCd]: { label: string; badge: 'warning' | 'primary' | 'success' | 'neutral' }
+} = {
   '01': { label: '예정', badge: 'warning' },
   '02': { label: '진행 중', badge: 'primary' },
   '03': { label: '완료', badge: 'success' },
@@ -120,7 +119,6 @@ const RegisterDrawer = ({
   const [endDate, setEndDate] = useState<Date | null>(null)
   const [selectedMemberIds, setSelectedMemberIds] = useState<Array<string | number>>([])
 
-  // 사원 목록 조회
   const { data: employeeData, execute: fetchEmployees } = useApiList(
     employeeApi.lookupEmployees,
     { immediate: false },
@@ -128,13 +126,11 @@ const RegisterDrawer = ({
   const employees: EmployeeSearchItem[] = employeeData ?? []
   const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
 
-  // Drawer 열릴 때 사원 목록 조회
   useEffect(() => {
     if (!open) return
     void fetchEmployees({})
   }, [open, fetchEmployees])
 
-  // 프로젝트 등록
   const { execute: createProject, loading: creating } = useApi(
     projectApi.createProject,
     { immediate: false },
@@ -178,7 +174,6 @@ const RegisterDrawer = ({
     try {
       await createProject(reqDto)
       showToast({ title: '프로젝트가 등록되었습니다.', variant: 'success' })
-      // 폼 초기화
       setProjNm('')
       setProjCn('')
       setStartDate(null)
@@ -191,6 +186,10 @@ const RegisterDrawer = ({
         showToast({ title: '프로젝트 등록 권한이 없습니다.', variant: 'danger' })
       } else {
         showToast({ title: '프로젝트 등록에 실패했습니다.', variant: 'danger' })
+      }
+      if (endDate <= startDate!) {
+        showToast({ title: '마감 예정일은 시작일 이후여야 합니다.', variant: 'danger' })
+        return
       }
       console.error(err)
     }
@@ -210,7 +209,6 @@ const RegisterDrawer = ({
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* 헤더 */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-100 px-6">
           <h2 className="text-lg font-bold text-slate-900">프로젝트 등록</h2>
           <button
@@ -231,7 +229,6 @@ const RegisterDrawer = ({
               value={projNm}
               onChange={(e) => setProjNm(e.target.value)}
             />
-
             <Textarea
               label="프로젝트 설명"
               placeholder="프로젝트 목표와 범위를 간략히 설명해주세요"
@@ -239,7 +236,6 @@ const RegisterDrawer = ({
               value={projCn}
               onChange={(e) => setProjCn(e.target.value)}
             />
-
             <div className="grid grid-cols-2 gap-4">
               <DatePickerField
                 label="시작일"
@@ -254,8 +250,6 @@ const RegisterDrawer = ({
                 onChange={setEndDate}
               />
             </div>
-
-            {/* 팀원 선택 — EmployeeSearchPicker */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-slate-700">
                 팀원 <span className="text-red-500">*</span>
@@ -271,7 +265,6 @@ const RegisterDrawer = ({
           </div>
         </div>
 
-        {/* 푸터 */}
         <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-slate-100 px-6 py-4">
           <Button variant="outline" onClick={onClose}>
             취소
@@ -289,8 +282,9 @@ const RegisterDrawer = ({
 const ProjectListPage = () => {
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [searchParams] = useSearchParams()
+  const statusFilter = searchParams.get('status') as ProjectStatCd | null
 
-  // 프로젝트 목록 조회
   const {
     data: projectListData,
     loading,
@@ -299,10 +293,17 @@ const ProjectListPage = () => {
 
   const projectList: ProjectListResponseDto[] = projectListData ?? []
 
+  const filteredList = statusFilter
+    ? projectList.filter((p) => p.projStatCd === statusFilter)
+    : projectList
+
+  const listTitle = statusFilter
+    ? (statusConfig[statusFilter]?.label ?? '전체 목록')
+    : '전체 목록'
+
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-50">
 
-      {/* 상단 헤더 */}
       <div className="flex h-14 shrink-0 items-center justify-between bg-white px-6 shadow-sm">
         <h1 className="text-lg font-bold text-slate-900">프로젝트 목록</h1>
         <Button
@@ -316,7 +317,6 @@ const ProjectListPage = () => {
 
       <div className="flex flex-1 min-h-0 flex-col gap-4 p-6">
 
-        {/* 상태별 대시보드 요약 카드 */}
         <div className="grid shrink-0 grid-cols-4 gap-4">
           {statGroups.map(({ statCd, label }) => {
             const count = projectList.filter((p) => p.projStatCd === statCd).length
@@ -339,30 +339,22 @@ const ProjectListPage = () => {
           })}
         </div>
 
-        {/* 프로젝트 목록 — 고정 높이 + 내부 스크롤 */}
         <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm">
 
-          {/* 목록 타이틀 */}
           <div className="flex h-12 shrink-0 items-center border-b border-slate-100 px-5">
-            <span className="text-sm font-bold text-slate-700">전체 목록</span>
+            <span className="text-sm font-bold text-slate-700">{listTitle}</span>
           </div>
 
-          {/* 스크롤 영역 */}
           <div className="flex-1 overflow-y-auto p-5">
             {loading ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-400">
                 불러오는 중...
               </div>
-            ) : projectList.length === 0 ? (
+            ) : filteredList.length === 0 ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
-                  title="참여 중인 프로젝트가 없습니다."
-                  description="새 프로젝트를 등록해보세요."
-                  actions={
-                    <Button variant="primary" onClick={() => setDrawerOpen(true)}>
-                      + 프로젝트 등록
-                    </Button>
-                  }
+                  title= {statusFilter ? `${listTitle}된 프로젝트가 없습니다.` : '참여 중인 프로젝트가 없습니다.'}
+                  description={statusFilter ? undefined : '새 프로젝트를 등록해보세요.'}
                 />
               </div>
             ) : (
@@ -372,7 +364,7 @@ const ProjectListPage = () => {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 }}
               >
-                {projectList.map((project) => (
+                {filteredList.map((project) => (
                   <ProjectCard
                     key={project.projId}
                     project={project}
@@ -385,7 +377,6 @@ const ProjectListPage = () => {
         </div>
       </div>
 
-      {/* Drawer */}
       <RegisterDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
