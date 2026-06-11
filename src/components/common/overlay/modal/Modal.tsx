@@ -79,7 +79,7 @@ const Modal = ({
         </div>
 
         {children && (
-          <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-5">
+          <div className="max-h-[calc(100vh-6rem)] overflow-y-auto p-5">
             {children}
           </div>
         )}

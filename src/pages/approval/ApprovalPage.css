@@ -390,7 +390,7 @@
 .approval-draft-form__content-editor {
   display: block;
   width: 100%;
-  min-height: 18rem;
+  height: calc(50vh);
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background-color: #ffffff;
