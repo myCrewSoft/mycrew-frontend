@@ -1,0 +1,9 @@
+.toastui-editor-md-tab-container,
+.toastui-editor-mode-switch,
+.toastui-editor-tabs {
+  display: none !important;
+}
+
+.board-toast-editor .toastui-editor-main {
+  height: calc(100% - 46px) !important;
+}

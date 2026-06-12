@@ -12,8 +12,16 @@ const boardPathByTypeCd: Record<string, string> = {
   ANONYMOUS: '/boards/anonymous',
 }
 
+const allowedBoardTypeCodes = new Set(Object.keys(boardPathByTypeCd))
+
+const normalizeBoardTypeCode = (boardTypeCd?: string) =>
+  boardTypeCd?.trim().toUpperCase() ?? ''
+
+const isAllowedBoard = (board: BoardSideBarResponse) =>
+  allowedBoardTypeCodes.has(normalizeBoardTypeCode(board.boardTypeCd))
+
 const getBoardPath = (boardTypeCd: string) =>
-  boardPathByTypeCd[boardTypeCd.toUpperCase()] ?? `/boards/${boardTypeCd.toLowerCase()}`
+  boardPathByTypeCd[normalizeBoardTypeCode(boardTypeCd)]
 
 type DepartmentBoardSideBarResponse = BoardSideBarResponse & {
   deptCd?: string
@@ -40,10 +48,11 @@ const getDepartmentCode = (board: DepartmentBoardSideBarResponse) => {
     board.boardTypeCd?.toUpperCase() === 'DEPT' ? undefined : board.boardTypeCd,
   ]
 
-  const departmentCode =
-    candidates.find((value): value is string => Boolean(value?.trim())) ?? board.boardTypeCd
+  const departmentCode = candidates.find(
+    (value): value is string => Boolean(value?.trim()),
+  )
 
-  return departmentCode.toUpperCase()
+  return departmentCode?.trim().toUpperCase() ?? ''
 }
 
 const getDepartmentPath = (deptCd: string) => `/boards/dept/${encodeURIComponent(deptCd)}`
@@ -76,24 +85,34 @@ export const useBoardSidebar = (sidebarKey: string) => {
 
   // 공통 컴포넌트가 요구하는 메뉴 구조로 매핑
   const boardMenuItems = Array.isArray(dynamicBoards)
-    ? dynamicBoards.map((board: BoardSideBarResponse) => ({
-        icon: FileText,
-        label: board.boardName,
-        path: getBoardPath(board.boardTypeCd),
-        // 💡 underlevel이 있다면 children으로 변환하여 계층 구조 유지
-        children: Array.isArray(board.underlevel)
-          ? board.underlevel.map((sub: BoardSideBarResponse) => {
+    ? dynamicBoards
+      .filter(isAllowedBoard)
+      .map((board: BoardSideBarResponse) => {
+        const boardTypeCode = normalizeBoardTypeCode(board.boardTypeCd)
+        const children = boardTypeCode === 'DEPT' && Array.isArray(board.underlevel)
+          ? board.underlevel
+            .map((sub: BoardSideBarResponse) => {
               const deptCd = getDepartmentCode(sub)
 
-              return {
-                icon: FileText,
-                label: sub.boardName,
-                path: getDepartmentPath(deptCd),
-                activeKey: getDepartmentPath(deptCd),
-              }
+              return deptCd
+                ? {
+                    icon: FileText,
+                    label: sub.boardName,
+                    path: getDepartmentPath(deptCd),
+                    activeKey: getDepartmentPath(deptCd),
+                  }
+                : null
             })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
           : undefined
-      }))
+
+        return {
+          icon: FileText,
+          label: board.boardName,
+          path: getBoardPath(board.boardTypeCd),
+          children,
+        }
+      })
     : []
 
   return { boardMenuItems }

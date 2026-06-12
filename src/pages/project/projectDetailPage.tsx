@@ -19,6 +19,7 @@ import {
   type ProjectTaskStatusCode,
   type ProjectTaskViewMode,
 } from './task'
+import ProjectBoardTab from './ProjectBoardTab'
 import ProjectMemberCard from './ProjectMemberListCard'
 import ProjectInfoCard from './ProjectInfoCard'
 import ProjectSummaryCard from './ProjectSummaryCard'
@@ -32,7 +33,25 @@ const STATUS_LABEL: Record<string, string> = {
   '03': '완료',
   '04': '중단',
 }
-
+// ── 마일스톤 아이콘 ───────────────────────────────────────────────
+const MilestoneIcon = ({ status }: { status: 'done' | 'in_progress' | 'pending' }) => {
+  if (status === 'done')
+    return (
+      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
+        <CheckCircle2 size={16} className="text-blue-600" />
+      </div>
+    )
+  if (status === 'in_progress')
+    return (
+      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-md shadow-blue-200">
+        <Circle size={10} className="fill-white text-white" />
+      </div>
+    )
+  return (
+    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white">
+      <Circle size={10} className="text-slate-300" />
+    </div>
+  )
 const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'success'> = {
   '01': 'warning',
   '02': 'primary',
@@ -188,7 +207,12 @@ const ProjectDetailPage = () => {
         />
       )}
 
-      {tab !== 'overview' && tab !== 'tasks' && (
+      {tab === 'board' && (
+        <ProjectBoardTab projectId={Number(projectId)} />
+      )}
+
+      {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
+      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && (
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">

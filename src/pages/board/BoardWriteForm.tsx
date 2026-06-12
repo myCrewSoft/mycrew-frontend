@@ -1,28 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  AlignCenter,
-  AlignJustify,
-  AlignLeft,
-  AlignRight,
-  Bold,
-  ChevronDown,
-  Image,
-  Italic,
-  Link,
-  List,
-  ListOrdered,
-  Maximize2,
-  Paperclip,
-  Smile,
-  Strikethrough,
-  Table2,
-  Underline,
-  Upload,
-  X,
-  type LucideIcon,
-} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import ToastEditor from '@toast-ui/editor'
+import '@toast-ui/editor/dist/toastui-editor.css'
+import './BoardWriteForm.css'
+import { X } from 'lucide-react'
 import Button from '../../components/common/button/Button'
+import FileUpload from '../../components/common/form/fileUpload/FileUpload'
 import { boardApi } from '../../api/boardApi'
+import { fileApi } from '../../api/fileApi'
 import { ApiError } from '../../api/axiosInstance'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
@@ -35,6 +19,7 @@ interface BoardWriteFormProps {
   initialBoardType?: BoardKind
   initialBoardTypeCd?: string
   departmentCode?: string
+  projectId?: number
   initialTitle?: string
   initialContent?: string
   initialImportantYn?: string
@@ -43,13 +28,6 @@ interface BoardWriteFormProps {
   onClose?: () => void
   onCreated?: (boardId: number | null) => void
   onUpdated?: (request: BoardMutationRequest) => void
-}
-
-interface ToolbarItem {
-  icon?: LucideIcon
-  text?: string
-  label: string
-  className?: string
 }
 
 interface DepartmentOption {
@@ -121,48 +99,6 @@ const getDepartmentOptions = (boards: BoardSideBarResponse[]): DepartmentOption[
     .filter((option): option is DepartmentOption => Boolean(option))
 }
 
-const toolbarGroups: ToolbarItem[][] = [
-  [
-    { icon: ChevronDown, label: '문단' },
-    { text: '10pt', label: '글자 크기' },
-  ],
-  [
-    { icon: Bold, label: '굵게' },
-    { icon: Italic, label: '기울임' },
-    { icon: Underline, label: '밑줄' },
-    { icon: Strikethrough, label: '취소선' },
-  ],
-  [
-    { text: 'A', label: '글자색', className: 'border-b-2 border-red-500' },
-    { icon: ChevronDown, label: '글자색 선택' },
-    { icon: Paperclip, label: '강조', className: 'text-yellow-500' },
-    { icon: ChevronDown, label: '강조 선택' },
-  ],
-  [
-    { icon: List, label: '목록' },
-    { icon: ListOrdered, label: '번호 목록' },
-    { icon: ChevronDown, label: '목록 옵션' },
-  ],
-  [
-    { icon: AlignLeft, label: '왼쪽 정렬' },
-    { icon: AlignCenter, label: '가운데 정렬' },
-    { icon: AlignRight, label: '오른쪽 정렬' },
-    { icon: AlignJustify, label: '양쪽 정렬' },
-  ],
-  [
-    { icon: Link, label: '링크' },
-    { icon: ChevronDown, label: '링크 옵션' },
-    { icon: Image, label: '이미지' },
-    { icon: Table2, label: '표' },
-    { icon: ChevronDown, label: '표 옵션' },
-    { icon: Smile, label: '이모지' },
-  ],
-  [{ icon: Maximize2, label: '전체 화면' }],
-]
-
-const iconButtonClass =
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950'
-
 const isYes = (value?: string) => value?.trim().toUpperCase() === 'Y'
 
 const BoardWriteForm = ({
@@ -171,6 +107,7 @@ const BoardWriteForm = ({
   initialBoardType = 'notice',
   initialBoardTypeCd = '',
   departmentCode = '',
+  projectId,
   initialTitle = '',
   initialContent = '',
   initialImportantYn = 'N',
@@ -180,6 +117,9 @@ const BoardWriteForm = ({
   onCreated,
   onUpdated,
 }: BoardWriteFormProps) => {
+  const editorHostRef = useRef<HTMLDivElement | null>(null)
+  const editorRef = useRef<ToastEditor | null>(null)
+  const selectedImagePreviewUrlRef = useRef<string | null>(null)
   const isEditMode = mode === 'edit'
   const [boardType, setBoardType] = useState<BoardKind>(initialBoardType)
   const [title, setTitle] = useState(initialTitle)
@@ -189,6 +129,8 @@ const BoardWriteForm = ({
   const [selectedDepartmentCode, setSelectedDepartmentCode] = useState(departmentCode)
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([])
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null)
 
   const { loading: creating, execute: createBoard } = useApi<
     number,
@@ -205,10 +147,15 @@ const BoardWriteForm = ({
       },
     ]
   >(boardApi.updateBoard, { immediate: false })
+  const { loading: uploading, execute: uploadBoardFile } = useApi<
+    number,
+    [{ file: File; fileCn?: string }]
+  >(fileApi.uploadBoardFile, { immediate: false })
 
-  const saving = creating || updating
+  const saving = creating || updating || uploading
+  const isProjectBoard = typeof projectId === 'number' && projectId > 0
   const originalBoardTypeCd = initialBoardTypeCd.trim().toUpperCase()
-  const resolvedBoardTypeCd = boardTypeCdByKind[boardType]
+  const resolvedBoardTypeCd = isProjectBoard ? 'PROJ' : boardTypeCdByKind[boardType]
   const originalDepartmentCode = departmentCode.trim()
   const contentByteLength = useMemo(
     () => new Blob([content]).size,
@@ -238,6 +185,48 @@ const BoardWriteForm = ({
     }
   }, [boardType])
 
+  useEffect(() => () => {
+    if (selectedImagePreviewUrlRef.current) {
+      URL.revokeObjectURL(selectedImagePreviewUrlRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!editorHostRef.current) return
+
+    const editor = new ToastEditor({
+      el: editorHostRef.current,
+      initialValue: initialContent,
+      initialEditType: 'wysiwyg',
+      previewStyle: 'vertical',
+      height: '350px',
+      usageStatistics: false,
+      useCommandShortcut: true,
+      hideModeSwitch: true,
+      toolbarItems: [
+        ['heading', 'bold', 'italic', 'strike'],
+        ['hr', 'quote'],
+        ['ul', 'ol', 'task', 'indent', 'outdent'],
+        ['table', 'image', 'link'],
+        ['code', 'codeblock'],
+      ],
+      events: {
+        change: () => {
+          setContent(editor.getMarkdown())
+          setValidationMessage(null)
+        },
+      },
+    })
+
+    editor.changeMode('wysiwyg', true)
+    editorRef.current = editor
+
+    return () => {
+      editor.destroy()
+      editorRef.current = null
+    }
+  }, [initialContent])
+
   const handleSubmit = async () => {
     const trimmedTitle = title.trim()
     const trimmedContent = content.trim()
@@ -262,23 +251,35 @@ const BoardWriteForm = ({
       return
     }
 
-    const request: BoardMutationRequest = {
-      boardTypeCd: isEditMode && validBoardTypeCodes.has(originalBoardTypeCd)
-        ? originalBoardTypeCd
-        : resolvedBoardTypeCd,
-      boardSj: trimmedTitle,
-      boardCn: trimmedContent,
-      boardAtchFileId: initialAttachmentFileId ?? 0,
-      deptCd: isEditMode
-        ? originalDepartmentCode
-        : boardType === 'department' ? selectedDepartmentCode : '',
-      projId: 0,
-      imprtntYn: isImportant ? 'Y' : 'N',
-      cmntUseYn: boardType === 'notice' || allowComments ? 'Y' : 'N',
-    }
-
     try {
       setValidationMessage(null)
+
+      const attachmentFileId = selectedFile
+        ? (await uploadBoardFile({
+            file: selectedFile,
+            fileCn: trimmedTitle,
+          })).data
+        : initialAttachmentFileId ?? 0
+
+      const request: BoardMutationRequest = {
+        boardTypeCd: isEditMode && (
+          validBoardTypeCodes.has(originalBoardTypeCd) ||
+          originalBoardTypeCd === 'PROJ'
+        )
+          ? originalBoardTypeCd
+          : resolvedBoardTypeCd,
+        boardSj: trimmedTitle,
+        boardCn: trimmedContent,
+        boardAtchFileId: attachmentFileId ?? 0,
+        deptCd: isProjectBoard
+          ? ''
+          : isEditMode
+          ? originalDepartmentCode
+          : boardType === 'department' ? selectedDepartmentCode : '',
+        projId: projectId ?? 0,
+        imprtntYn: isImportant ? 'Y' : 'N',
+        cmntUseYn: boardType === 'notice' || allowComments ? 'Y' : 'N',
+      }
 
       if (isEditMode && boardId) {
         await updateBoard({
@@ -326,21 +327,27 @@ const BoardWriteForm = ({
             게시판 선택 <span className="text-red-500">*</span>
           </label>
           <div className="flex w-full items-center gap-3">
-            <select
-              value={boardType}
-              onChange={(event) => {
-                setBoardType(event.target.value as BoardKind)
-                setValidationMessage(null)
-              }}
-              disabled={isEditMode}
-              className="h-11 w-fit rounded-md border border-slate-300 bg-white pl-2 pr-7 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-            >
-              {boardOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {isProjectBoard ? (
+              <div className="flex h-11 items-center rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-semibold text-slate-600">
+                프로젝트 보드
+              </div>
+            ) : (
+              <select
+                value={boardType}
+                onChange={(event) => {
+                  setBoardType(event.target.value as BoardKind)
+                  setValidationMessage(null)
+                }}
+                disabled={isEditMode}
+                className="h-11 w-fit rounded-md border border-slate-300 bg-white pl-2 pr-7 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+              >
+                {boardOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
             {boardType === 'department' && (
               <select
@@ -373,36 +380,9 @@ const BoardWriteForm = ({
             내용 <span className="text-red-500">*</span>
           </label>
           <div className="overflow-hidden rounded-md border border-slate-300 bg-white">
-            <div className="flex h-12 items-center gap-1 overflow-x-auto border-b border-slate-200 px-4">
-              {toolbarGroups.map((group, groupIndex) => (
-                <div
-                  key={groupIndex}
-                  className="flex items-center gap-1 border-r border-slate-200 pr-2 last:border-r-0 last:pr-0"
-                >
-                  {group.map((item) => {
-                    const Icon = item.icon
-
-                    return (
-                      <button
-                        key={item.label}
-                        type="button"
-                        aria-label={item.label}
-                        className={`${iconButtonClass} ${item.className ?? ''}`}
-                      >
-                        {Icon ? <Icon size={18} /> : item.text}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
+            <div className="board-toast-editor">
+              <div ref={editorHostRef} />
             </div>
-
-            <textarea
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="내용을 입력하세요."
-              className="h-[300px] w-full resize-none border-0 px-7 py-5 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
-            />
 
             <div className="flex h-10 items-center justify-between border-t border-slate-200 px-5 text-sm font-medium text-slate-500">
               <span>입력 바이트: {contentByteLength.toLocaleString()} / 10,000 byte</span>
@@ -414,24 +394,48 @@ const BoardWriteForm = ({
             첨부 파일
           </span>
           <div className="flex min-w-0 flex-col gap-2">
-            <div className="flex min-w-0 items-center justify-between gap-4 rounded-md border border-slate-300 bg-white px-4 py-3">
-              <div className="flex min-w-0 items-center gap-3 text-sm text-slate-500">
-                <Paperclip size={18} className="shrink-0" />
-                <span className="truncate">
-                  파일을 선택하거나 영역에 끌어다 놓으세요.
-                </span>
-              </div>
+            <FileUpload
+              label={selectedFile?.name ?? '파일 선택'}
+              helperText={
+                selectedFile
+                  ? `${(selectedFile.size / 1024).toFixed(1)} KB`
+                  : '파일을 선택하거나 영역에 끌어다 놓으세요.'
+              }
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0] ?? null
 
-              <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100">
-                <Upload size={16} />
-                <span>파일 선택</span>
-                <input type="file" className="hidden" />
-              </label>
-            </div>
+                if (selectedImagePreviewUrlRef.current) {
+                  URL.revokeObjectURL(selectedImagePreviewUrlRef.current)
+                }
 
-            <p className="text-xs text-slate-400">
-              파일 업로드 API가 연결되면 첨부파일 ID를 게시글 요청에 함께 전송합니다.
-            </p>
+                const nextPreviewUrl = nextFile?.type.startsWith('image/')
+                  ? URL.createObjectURL(nextFile)
+                  : null
+
+                selectedImagePreviewUrlRef.current = nextPreviewUrl
+                setSelectedFile(nextFile)
+                setSelectedImagePreviewUrl(nextPreviewUrl)
+                setValidationMessage(null)
+              }}
+            />
+
+            {selectedImagePreviewUrl && (
+              <img
+                src={selectedImagePreviewUrl}
+                alt="첨부 이미지 미리보기"
+                className="max-h-72 max-w-full rounded-md border border-slate-200 object-contain"
+              />
+            )}
+
+            {initialAttachmentFileId ? (
+              <p className="text-xs text-slate-500">
+                기존 첨부파일 ID: {initialAttachmentFileId}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400">
+                게시글 등록 시 선택한 파일이 함께 업로드됩니다.
+              </p>
+            )}
           </div>
 
           <span className="pt-1 text-base font-bold text-slate-950">추가 설정</span>
@@ -447,7 +451,7 @@ const BoardWriteForm = ({
                 중요 글로 등록
               </label>
 
-              {boardType !== 'notice' && (
+              {(isProjectBoard || boardType !== 'notice') && (
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
                   <input
                     type="checkbox"
