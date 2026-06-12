@@ -2,23 +2,32 @@ import { useEffect, useState } from 'react'
 import { Bell, Mail, MessageSquare, Search } from 'lucide-react'
 import { notificationApi } from '../../api/notificationApi'
 import { useApi } from '../../hooks/useApi'
+import type { NotificationUnreadCountResponse } from '../../types'
 import NotificationIconButton from '../common/button/NotificationIconButton'
 import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
 import GlobalSearchPalette from './headerSearch/GlobalSearchPalette'
 import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
 import { useMessengerSocketContext } from './headerPopover/messenger/MessengerSocketProvider'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
+import { NOTIFICATION_RECEIVED_EVENT } from './headerPopover/useNotificationStream'
 import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
+
+const firstLoginNotificationRefreshKey = 'firstLoginNotificationRefresh'
 
 const Header = () => {
   // Global search palette open state. Header owns only opening/closing.
   const [searchOpen, setSearchOpen] = useState(false)
+  const [notificationRefreshKey, setNotificationRefreshKey] = useState(0)
   const { unreadCount: messengerUnreadCount } = useMessengerSocketContext()
 
   const { execute: readAllNotifications } = useApi<null>(
     notificationApi.readAllNotifications,
     { immediate: false },
   )
+  const {
+    data: notificationUnreadCount,
+    execute: fetchNotificationUnreadCount,
+  } = useApi<NotificationUnreadCountResponse>(notificationApi.getUnreadCount)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -31,6 +40,42 @@ const Header = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  useEffect(() => {
+    const handleNotificationReceived = () => {
+      setNotificationRefreshKey((current) => current + 1)
+      void fetchNotificationUnreadCount().catch(() => undefined)
+    }
+
+    window.addEventListener(
+      NOTIFICATION_RECEIVED_EVENT,
+      handleNotificationReceived,
+    )
+
+    return () => {
+      window.removeEventListener(
+        NOTIFICATION_RECEIVED_EVENT,
+        handleNotificationReceived,
+      )
+    }
+  }, [fetchNotificationUnreadCount])
+
+  useEffect(() => {
+    if (
+      sessionStorage.getItem(firstLoginNotificationRefreshKey) !== 'true'
+    ) {
+      return
+    }
+
+    sessionStorage.removeItem(firstLoginNotificationRefreshKey)
+
+    const timer = window.setTimeout(() => {
+      setNotificationRefreshKey((current) => current + 1)
+      void fetchNotificationUnreadCount().catch(() => undefined)
+    }, 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [fetchNotificationUnreadCount])
 
   return (
     <>
@@ -98,13 +143,15 @@ const Header = () => {
           <HeaderPopover
             title="알림"
             onClose={() => {
-              void readAllNotifications().catch(() => undefined)
+              void readAllNotifications()
+                .then(() => fetchNotificationUnreadCount())
+                .catch(() => undefined)
             }}
             trigger={({ open, toggle }) => (
               <NotificationIconButton
                 active={open}
                 label="알림"
-                count={5}
+                count={notificationUnreadCount?.unreadCount ?? 0}
                 badgeVariant="danger"
                 onClick={toggle}
                 icon={
@@ -116,7 +163,10 @@ const Header = () => {
               />
             )}
           >
-            <NotificationPopoverContent />
+            <NotificationPopoverContent
+              refreshSignal={notificationRefreshKey}
+              onNotificationsChanged={() => fetchNotificationUnreadCount()}
+            />
           </HeaderPopover>
 
           <div className="mx-1 h-5 w-[1px] bg-slate-200" />

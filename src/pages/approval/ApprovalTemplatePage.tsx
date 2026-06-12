@@ -1,4 +1,4 @@
-import { FilePlus2, PenLine, RefreshCcw, Search, Send, Star } from 'lucide-react'
+import { FilePlus2, PenLine, RefreshCcw, Search, Send, Star, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import Button from '../../components/common/button/Button'
@@ -19,7 +19,9 @@ import ApprovalHtmlDocument from './ApprovalHtmlDocument'
 import ApprovalTemplateEditorModal from './ApprovalTemplateEditorModal'
 import { useDraftModal } from './useDraftModal'
 
-export default function ApprovalTemplatePage() {
+export default function ApprovalTemplatePage({
+  manageOnly = false,
+}: { manageOnly?: boolean } = {}) {
   const { showToast } = useToast()
   const [templates, setTemplates] = useState<ApprovalTemplateResponse[]>([])
   const [selectedTemplateCode, setSelectedTemplateCode] = useState<string | null>(null)
@@ -35,6 +37,7 @@ export default function ApprovalTemplatePage() {
   const [templateError, setTemplateError] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const {
     draftOpen,
@@ -201,6 +204,35 @@ export default function ApprovalTemplatePage() {
     }
   }
 
+  const handleDeleteTemplate = async () => {
+    if (!selectedTemplate || deleting) return
+    const confirmed = window.confirm(
+      `'${selectedTemplate.tmplatNm}' 결재 양식을 삭제하시겠습니까?\n삭제하면 양식 목록에서 더 이상 보이지 않습니다.`,
+    )
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      await approvalApi.deleteApprovalTemplate(selectedTemplate.tmplatCd)
+      showToast({
+        title: '결재 양식 삭제 완료',
+        description: selectedTemplate.tmplatNm,
+        variant: 'success',
+      })
+      setSelectedTemplateCode(null)
+      setSelectedTemplate(null)
+      await loadTemplates()
+    } catch (error) {
+      showToast({
+        title: '결재 양식 삭제 실패',
+        description: getApiErrorMessage(error, '결재 양식 삭제에 실패했습니다.'),
+        variant: 'danger',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleSearchSubmit = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
     setKeyword(keywordInput.trim())
@@ -230,13 +262,15 @@ export default function ApprovalTemplatePage() {
             >
               새로고침
             </Button>
-            <Button
-              variant="outline"
-              leftIcon={<Send size={16} />}
-              onClick={() => window.dispatchEvent(new Event('approval:open-draft'))}
-            >
-              기안서 작성
-            </Button>
+            {!manageOnly && (
+              <Button
+                variant="outline"
+                leftIcon={<Send size={16} />}
+                onClick={() => window.dispatchEvent(new Event('approval:open-draft'))}
+              >
+                기안서 작성
+              </Button>
+            )}
             <Button leftIcon={<FilePlus2 size={16} />} onClick={openCreateEditor}>
               양식 만들기
             </Button>
@@ -340,6 +374,15 @@ export default function ApprovalTemplatePage() {
                   >
                     수정
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    leftIcon={<Trash2 size={15} />}
+                    loading={deleting}
+                    onClick={() => void handleDeleteTemplate()}
+                  >
+                    삭제
+                  </Button>
                 </div>
               </div>
 
@@ -396,17 +439,19 @@ export default function ApprovalTemplatePage() {
         onSubmit={handleSaveTemplate}
       />
 
-      <ApprovalDraftModal
-        open={draftOpen}
-        saving={draftSaving}
-        form={draftForm}
-        approvers={draftApprovers}
-        error={draftError}
-        onChange={setDraftForm}
-        onApproversChange={setDraftApprovers}
-        onClose={closeDraft}
-        onSubmit={handleSaveDraft}
-      />
+      {!manageOnly && (
+        <ApprovalDraftModal
+          open={draftOpen}
+          saving={draftSaving}
+          form={draftForm}
+          approvers={draftApprovers}
+          error={draftError}
+          onChange={setDraftForm}
+          onApproversChange={setDraftApprovers}
+          onClose={closeDraft}
+          onSubmit={handleSaveDraft}
+        />
+      )}
     </div>
   )
 }

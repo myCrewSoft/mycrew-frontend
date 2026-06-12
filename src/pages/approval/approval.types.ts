@@ -30,6 +30,7 @@ export type SelectedApprover = {
   name: string
   department: string
   position: string
+  prflImgFileId?: number | null
 }
 
 export type TemplateFormState = {

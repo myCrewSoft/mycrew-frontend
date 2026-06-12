@@ -12,12 +12,12 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 const Select = ({ label, options, className = '', ...props }: SelectProps) => {
   return (
-    <label className="flex min-w-40 flex-col gap-2">
+    <label className="flex w-full min-w-0 flex-col gap-2">
       {label && (
         <span className="text-sm font-semibold text-slate-700">{label}</span>
       )}
       <select
-        className={`h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-400 ${className}`}
+        className={`h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition-all focus:border-blue-400 ${className}`}
         {...props}
       >
         {options.map((option) => (

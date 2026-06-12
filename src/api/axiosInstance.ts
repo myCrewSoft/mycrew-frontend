@@ -97,6 +97,10 @@ const isAuthEndpoint = (url = '') =>
  */
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (config.data instanceof FormData) {
+      config.headers.setContentType('multipart/form-data');
+    }
+
     if (isAuthEndpoint(config.url)) {
       delete config.headers.Authorization;
       delete config.headers.authorization;
@@ -139,6 +143,22 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+const isSpringPageResponse = (data: unknown): data is {
+  content: unknown[]
+  totalPages: number
+  totalElements: number
+} => {
+  if (!data || typeof data !== 'object') return false
+
+  const page = data as Record<string, unknown>
+
+  return (
+    Array.isArray(page.content) &&
+    typeof page.totalPages === 'number' &&
+    typeof page.totalElements === 'number'
+  )
+}
+
 // ── 응답 인터셉터 ─────────────────────────────────────────────────
 
 axiosInstance.interceptors.response.use(
@@ -152,6 +172,10 @@ axiosInstance.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     // blob 응답은 ApiResponse 형식이 아니므로 파싱 없이 그대로 반환
     if (response.config.responseType === 'blob') {
+      return response;
+    }
+
+    if (isSpringPageResponse(response.data)) {
       return response;
     }
 

@@ -1,10 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Camera, Eye, RefreshCw, UserPlus, Users } from 'lucide-react';
+import {
+  Building2,
+  Eye,
+  IdCard,
+  RefreshCw,
+  ShieldCheck,
+  ShieldMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar';
 import Button from '../../components/common/button/Button';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
 import DataTable from '../../components/common/dataDisplay/dataTable/DataTable';
@@ -18,6 +28,13 @@ import Select from '../../components/common/form/select/Select';
 import { adminEmployeeStatusOptions } from '../../types/adminEmployee';
 import type { PageInfo } from '../../api/axiosInstance';
 import type {
+  AdminDepartmentResponseDTO,
+  RankResponse,
+  RoleListResponse,
+  RoleScopeType,
+  ScopeOptionResponse,
+} from '../../types/admin';
+import type {
   AdminEmployeeDetail,
   AdminEmployeeListItem,
   AdminEmployeeRegisterRequest,
@@ -27,6 +44,35 @@ import type {
 } from '../../types/adminEmployee';
 
 const pageSize = 10;
+
+type EmployeeAssignmentAction =
+  | 'department'
+  | 'rank'
+  | 'rank-revoke'
+  | 'role'
+  | `role-revoke-${number | string}`;
+
+type ScopedOptionType = Extract<RoleScopeType, 'DEPT' | 'PROJECT' | 'TASK'>;
+
+interface RoleAssignFormState {
+  roleId: string;
+  scopeTypeCd: RoleScopeType;
+  scopeId: string;
+}
+
+const roleScopeTypeOptions: Array<{ value: RoleScopeType; label: string }> = [
+  { value: 'GLOBAL', label: '전체' },
+  { value: 'DEPT', label: '부서' },
+  { value: 'PROJECT', label: '프로젝트' },
+  { value: 'TASK', label: '업무' },
+  { value: 'SELF', label: '본인' },
+];
+
+const createRoleAssignForm = (): RoleAssignFormState => ({
+  roleId: '',
+  scopeTypeCd: 'GLOBAL',
+  scopeId: '',
+});
 
 const employeeStatusLabels = Object.fromEntries(
   adminEmployeeStatusOptions.map((status) => [status.code, status.label]),
@@ -63,6 +109,16 @@ const formatCode = (value: string | null | undefined, fallback = '-') =>
 
 const formatEmployeeId = (empId: number) => `EMP-${empId}`;
 
+const requiresScopeId = (scopeTypeCd: RoleScopeType) =>
+  scopeTypeCd === 'DEPT' ||
+  scopeTypeCd === 'PROJECT' ||
+  scopeTypeCd === 'TASK';
+
+const isRoleScopeType = (
+  value: string | null | undefined,
+): value is RoleScopeType =>
+  roleScopeTypeOptions.some((option) => option.value === value);
+
 const getDepartmentName = (employee: AdminEmployeeListItem) =>
   formatCode(employee.department?.deptNm ?? employee.deptCd);
 
@@ -91,6 +147,27 @@ const getRoleName = (role: AdminRoleAssignment) =>
   role.role?.roleCd ??
   role.roleCd ??
   String(role.roleId ?? '-');
+
+const getRoleAssignmentKey = (role: AdminRoleAssignment) =>
+  role.roleAssignId ??
+  `${role.roleId ?? role.role?.roleId ?? 'role'}-${role.scopeTypeCd ?? 'scope'}-${role.scopeId ?? 'none'}`;
+
+const getRoleRevokeAction = (
+  role: AdminRoleAssignment,
+): EmployeeAssignmentAction => `role-revoke-${getRoleAssignmentKey(role)}`;
+
+const getRoleScopeLabel = (role: AdminRoleAssignment) => {
+  const scopeLabel = isRoleScopeType(role.scopeTypeCd)
+    ? roleScopeTypeOptions.find((option) => option.value === role.scopeTypeCd)
+        ?.label
+    : role.scopeTypeCd;
+
+  if (!scopeLabel && !role.scopeId) {
+    return '전체';
+  }
+
+  return [scopeLabel, role.scopeId].filter(Boolean).join(' ');
+};
 
 const getMailAddress = (mail: AdminMailAccount) =>
   mail.mailAddr ?? mail.emlAddr ?? mail.email ?? '-';
@@ -160,6 +237,33 @@ export default function AdminEmployeesPage() {
   const [statusUpdateError, setStatusUpdateError] = useState<string | null>(
     null,
   );
+  const [departments, setDepartments] = useState<AdminDepartmentResponseDTO[]>(
+    [],
+  );
+  const [ranks, setRanks] = useState<RankResponse[]>([]);
+  const [roles, setRoles] = useState<RoleListResponse[]>([]);
+  const [scopeOptionMap, setScopeOptionMap] = useState<
+    Record<ScopedOptionType, ScopeOptionResponse[]>
+  >({
+    DEPT: [],
+    PROJECT: [],
+    TASK: [],
+  });
+  const [assignmentOptionsLoading, setAssignmentOptionsLoading] =
+    useState(true);
+  const [assignmentOptionsError, setAssignmentOptionsError] = useState<
+    string | null
+  >(null);
+  const [targetDeptCd, setTargetDeptCd] = useState('');
+  const [targetRankId, setTargetRankId] = useState('');
+  const [roleAssignForm, setRoleAssignForm] =
+    useState<RoleAssignFormState>(createRoleAssignForm);
+  const [assignmentSubmitting, setAssignmentSubmitting] =
+    useState<EmployeeAssignmentAction | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentSuccess, setAssignmentSuccess] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -216,6 +320,74 @@ export default function AdminEmployeesPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadAssignmentOptions = async () => {
+      setAssignmentOptionsLoading(true);
+      setAssignmentOptionsError(null);
+
+      try {
+        const [
+          departmentsResponse,
+          ranksResponse,
+          rolesResponse,
+          departmentScopeResponse,
+          projectScopeResponse,
+          taskScopeResponse,
+        ] = await Promise.all([
+          adminApi.getDepartments(),
+          adminApi.getRanks(),
+          adminApi.getRoles(),
+          adminApi.getDepartmentScopeOptions(),
+          adminApi.getProjectScopeOptions(),
+          adminApi.getTaskScopeOptions(),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setDepartments(
+          [...(departmentsResponse.data.data ?? [])].sort((left, right) =>
+            left.deptNm.localeCompare(right.deptNm, 'ko'),
+          ),
+        );
+        setRanks(
+          [...(ranksResponse.data.data ?? [])].sort(
+            (left, right) =>
+              left.sortOrder - right.sortOrder ||
+              left.rankName.localeCompare(right.rankName, 'ko'),
+          ),
+        );
+        setRoles(rolesResponse.data.data ?? []);
+        setScopeOptionMap({
+          DEPT: departmentScopeResponse.data.data ?? [],
+          PROJECT: projectScopeResponse.data.data ?? [],
+          TASK: taskScopeResponse.data.data ?? [],
+        });
+      } catch (err) {
+        if (active) {
+          setAssignmentOptionsError(
+            err instanceof ApiError
+              ? err.message
+              : '부서, 직급, 역할 옵션을 불러오는 중 오류가 발생했습니다.',
+          );
+        }
+      } finally {
+        if (active) {
+          setAssignmentOptionsLoading(false);
+        }
+      }
+    };
+
+    void loadAssignmentOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const summary = useMemo(() => {
     const total = pagination?.totalElements ?? employees.length;
     const login = employees.filter(
@@ -236,6 +408,14 @@ export default function AdminEmployeesPage() {
     ];
   }, [employees, pagination]);
 
+  const currentScopeOptions = useMemo(() => {
+    if (!requiresScopeId(roleAssignForm.scopeTypeCd)) {
+      return [];
+    }
+
+    return scopeOptionMap[roleAssignForm.scopeTypeCd as ScopedOptionType];
+  }, [roleAssignForm.scopeTypeCd, scopeOptionMap]);
+
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPage(1);
@@ -247,17 +427,82 @@ export default function AdminEmployeesPage() {
     setReloadKey((current) => current + 1);
   };
 
+  const syncEmployeeFromDetail = (detail: AdminEmployeeDetail) => {
+    setEmployees((current) =>
+      current.map((employee) =>
+        employee.empId === detail.empId
+          ? {
+              ...employee,
+              deptCd: detail.department?.deptCd ?? null,
+              jobPstnCd: detail.jobPosition?.jobPstnCd ?? null,
+              jobGrdCd: detail.jobGrade?.jobGrdCd ?? null,
+              empStatCd: detail.empStat?.empStatCd ?? employee.empStatCd,
+              jobDutyCn: detail.jobDutyCn,
+              empNm: detail.empNm,
+              genderCd: detail.genderCd,
+              mblTelno: detail.mblTelno,
+              zip: detail.zip,
+              addr: detail.addr,
+              prflImgFileId: detail.prflImgFileId,
+              execYn: detail.execYn,
+              entcoYmd: detail.entcoYmd,
+              retcoYmd: detail.retcoYmd,
+              frstRegDt: detail.frstRegDt,
+              lastMdfcnDt: detail.lastMdfcnDt,
+              enabled: detail.enabled,
+              department: detail.department,
+              jobPosition: detail.jobPosition,
+              jobGrade: detail.jobGrade,
+              empStat: detail.empStat,
+              roleAssignmentList: detail.roleAssignmentList,
+            }
+          : employee,
+      ),
+    );
+  };
+
+  const syncAssignmentTargetsFromDetail = (
+    detail: AdminEmployeeDetail | null,
+  ) => {
+    setTargetDeptCd(detail?.department?.deptCd ?? '');
+    setTargetRankId(detail?.jobGrade?.jobGrdCd ?? '');
+  };
+
+  const refreshEmployeeDetail = async (empId: number) => {
+    const response = await adminApi.getEmployeeDetail(empId);
+    const detail = response.data.data ?? null;
+
+    setSelectedDetail(detail);
+    syncAssignmentTargetsFromDetail(detail);
+
+    if (detail) {
+      syncEmployeeFromDetail(detail);
+    }
+
+    setReloadKey((current) => current + 1);
+    return detail;
+  };
+
   const openEmployeeDetail = async (empId: number) => {
     setDetailOpen(true);
     setDetailLoading(true);
     setDetailError(null);
     setStatusUpdateError(null);
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+    syncAssignmentTargetsFromDetail(null);
+    setRoleAssignForm(createRoleAssignForm());
     setSelectedDetail(null);
 
     try {
       const response = await adminApi.getEmployeeDetail(empId);
       const detail = response.data.data ?? null;
       setSelectedDetail(detail);
+      syncAssignmentTargetsFromDetail(detail);
+
+      if (detail) {
+        syncEmployeeFromDetail(detail);
+      }
 
       if (!detail) {
         setDetailError('사원 상세 정보가 없습니다.');
@@ -274,7 +519,7 @@ export default function AdminEmployeesPage() {
   };
 
   const closeDetail = () => {
-    if (detailLoading || statusUpdatingCode) {
+    if (detailLoading || statusUpdatingCode || assignmentSubmitting) {
       return;
     }
 
@@ -326,6 +571,236 @@ export default function AdminEmployeesPage() {
       );
     } finally {
       setStatusUpdatingCode(null);
+    }
+  };
+
+  const updateRoleAssignForm = (
+    key: keyof RoleAssignFormState,
+    value: string,
+  ) => {
+    if (key === 'scopeTypeCd') {
+      setRoleAssignForm((current) => ({
+        ...current,
+        scopeTypeCd: value as RoleScopeType,
+        scopeId: '',
+      }));
+      return;
+    }
+
+    setRoleAssignForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  };
+
+  const assignDepartmentToEmployee = async () => {
+    if (!selectedDetail || assignmentSubmitting) {
+      return;
+    }
+
+    const nextDeptCd = targetDeptCd.trim();
+    const currentDeptCd = selectedDetail.department?.deptCd ?? '';
+
+    if (!nextDeptCd) {
+      setAssignmentError('배치할 부서를 선택해 주세요.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    if (nextDeptCd === currentDeptCd) {
+      setAssignmentError('이미 선택한 부서에 배치되어 있습니다.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    setAssignmentSubmitting('department');
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      if (currentDeptCd) {
+        await adminApi.transferDepartmentMembers(currentDeptCd, {
+          targetDeptCd: nextDeptCd,
+          empIds: [selectedDetail.empId],
+        });
+      } else {
+        await adminApi.assignDepartmentMembers(nextDeptCd, {
+          empIds: [selectedDetail.empId],
+        });
+      }
+
+      await refreshEmployeeDetail(selectedDetail.empId);
+      setAssignmentSuccess('부서 배치를 완료했습니다.');
+    } catch (err) {
+      setAssignmentError(
+        err instanceof ApiError
+          ? err.message
+          : '부서 배치 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setAssignmentSubmitting(null);
+    }
+  };
+
+  const assignRankToEmployee = async () => {
+    if (!selectedDetail || assignmentSubmitting) {
+      return;
+    }
+
+    const nextRankId = targetRankId.trim();
+    const currentRankId = selectedDetail.jobGrade?.jobGrdCd ?? '';
+
+    if (!nextRankId) {
+      setAssignmentError('부여할 직급을 선택해 주세요.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    if (nextRankId === currentRankId) {
+      setAssignmentError('이미 선택한 직급이 부여되어 있습니다.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    setAssignmentSubmitting('rank');
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      await adminApi.assignRank(nextRankId, {
+        empIds: [selectedDetail.empId],
+      });
+      await refreshEmployeeDetail(selectedDetail.empId);
+      setAssignmentSuccess('직급 부여를 완료했습니다.');
+    } catch (err) {
+      setAssignmentError(
+        err instanceof ApiError
+          ? err.message
+          : '직급 부여 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setAssignmentSubmitting(null);
+    }
+  };
+
+  const revokeRankFromEmployee = async () => {
+    if (!selectedDetail || assignmentSubmitting) {
+      return;
+    }
+
+    const currentRankId = selectedDetail.jobGrade?.jobGrdCd ?? '';
+
+    if (!currentRankId) {
+      setAssignmentError('해제할 직급이 없습니다.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    setAssignmentSubmitting('rank-revoke');
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      await adminApi.revokeRank(currentRankId, {
+        empIds: [selectedDetail.empId],
+      });
+      await refreshEmployeeDetail(selectedDetail.empId);
+      setAssignmentSuccess('직급을 해제했습니다.');
+    } catch (err) {
+      setAssignmentError(
+        err instanceof ApiError
+          ? err.message
+          : '직급 해제 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setAssignmentSubmitting(null);
+    }
+  };
+
+  const assignRoleToEmployee = async () => {
+    if (!selectedDetail || assignmentSubmitting) {
+      return;
+    }
+
+    const roleId = Number(roleAssignForm.roleId);
+
+    if (!Number.isFinite(roleId) || roleId <= 0) {
+      setAssignmentError('부여할 역할을 선택해 주세요.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    const needsScopeId = requiresScopeId(roleAssignForm.scopeTypeCd);
+    const scopeId = roleAssignForm.scopeId.trim();
+
+    if (needsScopeId && !scopeId) {
+      setAssignmentError('선택한 역할 범위의 대상을 선택해 주세요.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    setAssignmentSubmitting('role');
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      await adminApi.assignRole(roleId, {
+        empIds: [selectedDetail.empId],
+        scopeTypeCd: roleAssignForm.scopeTypeCd,
+        scopeId: needsScopeId ? scopeId : null,
+      });
+      await refreshEmployeeDetail(selectedDetail.empId);
+      setRoleAssignForm(createRoleAssignForm());
+      setAssignmentSuccess('역할 부여를 완료했습니다.');
+    } catch (err) {
+      setAssignmentError(
+        err instanceof ApiError
+          ? err.message
+          : '역할 부여 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setAssignmentSubmitting(null);
+    }
+  };
+
+  const revokeRoleFromEmployee = async (role: AdminRoleAssignment) => {
+    if (!selectedDetail || assignmentSubmitting) {
+      return;
+    }
+
+    const roleId = role.roleId ?? role.role?.roleId;
+
+    if (!roleId) {
+      setAssignmentError('해제할 역할 ID를 확인할 수 없습니다.');
+      setAssignmentSuccess(null);
+      return;
+    }
+
+    const scopeTypeCd = isRoleScopeType(role.scopeTypeCd)
+      ? role.scopeTypeCd
+      : null;
+    const scopeId = role.scopeId ?? null;
+
+    setAssignmentSubmitting(getRoleRevokeAction(role));
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+
+    try {
+      await adminApi.revokeRole(roleId, {
+        empIds: [selectedDetail.empId],
+        scopeTypeCd,
+        scopeId,
+      });
+      await refreshEmployeeDetail(selectedDetail.empId);
+      setAssignmentSuccess('역할을 해제했습니다.');
+    } catch (err) {
+      setAssignmentError(
+        err instanceof ApiError
+          ? err.message
+          : '역할 해제 중 오류가 발생했습니다.',
+      );
+    } finally {
+      setAssignmentSubmitting(null);
     }
   };
 
@@ -473,12 +948,19 @@ export default function AdminEmployeesPage() {
                   key: 'employee',
                   header: '사원명',
                   render: (employee) => (
-                    <div>
-                      <div className="font-bold text-slate-950">
-                        {employee.empNm}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        {formatEmployeeId(employee.empId)}
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar
+                        fileId={employee.prflImgFileId}
+                        name={employee.empNm}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-950">
+                          {employee.empNm}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-400">
+                          {formatEmployeeId(employee.empId)}
+                        </div>
                       </div>
                     </div>
                   ),
@@ -555,7 +1037,7 @@ export default function AdminEmployeesPage() {
       <Modal
         open={detailOpen}
         title="사원 상세"
-        size="xl"
+        size="lg"
         description={
           selectedDetail
             ? `${selectedDetail.empNm} / ${formatEmployeeId(selectedDetail.empId)}`
@@ -566,7 +1048,11 @@ export default function AdminEmployeesPage() {
           <Button
             variant="outline"
             onClick={closeDetail}
-            disabled={detailLoading || Boolean(statusUpdatingCode)}
+            disabled={
+              detailLoading ||
+              Boolean(statusUpdatingCode) ||
+              Boolean(assignmentSubmitting)
+            }
           >
             닫기
           </Button>
@@ -582,12 +1068,16 @@ export default function AdminEmployeesPage() {
             description={detailError}
           />
         ) : selectedDetail ? (
-          <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+          <div className="grid gap-5 xl:grid-cols-[240px_1fr]">
             <aside className="flex flex-col gap-4">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-slate-300">
-                  <Camera size={44} />
-                </div>
+                <ProfileAvatar
+                  fileId={selectedDetail.prflImgFileId}
+                  name={selectedDetail.empNm}
+                  size={208}
+                  rounded="xl"
+                  className="aspect-square !h-auto !w-full border border-slate-200"
+                />
                 <div className="mt-4">
                   <h3 className="text-lg font-bold text-slate-950">
                     {selectedDetail.empNm}
@@ -680,6 +1170,236 @@ export default function AdminEmployeesPage() {
                 <DetailRow label="직무" value={selectedDetail.jobDutyCn} />
               </dl>
 
+              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950">
+                      사원 배치/권한 관리
+                    </h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      부서 배치, 직급 부여, 역할 부여를 이 사원 상세에서 바로 처리합니다.
+                    </p>
+                  </div>
+                  <Badge variant="outline">
+                    {assignmentOptionsLoading ? '옵션 로딩 중' : '관리 가능'}
+                  </Badge>
+                </div>
+
+                {assignmentOptionsError && (
+                  <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                    {assignmentOptionsError}
+                  </p>
+                )}
+                {assignmentError && (
+                  <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
+                    {assignmentError}
+                  </p>
+                )}
+                {assignmentSuccess && (
+                  <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                    {assignmentSuccess}
+                  </p>
+                )}
+
+                <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <Building2 size={16} className="text-blue-600" />
+                      부서 배치
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      현재 부서: {formatCode(selectedDetail.department?.deptNm)}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <Select
+                        label="배치 부서"
+                        value={targetDeptCd}
+                        disabled={
+                          assignmentOptionsLoading ||
+                          Boolean(assignmentSubmitting)
+                        }
+                        onChange={(event) => setTargetDeptCd(event.target.value)}
+                        options={[
+                          {
+                            value: '',
+                            label: assignmentOptionsLoading
+                              ? '부서 불러오는 중'
+                              : '부서 선택',
+                          },
+                          ...departments.map((department) => ({
+                            value: department.deptCd,
+                            label: department.deptNm,
+                          })),
+                        ]}
+                      />
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        loading={assignmentSubmitting === 'department'}
+                        disabled={
+                          assignmentOptionsLoading ||
+                          Boolean(assignmentSubmitting) ||
+                          !targetDeptCd ||
+                          targetDeptCd === selectedDetail.department?.deptCd
+                        }
+                        onClick={() => void assignDepartmentToEmployee()}
+                      >
+                        부서 적용
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <IdCard size={16} className="text-indigo-600" />
+                      직급 부여
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      현재 직급: {formatCode(selectedDetail.jobGrade?.jobGrdNm)}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <Select
+                        label="부여 직급"
+                        value={targetRankId}
+                        disabled={
+                          assignmentOptionsLoading ||
+                          Boolean(assignmentSubmitting)
+                        }
+                        onChange={(event) => setTargetRankId(event.target.value)}
+                        options={[
+                          {
+                            value: '',
+                            label: assignmentOptionsLoading
+                              ? '직급 불러오는 중'
+                              : '직급 선택',
+                          },
+                          ...ranks.map((rank) => ({
+                            value: rank.rankId,
+                            label: rank.rankName,
+                          })),
+                        ]}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          loading={assignmentSubmitting === 'rank'}
+                          disabled={
+                            assignmentOptionsLoading ||
+                            Boolean(assignmentSubmitting) ||
+                            !targetRankId ||
+                            targetRankId === selectedDetail.jobGrade?.jobGrdCd
+                          }
+                          onClick={() => void assignRankToEmployee()}
+                        >
+                          직급 적용
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          loading={assignmentSubmitting === 'rank-revoke'}
+                          disabled={
+                            assignmentOptionsLoading ||
+                            Boolean(assignmentSubmitting) ||
+                            !selectedDetail.jobGrade?.jobGrdCd
+                          }
+                          onClick={() => void revokeRankFromEmployee()}
+                        >
+                          직급 해제
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                      <ShieldCheck size={16} className="text-emerald-600" />
+                      역할 부여
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      현재 역할: {selectedDetail.roleAssignmentList?.length ?? 0}개
+                    </p>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <Select
+                        label="역할"
+                        value={roleAssignForm.roleId}
+                        disabled={
+                          assignmentOptionsLoading ||
+                          Boolean(assignmentSubmitting)
+                        }
+                        onChange={(event) =>
+                          updateRoleAssignForm('roleId', event.target.value)
+                        }
+                        options={[
+                          {
+                            value: '',
+                            label: assignmentOptionsLoading
+                              ? '역할 불러오는 중'
+                              : '역할 선택',
+                          },
+                          ...roles.map((role) => ({
+                            value: String(role.roleId),
+                            label: role.roleName,
+                          })),
+                        ]}
+                      />
+                      <Select
+                        label="범위"
+                        value={roleAssignForm.scopeTypeCd}
+                        disabled={Boolean(assignmentSubmitting)}
+                        onChange={(event) =>
+                          updateRoleAssignForm(
+                            'scopeTypeCd',
+                            event.target.value,
+                          )
+                        }
+                        options={roleScopeTypeOptions}
+                      />
+                      {requiresScopeId(roleAssignForm.scopeTypeCd) && (
+                        <Select
+                          label="범위 대상"
+                          value={roleAssignForm.scopeId}
+                          disabled={
+                            assignmentOptionsLoading ||
+                            Boolean(assignmentSubmitting)
+                          }
+                          onChange={(event) =>
+                            updateRoleAssignForm('scopeId', event.target.value)
+                          }
+                          options={[
+                            {
+                              value: '',
+                              label: assignmentOptionsLoading
+                                ? '대상 불러오는 중'
+                                : '대상 선택',
+                            },
+                            ...currentScopeOptions.map((option) => ({
+                              value: option.scopeId,
+                              label: option.label,
+                            })),
+                          ]}
+                        />
+                      )}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        loading={assignmentSubmitting === 'role'}
+                        disabled={
+                          assignmentOptionsLoading ||
+                          Boolean(assignmentSubmitting) ||
+                          !roleAssignForm.roleId ||
+                          (requiresScopeId(roleAssignForm.scopeTypeCd) &&
+                            !roleAssignForm.scopeId)
+                        }
+                        onClick={() => void assignRoleToEmployee()}
+                      >
+                        역할 부여
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-lg border border-slate-100 p-3">
                 <h3 className="text-xs font-bold text-slate-500">메일 계정</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -704,14 +1424,33 @@ export default function AdminEmployeesPage() {
                 <h3 className="text-xs font-bold text-slate-500">역할</h3>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedDetail.roleAssignmentList?.length ? (
-                    selectedDetail.roleAssignmentList.map((role, index) => (
-                      <Badge
-                        key={`${getRoleName(role)}-${index}`}
-                        variant="outline"
-                      >
-                        {getRoleName(role)}
-                      </Badge>
-                    ))
+                    selectedDetail.roleAssignmentList.map((role) => {
+                      const revokeAction = getRoleRevokeAction(role);
+
+                      return (
+                        <div
+                          key={getRoleAssignmentKey(role)}
+                          className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2"
+                        >
+                          <div className="flex min-w-0 flex-wrap gap-1.5">
+                            <Badge variant="outline">{getRoleName(role)}</Badge>
+                            <Badge variant="neutral">
+                              {getRoleScopeLabel(role)}
+                            </Badge>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<ShieldMinus size={14} />}
+                            loading={assignmentSubmitting === revokeAction}
+                            disabled={Boolean(assignmentSubmitting)}
+                            onClick={() => void revokeRoleFromEmployee(role)}
+                          >
+                            해제
+                          </Button>
+                        </div>
+                      );
+                    })
                   ) : (
                     <span className="text-sm font-semibold text-slate-400">
                       -

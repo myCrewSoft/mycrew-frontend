@@ -283,4 +283,14 @@ export const approvalApi = {
   ): Promise<ApprovalMutationAxiosResponse> => {
     return axiosInstance.patch(`${APPROVAL_BASE_URL}/templates/${tmplatCd}/favorite`);
   },
+
+  /**
+   * 결재 템플릿 삭제 (제작자 또는 '결재 양식 삭제' 권한 보유자만 가능)
+   * DELETE /api/approval/templates/{tmplatCd}
+   */
+  deleteApprovalTemplate: (
+    tmplatCd: string,
+  ): Promise<AxiosResponse<ApiResponse<string>>> => {
+    return axiosInstance.delete(`${APPROVAL_BASE_URL}/templates/${tmplatCd}`);
+  },
 } as const;

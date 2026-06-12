@@ -2,12 +2,22 @@ import { Search, Send, UserPlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import { employeeApi } from '../../api/employeeApi'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Button from '../../components/common/button/Button'
 import FormField from '../../components/common/form/formField/FormField'
 import Modal from '../../components/common/overlay/modal/Modal'
 import type { EmployeeLookupResponse } from '../../types'
 import type { ApprovalTemplateResponse } from '../../types/approval'
 import type { DraftFormState, SelectedApprover } from './approval.types'
+
+// lookup 응답의 profileImageUrl(`/api/files/images/{id}`)에서 파일 ID만 추출한다.
+const extractProfileFileId = (
+  profileImageUrl?: string | null,
+): number | null => {
+  if (!profileImageUrl) return null
+  const matched = profileImageUrl.match(/(\d+)\s*$/)
+  return matched ? Number(matched[1]) : null
+}
 
 type Props = {
   open: boolean
@@ -130,7 +140,13 @@ export default function ApprovalDraftModal({
     if (approvers.some((a) => a.id === emp.id)) return
     onApproversChange([
       ...approvers,
-      { id: emp.id, name: emp.name, department: emp.department, position: emp.position },
+      {
+        id: emp.id,
+        name: emp.name,
+        department: emp.department,
+        position: emp.position,
+        prflImgFileId: extractProfileFileId(emp.profileImageUrl),
+      },
     ])
     setEmployeeSearch('')
     setEmployeeResults([])
@@ -261,10 +277,18 @@ export default function ApprovalDraftModal({
                           className={`approval-approver-panel__dropdown-item${alreadyAdded ? ' approval-approver-panel__dropdown-item--added' : ''}`}
                           onClick={() => addApprover(emp)}
                           disabled={alreadyAdded}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10 }}
                         >
-                          <span className="approval-approver-panel__emp-name">{emp.name}</span>
-                          <span className="approval-approver-panel__emp-meta">
-                            {emp.department} · {emp.position}
+                          <ProfileAvatar
+                            fileId={extractProfileFileId(emp.profileImageUrl)}
+                            name={emp.name}
+                            size={32}
+                          />
+                          <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                            <span className="approval-approver-panel__emp-name">{emp.name}</span>
+                            <span className="approval-approver-panel__emp-meta">
+                              {emp.department} · {emp.position}
+                            </span>
                           </span>
                           {alreadyAdded && (
                             <span className="approval-approver-panel__badge">추가됨</span>
@@ -291,6 +315,11 @@ export default function ApprovalDraftModal({
                     {idx < approvers.length - 1 && (
                       <span className="approval-approver-panel__connector" />
                     )}
+                    <ProfileAvatar
+                      fileId={a.prflImgFileId}
+                      name={a.name}
+                      size={32}
+                    />
                     <div className="approval-approver-panel__info">
                       <span className="approval-approver-panel__name">{a.name}</span>
                       <span className="approval-approver-panel__sub">
