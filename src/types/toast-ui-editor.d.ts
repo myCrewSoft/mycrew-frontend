@@ -1,3 +1,5 @@
+// Toast UI Editor 3.2.2 exposes runtime entry points without a `types`
+// condition, so TypeScript's bundler resolution cannot reach its bundled types.
 declare module '@toast-ui/editor' {
   export type EditorMode = 'markdown' | 'wysiwyg'
   export type PreviewStyle = 'tab' | 'vertical'
@@ -26,6 +28,22 @@ declare module '@toast-ui/editor' {
 
     changeMode(mode: EditorMode, isWithoutFocus?: boolean): void
     getMarkdown(): string
+    destroy(): void
+  }
+}
+
+declare module '@toast-ui/editor/dist/toastui-editor-viewer' {
+  export interface ViewerOptions {
+    el: HTMLElement
+    initialValue?: string
+    usageStatistics?: boolean
+    theme?: string
+  }
+
+  export default class ToastViewer {
+    constructor(options: ViewerOptions)
+
+    setMarkdown(markdown: string): void
     destroy(): void
   }
 }

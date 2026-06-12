@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import Viewer  from '@toast-ui/editor'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import Viewer from '@toast-ui/editor/dist/toastui-editor-viewer'
+import '@toast-ui/editor/dist/toastui-editor-viewer.css'
 import { ZoomIn } from 'lucide-react'
 import { getImage } from '../../api/fileApi'
 import Modal from '../../components/common/overlay/modal/Modal'
@@ -18,6 +19,7 @@ const getInlineImageIds = (content: string) => (
 )
 
 const BoardContentViewer = ({ content = '' }: BoardContentViewerProps) => {
+  const viewerHostRef = useRef<HTMLDivElement | null>(null)
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({})
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const resolvedContent = content ?? ''
@@ -60,6 +62,18 @@ const BoardContentViewer = ({ content = '' }: BoardContentViewerProps) => {
     )
   }, [imageUrls, resolvedContent])
 
+  useEffect(() => {
+    if (!viewerHostRef.current) return
+
+    const viewer = new Viewer({
+      el: viewerHostRef.current,
+      initialValue: displayContent,
+      usageStatistics: false,
+    })
+
+    return () => viewer.destroy()
+  }, [displayContent])
+
   return (
     <>
       <div
@@ -72,7 +86,7 @@ const BoardContentViewer = ({ content = '' }: BoardContentViewerProps) => {
           }
         }}
       >
-        <Viewer.arguments key={displayContent} initialValue={displayContent} />
+        <div ref={viewerHostRef} />
       </div>
 
       <Modal
