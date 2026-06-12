@@ -1,5 +1,4 @@
 ﻿// src/pages/project/ProjectDetailPage.tsx
-import { useParams } from 'react-router-dom'
 import { projectApi } from '../../api/projectApi'
 import { useApi } from '../../hooks/useApi'
 import { useState } from 'react'
@@ -43,18 +42,18 @@ const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'succes
 
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
-  const { id } = useParams()
+  const { projId } = useParams<{ projId: string }>()
   const [tab, setTab] = useState('overview')
   const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
 
-  const { projId } = useParams<{ projId: string }>()
+  const projectId = Number(projId)
 
   const { data: project, loading, execute: refetchProject } = useApi(
     projectApi.getProject,
-    { immediateArgs: [Number(projId)] }
+    { immediateArgs: [projectId] }
   )
 
   const { data: employeeList } = useApi(
@@ -171,7 +170,7 @@ const ProjectDetailPage = () => {
               memberList={project.projMemberList}
               employees={employees}
               departments={departments}
-              onSuccess={() => refetchProject(Number(projId))}
+              onSuccess={() => refetchProject(projectId)}
             />
           </div>
         </div>
@@ -204,7 +203,7 @@ const ProjectDetailPage = () => {
         open={editDrawerOpen}
         onClose={() => setEditDrawerOpen(false)}
         project={project}
-        onSuccess={() => refetchProject(Number(projId))}
+        onSuccess={() => refetchProject(projectId)}
       />
 
     </PageComponent>
