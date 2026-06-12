@@ -5,6 +5,7 @@ import AdminEmployeesSubSidebar from './AdminEmployeesSubSidebar';
 import AdminGenericSubSidebar from './AdminGenericSubSidebar';
 import AdminRanksSubSidebar from './AdminRanksSubSidebar';
 import AdminRolesSubSidebar from './AdminRolesSubSidebar';
+import AdminAttendanceSubSidebar from './AdminAttendanceSubSidebar';
 import { subSidebarClass } from './adminLayoutStyles';
 
 export default function AdminSubSidebar() {
@@ -34,6 +35,8 @@ export default function AdminSubSidebar() {
     content = <AdminRanksSubSidebar />;
   } else if (pathname.startsWith('/admin/departments')) {
     content = <AdminDepartmentsSubSidebar />;
+  } else if (pathname.startsWith('/admin/attendance')) {
+    content = <AdminAttendanceSubSidebar />;
   } else {
     content = <AdminGenericSubSidebar pathname={pathname} />;
   }
