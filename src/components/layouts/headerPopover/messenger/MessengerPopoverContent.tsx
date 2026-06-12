@@ -319,6 +319,7 @@ const MessengerPopoverContent = () => {
         />
       ) : viewMode === 'info' && selectedRoomForInfo ? (
         <MessengerRoomInfoPanel
+          key={selectedRoomForInfo.id}
           room={selectedRoomForInfo}
           onBack={() => setViewMode('chat')}
           onUpdateRoom={handleUpdateRoom}

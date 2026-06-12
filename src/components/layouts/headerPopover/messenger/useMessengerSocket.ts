@@ -327,18 +327,24 @@ export const useMessengerSocket = (
           lastCfmtnMsgId: number,
           unreadCount: number,
         ) => {
-          // READ_CHANGED는 REST로 불러온 메시지에도 반영해야 하므로 메시지 id별 unreadCount를 따로 기억합니다.
+          // messageId가 채팅 메시지 ID와 다를 수 있으므로 lastCfmtnMsgId도 함께 저장합니다.
           setMessageUnreadCountsById((prevUnreadCountsById) => ({
             ...prevUnreadCountsById,
             [messageId]: unreadCount,
+            [lastCfmtnMsgId]: unreadCount,
           }))
-          setLastReadMessageIdByRoomId((prevLastReadMessageIdByRoomId) => ({
-            ...prevLastReadMessageIdByRoomId,
-            [chatRoomId]: Math.max(
-              prevLastReadMessageIdByRoomId[chatRoomId] ?? 0,
-              lastCfmtnMsgId,
-            ),
-          }))
+          // unreadCount > 0이면 아직 안 읽은 사람이 있으므로 lastReadMessageIdByRoomId를 올리지 않습니다.
+          // lastReadMessageIdByRoomId가 올라가면 applyRealtimeUnreadCounts의 fallback이
+          // 아직 남은 unreadCount를 0으로 잘못 덮어쓰기 때문입니다.
+          if (unreadCount === 0) {
+            setLastReadMessageIdByRoomId((prevLastReadMessageIdByRoomId) => ({
+              ...prevLastReadMessageIdByRoomId,
+              [chatRoomId]: Math.max(
+                prevLastReadMessageIdByRoomId[chatRoomId] ?? 0,
+                lastCfmtnMsgId,
+              ),
+            }))
+          }
 
           // WebSocket으로 새로 받은 메시지 배열도 즉시 갱신해서 화면 반응을 빠르게 만듭니다.
           setMessagesByRoomId((prevMessagesByRoomId) => ({
