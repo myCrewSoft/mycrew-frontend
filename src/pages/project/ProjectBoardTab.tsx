@@ -36,7 +36,7 @@ import type {
 } from '../../types'
 import BoardWriteForm from '../board/BoardWriteForm'
 import BoardAttachmentImage from '../board/BoardAttachmentImage'
-import { Viewer } from '@toast-ui/react-editor'
+import BoardContentViewer from '../board/BoardContentViewer'
 
 interface ProjectBoardTabProps {
   projectId: number
@@ -493,7 +493,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
             </div>
 
             <div className="min-h-48 break-words pb-3 pt-6 text-sm leading-7 text-slate-800">
-              <Viewer initialValue={selectedBoard.boardCn ?? ''} />
+              <BoardContentViewer content={selectedBoard.boardCn} />
             </div>
 
             <BoardAttachmentImage

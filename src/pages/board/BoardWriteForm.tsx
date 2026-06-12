@@ -207,7 +207,7 @@ const BoardWriteForm = ({
         ['heading', 'bold', 'italic', 'strike'],
         ['hr', 'quote'],
         ['ul', 'ol', 'task', 'indent', 'outdent'],
-        ['table', 'image', 'link'],
+        ['table', 'link'],
         ['code', 'codeblock'],
       ],
       events: {
@@ -229,7 +229,8 @@ const BoardWriteForm = ({
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim()
-    const trimmedContent = content.trim()
+    const latestContent = editorRef.current?.getMarkdown() ?? content
+    const trimmedContent = latestContent.trim()
 
     if (!trimmedTitle) {
       setValidationMessage('제목을 입력해주세요.')
@@ -238,6 +239,11 @@ const BoardWriteForm = ({
 
     if (!trimmedContent) {
       setValidationMessage('내용을 입력해주세요.')
+      return
+    }
+
+    if (trimmedContent.length > 4000) {
+      setValidationMessage('내용은 4000자 이하여야 합니다.')
       return
     }
 
