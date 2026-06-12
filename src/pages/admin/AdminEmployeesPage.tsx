@@ -3,7 +3,6 @@ import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Building2,
-  Camera,
   Eye,
   IdCard,
   RefreshCw,
@@ -1072,9 +1071,13 @@ export default function AdminEmployeesPage() {
           <div className="grid gap-5 xl:grid-cols-[240px_1fr]">
             <aside className="flex flex-col gap-4">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-slate-300">
-                  <Camera size={44} />
-                </div>
+                <ProfileAvatar
+                  fileId={selectedDetail.prflImgFileId}
+                  name={selectedDetail.empNm}
+                  size={208}
+                  rounded="xl"
+                  className="aspect-square !h-auto !w-full border border-slate-200"
+                />
                 <div className="mt-4">
                   <h3 className="text-lg font-bold text-slate-950">
                     {selectedDetail.empNm}
