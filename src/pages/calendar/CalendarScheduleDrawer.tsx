@@ -1,5 +1,5 @@
 import { Building2, ClipboardList, FolderKanban, Globe2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ApiError } from '../../api/axiosInstance'
 import { scheduleApi } from '../../api/scheduleApi'
 import Button from '../../components/common/button/Button'
@@ -37,14 +37,8 @@ interface OptionItem {
 }
 
 const scheduleTypeOptions: OptionItem[] = [
-  { value: 'C001', label: scheduleTypeLabelMap.C001 },
   { value: 'C002', label: scheduleTypeLabelMap.C002 },
   { value: 'C003', label: scheduleTypeLabelMap.C003 },
-  { value: 'C004', label: scheduleTypeLabelMap.C004 },
-  { value: 'C005', label: scheduleTypeLabelMap.C005 },
-  { value: 'C006', label: scheduleTypeLabelMap.C006 },
-  { value: 'C007', label: scheduleTypeLabelMap.C007 },
-  { value: 'C008', label: scheduleTypeLabelMap.C008 },
 ]
 
 const repeatTypeOptions: OptionItem[] = [
@@ -219,6 +213,28 @@ const CalendarScheduleDrawer = ({
   )
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
 
+  // 달력에서 날짜 선택이 바뀌면(비편집 모드) 시작/종료 일시를 즉시 갱신합니다.
+  // useEffect 대신 렌더 중 setState 패턴을 사용해 cascading render를 방지합니다.
+  const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate)
+  const [prevSelectedRange, setPrevSelectedRange] = useState(selectedRange)
+  if (
+    !isEditMode &&
+    (prevSelectedDate !== selectedDate ||
+      prevSelectedRange?.start !== selectedRange?.start ||
+      prevSelectedRange?.end !== selectedRange?.end ||
+      prevSelectedRange?.allDay !== selectedRange?.allDay)
+  ) {
+    setPrevSelectedDate(selectedDate)
+    setPrevSelectedRange(selectedRange)
+    const nextInitialValues = createInitialFormValues(selectedDate, null, selectedRange)
+    setFormValues((current) => ({
+      ...current,
+      beginDate: nextInitialValues.beginDate,
+      endDate: nextInitialValues.endDate,
+      allDay: nextInitialValues.allDay,
+    }))
+  }
+
   const { refreshSchedules } = useCalendar()
   const { showToast } = useToast()
 
@@ -244,29 +260,6 @@ const CalendarScheduleDrawer = ({
     projectId: relatedProjectId,
     taskId: relatedTaskId,
   })
-
-  useEffect(() => {
-    if (isEditMode) return
-
-    const nextInitialValues = createInitialFormValues(
-      selectedDate,
-      null,
-      selectedRange,
-    )
-
-    setFormValues((current) => ({
-      ...current,
-      beginDate: nextInitialValues.beginDate,
-      endDate: nextInitialValues.endDate,
-      allDay: nextInitialValues.allDay,
-    }))
-  }, [
-    isEditMode,
-    selectedDate,
-    selectedRange?.allDay,
-    selectedRange?.end,
-    selectedRange?.start,
-  ])
 
   const handleScheduleTypeChange = (nextTypeCode: ScheduleTypeCode) => {
     setFormValues((current) => ({
@@ -376,22 +369,24 @@ const CalendarScheduleDrawer = ({
   const createSchedulePayload = (): ScheduleRequestDto => ({
     schdClsfCd: formValues.scheduleTypeCode,
     schdNm: formValues.title.trim(),
-    deptCd: formValues.deptCd,
+    deptCd: formValues.deptCd ?? '',
     projId:
       shouldShowProjectSelect && relatedProjectId
         ? Number(relatedProjectId)
-        : undefined,
+        : 0,
     taskId:
       shouldShowTaskSelect && relatedTaskId
         ? Number(relatedTaskId)
-        : undefined,
+        : 0,
+    vconfId: 0,
+    rsrvId: 0,
     schdDetailCn: formValues.detail,
     beginDt: formValues.beginDate,
     endDt: formValues.endDate,
     allDayYn: formValues.allDay ? 'Y' : 'N',
     reptYn: formValues.repeatYn ? 'Y' : 'N',
-    reptTypeCd: formValues.repeatYn ? formValues.repeatTypeCode : undefined,
-    reptEndDt: formValues.repeatYn ? formValues.repeatEndDate : undefined,
+    reptTypeCd: formValues.repeatYn ? (formValues.repeatTypeCode ?? '') : '',
+    reptEndDt: formValues.repeatYn ? (formValues.repeatEndDate ?? '') : '',
     targets: shouldShowAttendeePicker
       ? selectedAttendeeIds.map((id) => ({
           targetTypeCd: '01',
