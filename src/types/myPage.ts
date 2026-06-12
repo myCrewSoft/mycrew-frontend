@@ -78,10 +78,6 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-export interface ChangeSignatureRequest {
-  mbrStampFileId: number;
-}
-
 export interface ChangeJobDutyRequest {
   jobDutyCn: string;
 }

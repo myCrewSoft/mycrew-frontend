@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ImageUp, Signature } from 'lucide-react';
 import { ApiError } from '../../api/axiosInstance';
 import { mypageApi } from '../../api/myPageAPi';
@@ -6,15 +6,12 @@ import Button from '../../components/common/button/Button';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
 import { useToast } from '../../components/common/toast/useToast';
 import type { MyPageState } from '../../hooks/useMyPage';
+import useImage from '../../hooks/useImage';
 
-const getErrorMessage = (error: unknown) =>
-  error instanceof ApiError ? error.message : '전자서명 변경 중 문제가 발생했습니다.';
-
-// 파일 저장소에서 서명 이미지를 조회하는 URL을 만든다. (GET /api/files/{id})
-const buildFileUrl = (fileId?: number | null) => {
-  if (!fileId) return null;
-  const apiBaseUrl = import.meta.env.VITE_API_URL ?? '';
-  return `${apiBaseUrl}/api/files/${fileId}`;
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return '전자서명 변경 중 문제가 발생했습니다.';
 };
 
 // 업로드 응답이 number 이거나 { fileId } / { atchFileId } 형태일 수 있어 모두 처리한다.
@@ -29,6 +26,20 @@ interface ChangeSignatureSectionProps {
   state: MyPageState;
 }
 
+function SignatureImage({ fileId, alt }: { fileId: number; alt: string }) {
+  const src = useImage(fileId);
+
+  if (!src) return null;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-28 max-w-full object-contain"
+    />
+  );
+}
+
 export default function ChangeSignatureSection({ state }: ChangeSignatureSectionProps) {
   const { myPage, reload } = state;
   const { showToast } = useToast();
@@ -37,7 +48,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const currentSignatureUrl = buildFileUrl(myPage?.mbrStampFileId);
+  const currentStampFileId = myPage?.mbrStampFileId ?? null;
 
   // 선택한 파일의 미리보기 URL을 만들고, 언마운트/변경 시 해제한다.
   useEffect(() => {
@@ -45,17 +56,23 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       setPreviewUrl(null);
       return;
     }
+
     const url = URL.createObjectURL(selectedFile);
     setPreviewUrl(url);
+
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
-  const handleSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
+
     if (file && !file.type.startsWith('image/')) {
       showToast({ title: '이미지 파일만 업로드할 수 있습니다.', variant: 'danger' });
+      event.target.value = '';
+      setSelectedFile(null);
       return;
     }
+
     setSelectedFile(file);
   };
 
@@ -63,6 +80,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
     if (!selectedFile || submitting) return;
 
     setSubmitting(true);
+
     try {
       const uploadResponse = await mypageApi.uploadStampImage(selectedFile);
       const fileId = extractFileId(uploadResponse.data.data);
@@ -72,9 +90,14 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       }
 
       await mypageApi.changeSignature({ mbrStampFileId: fileId });
+
       showToast({ title: '전자서명 이미지가 변경되었습니다.', variant: 'success' });
       setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       await reload();
     } catch (error) {
       showToast({
@@ -97,12 +120,8 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
           <div className="flex flex-col gap-2">
             <span className="text-xs font-bold text-slate-500">현재 서명</span>
             <div className="flex h-32 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
-              {currentSignatureUrl ? (
-                <img
-                  src={currentSignatureUrl}
-                  alt="현재 전자서명"
-                  className="max-h-28 max-w-full object-contain"
-                />
+              {currentStampFileId ? (
+                <SignatureImage fileId={currentStampFileId} alt="현재 전자서명" />
               ) : (
                 <span className="flex flex-col items-center gap-1 text-xs font-semibold text-slate-400">
                   <Signature size={24} aria-hidden="true" />
@@ -147,11 +166,13 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
           >
             이미지 선택
           </Button>
+
           {selectedFile && (
             <span className="truncate text-xs font-semibold text-slate-500">
               {selectedFile.name}
             </span>
           )}
+
           <Button
             type="button"
             variant="primary"

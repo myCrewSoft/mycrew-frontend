@@ -62,7 +62,7 @@ const Modal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
       <section
-        className={`w-full ${maxWidthClassName ?? modalSizeStyle[size]} rounded-xl bg-white shadow-2xl`}
+        className={`flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden ${maxWidthClassName ?? modalSizeStyle[size]} rounded-xl bg-white shadow-2xl`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-5">
           <div>
@@ -79,7 +79,7 @@ const Modal = ({
         </div>
 
         {children && (
-          <div className="max-h-[calc(100vh-6rem)] overflow-y-auto p-5">
+          <div className="min-h-0 flex-1 overflow-y-auto p-5">
             {children}
           </div>
         )}
