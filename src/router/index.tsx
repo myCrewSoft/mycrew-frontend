@@ -22,6 +22,7 @@ import MailPage from '../pages/mail/MailPage';
 import OrganizationPage from '../pages/organization/OrganizationPage';
 import ApprovalPage from '../pages/approval/ApprovalPage';
 import EducationPage from '../pages/education/EducationPage';
+import MeetingRoomPage from '../pages/meeting/MeetingRoomPage';
 
 
 export const router = createBrowserRouter([
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
       ...meetingRoutes,
       ...driveRoutes,
       ...projectRoutes,
+      { path: '/meeting/room/:vconfId', element: <MeetingRoomPage /> }
     ],
   },
   {

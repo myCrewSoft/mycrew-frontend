@@ -1,49 +1,99 @@
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
 import type {
-  CreateInstantMeetingRequest,
-  CreateScheduledMeetingRequest,
-  MeetingListParams,
-  MeetingSummaryResponse,
-} from '../types/meeting.dto'
+  VideoConfCreateRequest,
+  VideoConfResponse,
+  VideoTokenResponse,
+  VideoMomUpdateRequest,
+  VideoMomResponse,
+  VideoMomAprvlRequest,
+} from '../types'
 
-// 화상회의 목록을 조회합니다.
-// 백엔드가 준비되면 /api/v1/meetings?status=live 같은 형태로 바로 호출됩니다.
-const getMeetings = (params?: MeetingListParams) => {
-  return axiosInstance.get<ApiResponse<MeetingSummaryResponse[]>>('/meetings', {
-    params,
-  })
+const MEETING_API_PREFIX = '/api/video-conferences'
+
+// 내가 참여 중인 화상회의 목록 조회
+const getConfList = () => {
+  return axiosInstance.get<ApiResponse<VideoConfResponse[]>>(`${MEETING_API_PREFIX}`)
 }
 
-// 화상회의 상세 정보를 조회합니다.
-// 지금 화면은 목록 DTO만으로 모달을 열지만, 백엔드 상세 API가 준비되면 이 함수를 연결하면 됩니다.
-const getMeeting = (meetingId: number) => {
-  return axiosInstance.get<ApiResponse<MeetingSummaryResponse>>(
-    `/meetings/${meetingId}`,
+// 화상회의 단건 조회
+const getConf = (vconfId: number) => {
+  return axiosInstance.get<ApiResponse<VideoConfResponse>>(`${MEETING_API_PREFIX}/${vconfId}`)
+}
+
+// 화상회의 생성
+const createConf = (payload: VideoConfCreateRequest) => {
+  return axiosInstance.post<ApiResponse<VideoConfResponse>>(`${MEETING_API_PREFIX}`, payload)
+}
+
+// LiveKit 입장 토큰 발급
+const issueToken = (vconfId: number) => {
+  return axiosInstance.post<ApiResponse<VideoTokenResponse>>(`${MEETING_API_PREFIX}/${vconfId}/token`)
+}
+
+// 화상회의 종료
+const endConf = (vconfId: number) => {
+  return axiosInstance.patch<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/end`)
+}
+
+// 회의록 조회
+const getMom = (vconfId: number) => {
+  return axiosInstance.get<ApiResponse<VideoMomResponse>>(`${MEETING_API_PREFIX}/${vconfId}/minutes`)
+}
+
+// 회의록 수정
+const updateMom = (vconfId: number, payload: VideoMomUpdateRequest) => {
+  return axiosInstance.put<ApiResponse<VideoMomResponse>>(`${MEETING_API_PREFIX}/${vconfId}/minutes`, payload)
+}
+
+// 회의록 검토 요청
+const requestMomReview = (vconfId: number) => {
+  return axiosInstance.post<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/minutes/review`)
+}
+
+// 회의록 결재
+const approveMom = (vconfId: number, payload: VideoMomAprvlRequest) => {
+  return axiosInstance.post<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/minutes/approve`, payload)
+}
+
+// 녹취록 업로드
+const uploadRcrdg = (vconfId: number, file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return axiosInstance.post<ApiResponse<void>>(
+    `${MEETING_API_PREFIX}/${vconfId}/recordings/upload`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
   )
 }
 
-// "지금 바로 회의 시작" 버튼에서 사용할 즉시 회의 생성 API입니다.
-// 백엔드 구현 전에는 화면에서 실패를 조용히 처리하고, 구현 후에는 inviteUrl로 입장시키면 됩니다.
-const createInstantMeeting = (payload: CreateInstantMeetingRequest) => {
-  return axiosInstance.post<ApiResponse<MeetingSummaryResponse>>(
-    '/meetings',
-    payload,
-  )
+// 녹취록 다운로드 URL 반환
+const getRcrdgDownloadUrl = (atchFileId: number) => {
+  return `${MEETING_API_PREFIX}/recordings/${atchFileId}/download`
 }
 
-// 예약 회의를 생성합니다.
-// 즉시 회의와 같은 POST /meetings를 쓰되, 날짜/시간이 포함된 payload를 보냅니다.
-const createScheduledMeeting = (payload: CreateScheduledMeetingRequest) => {
-  return axiosInstance.post<ApiResponse<MeetingSummaryResponse>>(
-    '/meetings',
-    payload,
+// STT 변환 (5초 오디오 청크 전송)
+const transcribe = (vconfId: number, audioChunk: Blob) => {
+  const formData = new FormData()
+  formData.append('audio', audioChunk, 'chunk.webm')
+  return axiosInstance.post<ApiResponse<string>>(
+    `${MEETING_API_PREFIX}/${vconfId}/stt`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
   )
 }
 
 export const meetingApi = {
-  getMeetings,
-  getMeeting,
-  createInstantMeeting,
-  createScheduledMeeting,
+  getConfList,
+  getConf,
+  createConf,
+  issueToken,
+  endConf,
+  getMom,
+  updateMom,
+  requestMomReview,
+  approveMom,
+  uploadRcrdg,
+  getRcrdgDownloadUrl,
+  transcribe,
 }
