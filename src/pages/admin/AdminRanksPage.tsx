@@ -15,6 +15,7 @@ import {
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import type { PageInfo } from '../../api/axiosInstance';
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
 import Button from '../../components/common/button/Button';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
@@ -773,12 +774,19 @@ export default function AdminRanksPage() {
                   key: 'employee',
                   header: '사원',
                   render: (employee) => (
-                    <div>
-                      <div className="font-bold text-slate-950">
-                        {employee.empNm}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        EMP-{employee.empId}
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar
+                        fileId={employee.prflImgFileId}
+                        name={employee.empNm}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-950">
+                          {employee.empNm}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-400">
+                          EMP-{employee.empId}
+                        </div>
                       </div>
                     </div>
                   ),
@@ -848,12 +856,19 @@ export default function AdminRanksPage() {
                       key: 'employee',
                       header: '사원',
                       render: (employee) => (
-                        <div>
-                          <div className="font-bold text-slate-950">
-                            {employee.empNm}
-                          </div>
-                          <div className="mt-1 text-xs font-semibold text-slate-400">
-                            EMP-{employee.empId}
+                        <div className="flex items-center gap-3">
+                          <ProfileAvatar
+                            fileId={employee.prflImgFileId}
+                            name={employee.empNm}
+                            size={36}
+                          />
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-950">
+                              {employee.empNm}
+                            </div>
+                            <div className="mt-1 text-xs font-semibold text-slate-400">
+                              EMP-{employee.empId}
+                            </div>
                           </div>
                         </div>
                       ),
@@ -1095,12 +1110,19 @@ export default function AdminRanksPage() {
                   key: 'employee',
                   header: '사원',
                   render: (employee) => (
-                    <div>
-                      <div className="font-bold text-slate-950">
-                        {employee.empNm}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-400">
-                        EMP-{employee.empId}
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar
+                        fileId={employee.prflImgFileId}
+                        name={employee.empNm}
+                        size={36}
+                      />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-950">
+                          {employee.empNm}
+                        </div>
+                        <div className="mt-1 text-xs font-semibold text-slate-400">
+                          EMP-{employee.empId}
+                        </div>
                       </div>
                     </div>
                   ),
