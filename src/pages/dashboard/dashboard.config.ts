@@ -115,6 +115,15 @@ export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayoutItem[] = [
   { i: 'attendance', x: 3, y: 6, w: 3, h: 3, minW: 3, minH: 2, maxW: 4, maxH: 4 },
 ]
 
+// 관리자 메인 대시보드 기본 레이아웃
+// (프로젝트별 진척률, 근태현황, 주요 일정, 공지사항)
+export const ADMIN_DASHBOARD_LAYOUT: DashboardLayoutItem[] = [
+  { i: 'projectProgress', x: 0, y: 0, w: 8, h: 4, minW: 4, minH: 2, maxW: 8, maxH: 5 },
+  { i: 'attendance', x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 2, maxW: 4, maxH: 4 },
+  { i: 'todaySchedule', x: 0, y: 4, w: 6, h: 4, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'notice', x: 6, y: 4, w: 6, h: 4, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+]
+
 export const DASHBOARD_WIDGET_CONFIG_MAP = DASHBOARD_WIDGETS.reduce(
   (acc, widget) => {
     acc[widget.key] = widget

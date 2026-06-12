@@ -50,17 +50,17 @@ export interface SubSidebarConfig {
 }
 
 export const menuItems: MenuItem[] = [
-  { icon: Mail, label: '메일', path: '/mail' },
-  { icon: FileText, label: '전자결재', path: '/approval' },
-  { icon: Cloud, label: '드라이브', path: '/drive' },
-  { icon: Kanban, label: '프로젝트', path: '/project' },
-  { icon: Video, label: '회의', path: '/meeting' },
   { icon: Clock, label: '근태', path: '/attendance' },
+  { icon: Kanban, label: '프로젝트', path: '/project' },
+  { icon: FileText, label: '전자결재', path: '/approval' },
+  { icon: Mail, label: '메일', path: '/mail' },
+  { icon: Cloud, label: '드라이브', path: '/drive' },
+  { icon: ClipboardList, label: '게시판', path: '/boards' },
   { icon: Calendar, label: '일정', path: '/calendar' },
+  { icon: Video, label: '회의', path: '/meeting' },
   { icon: CalendarPlus, label: '예약', path: '/reservations' },
   { icon: GraduationCap, label: '교육', path: '/education' },
   { icon: Network, label: '조직관리', path: '/organization' },
-  { icon: ClipboardList, label: '게시판', path: '/boards' },
 ]
 
 export const adminMenuItem: MenuItem = {

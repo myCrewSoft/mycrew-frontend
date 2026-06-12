@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { mypageApi } from '../api/myPageAPi';
 import type { EmployeeMyPage } from '../types/myPage';
 
-interface MyPageState {
+export interface MyPageState {
   myPage: EmployeeMyPage | null;
   loading: boolean;
   error: string;

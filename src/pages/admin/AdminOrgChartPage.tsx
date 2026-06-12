@@ -15,7 +15,6 @@ import {
 import type { Edge, Node, NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-  Avatar,
   Box,
   Chip,
   Divider,
@@ -35,6 +34,7 @@ import {
 } from 'lucide-react';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar';
 import Button from '../../components/common/button/Button';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard';
@@ -558,9 +558,11 @@ export default function AdminOrgChartPage() {
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar sx={{ bgcolor: '#2563eb', fontWeight: 800 }}>
-                      {member.empNm.slice(0, 1)}
-                    </Avatar>
+                    <ProfileAvatar
+                      fileId={member.prflImgFileId}
+                      name={member.empNm}
+                      size={40}
+                    />
                   </ListItemAvatar>
                   <ListItemText
                     primary={
