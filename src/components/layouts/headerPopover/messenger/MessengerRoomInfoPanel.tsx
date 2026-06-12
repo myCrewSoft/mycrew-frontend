@@ -1,5 +1,5 @@
 import { ArrowLeft, Edit3, LogOut, Save, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import EmployeeSearchPicker from '../../../common/employeeSearch/EmployeeSearchPicker'
 import type { EmployeeSearchItem } from '../../../common/employeeSearch/EmployeeSearchPicker'
 import type { ChatParticipant, ChatRoom } from './messenger.types'
@@ -59,17 +59,10 @@ const MessengerRoomInfoPanel = ({
   onRemoveParticipants,
   onLeaveRoom,
 }: MessengerRoomInfoPanelProps) => {
-  const [editMode, setEditMode] = useState(false)
-  const [roomName, setRoomName] = useState(room.name)
-  const [roomDescription, setRoomDescription] = useState(room.description)
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState<number[]>(
-    [],
-  )
-
   const editableRoomInfo = !isDirectChatRoom(room) && !isWorkChatRoom(room)
   const canManageParticipants = !isDirectChatRoom(room) && !isWorkChatRoom(room)
   const canLeaveRoom = !isWorkChatRoom(room)
-  const participants = room.participants ?? []
+  const participants = useMemo(() => room.participants ?? [], [room.participants])
   const participantItems = useMemo(
     () => participants.map(toEmployeeSearchItem),
     [participants],
@@ -79,13 +72,11 @@ const MessengerRoomInfoPanel = ({
     [participants],
   )
 
-  useEffect(() => {
-    // 다른 채팅방 정보로 이동하면 보기 모드와 입력값을 새 방 기준으로 초기화합니다.
-    setEditMode(false)
-    setRoomName(room.name)
-    setRoomDescription(room.description)
-    setSelectedParticipantIds(originalParticipantIds)
-  }, [originalParticipantIds, room])
+  // 부모에서 key={room.id}를 사용하므로 방이 바뀌면 컴포넌트가 remount되어 초기값이 자동으로 갱신됩니다.
+  const [editMode, setEditMode] = useState(false)
+  const [roomName, setRoomName] = useState(room.name)
+  const [roomDescription, setRoomDescription] = useState(room.description)
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState(originalParticipantIds)
 
   const handleCancelEdit = () => {
     setEditMode(false)

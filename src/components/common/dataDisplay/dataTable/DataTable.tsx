@@ -5,6 +5,7 @@ interface DataTableColumn<T> {
   header: string
   render: (row: T) => ReactNode
   className?: string
+  headerClassName?: string
 }
 
 interface DataTableProps<T> {
@@ -28,7 +29,7 @@ const DataTable = <T,>({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-4 py-3 ${column.className ?? ''}`}
+                className={`px-4 py-3 ${column.className ?? ''} ${column.headerClassName ?? ''}`}
               >
                 {column.header}
               </th>

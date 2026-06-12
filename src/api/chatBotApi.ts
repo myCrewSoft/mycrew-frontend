@@ -8,6 +8,7 @@ export interface ChatStreamParams {
   message: string
   requestId: string
   aiType: AiType
+  boardId?: number
 }
 
 interface ChatStreamHandlers {
@@ -127,11 +128,18 @@ const chatbotApi = {
     signal?: AbortSignal,
   ): Promise<void> => {
     const baseUrl = import.meta.env.VITE_API_URL as string
-    const query = new URLSearchParams({
+    const queryParams = new URLSearchParams({
       message: params.message,
       requestId: params.requestId,
       aiType: params.aiType,
-    }).toString()
+    })
+
+    // 게시글 위험 분석 요청일 때만 분석 대상 게시글 ID를 함께 전달합니다.
+    if (typeof params.boardId === 'number') {
+      queryParams.set('boardId', String(params.boardId))
+    }
+
+    const query = queryParams.toString()
     const url = `${baseUrl}/api/chat/stream?${query}`
     let response = await fetchChatStream(url, signal)
 
