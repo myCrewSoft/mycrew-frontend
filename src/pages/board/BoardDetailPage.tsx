@@ -112,6 +112,22 @@ const getCurrentEmployeeId = () => {
   return Number.isFinite(employeeId) && employeeId > 0 ? employeeId : null
 }
 
+const isSameEmployeeId = (
+  firstEmployeeId: number | string | null | undefined,
+  secondEmployeeId: number | string | null | undefined,
+) => {
+  const normalizedFirstId = Number(firstEmployeeId)
+  const normalizedSecondId = Number(secondEmployeeId)
+
+  return (
+    Number.isFinite(normalizedFirstId) &&
+    normalizedFirstId > 0 &&
+    Number.isFinite(normalizedSecondId) &&
+    normalizedSecondId > 0 &&
+    normalizedFirstId === normalizedSecondId
+  )
+}
+
 const formatCommentAuthor = (
   writerEmployeeId: number | undefined,
   boardType: BoardKind,
@@ -247,7 +263,13 @@ const BoardDetailPage = () => {
   const isEditMode = editModeKey === detailStateKey
   const currentEmployeeId = getCurrentEmployeeId()
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
-  const canDeletePost = detail ? currentEmployeeId === detail.frstRgtrId : false
+  // 부서/익명 게시판은 상세 응답에서 작성자 식별값이 누락될 수 있으므로
+  // 삭제 버튼을 표시하고 실제 권한은 인증 정보를 가진 백엔드에서 검증합니다.
+  const canDeletePost = detail
+    ? boardType === 'department' ||
+      boardType === 'anonymous' ||
+      isSameEmployeeId(currentEmployeeId, detail.frstRgtrId)
+    : false
   const currentLikeState = likeState?.key === detailStateKey
     ? likeState
     : {

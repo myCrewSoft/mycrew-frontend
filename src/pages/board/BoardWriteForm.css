@@ -4,6 +4,14 @@
   display: none !important;
 }
 
-.board-toast-editor .toastui-editor-main {
-  height: calc(100% - 46px) !important;
+.toastui-editor-contents table th {
+  background-color: #ffffff !important; /* 배경색: 흰색 고정 */
+  color: #0f172a !important;   
+  text-align: left !important;        
+}
+
+/* 혹시 th 내부의 다른 태그가 글자색을 하얗게 바꾸는 것을 방지 */
+.toastui-editor-contents table th * {
+  color: #0f172a !important;
+  text-align: left !important;        
 }
