@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
+import chatbotApi from './chatBotApi'
 import type { ApiResponse } from './axiosInstance' // 프로젝트 구조에 맞게 경로 확인 필요
 import type { BoardKind, BoardListParams } from '../types/board'
 import type {
@@ -21,6 +22,14 @@ interface UpdateBoardParams {
   boardId: number
   departmentCode?: string
   request: BoardMutationRequest
+}
+
+interface BoardRiskStreamParams {
+  boardId: number
+  message: string
+  requestId: string
+  onMessage: (message: string) => void
+  signal?: AbortSignal
 }
 
 /**
@@ -80,5 +89,37 @@ export const boardApi = {
    */
   getBoardSideBar: (): Promise<AxiosResponse<ApiResponse<BoardSideBarResponse[]>>> => {
     return axiosInstance.get('/api/boards/sidebar')
+  },
+
+  /**
+   * 게시글 위험도 분석
+   *
+   * SSE 스트림은 Axios의 일반 JSON 응답과 처리 방식이 달라 기존 chatBotApi의
+   * 인증 갱신 및 스트림 파서를 재사용합니다. 게시글 분석 타입은 항상 PORK로 고정합니다.
+   */
+  streamBoardRiskAnalysis: ({
+    boardId,
+    message,
+    requestId,
+    onMessage,
+    signal,
+  }: BoardRiskStreamParams): Promise<void> => {
+    return chatbotApi.streamChat(
+      {
+        boardId,
+        message,
+        requestId,
+        aiType: 'PORK',
+      },
+      { onMessage },
+      signal,
+    )
+  },
+
+  /**
+   * 진행 중인 게시글 위험도 분석 중단
+   */
+  stopBoardRiskAnalysis: (requestId: string): Promise<void> => {
+    return chatbotApi.stopStream(requestId)
   },
 }
