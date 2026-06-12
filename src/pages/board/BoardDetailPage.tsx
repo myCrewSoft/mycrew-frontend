@@ -17,6 +17,8 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Textarea from '../../components/common/form/textarea/Textarea'
 import BoardWriteForm from './BoardWriteForm'
+import BoardAttachmentImage from './BoardAttachmentImage'
+import BoardContentViewer from './BoardContentViewer'
 import { boardApi, type BoardMutationRequest } from '../../api/boardApi'
 import {
   boardDetailApi,
@@ -810,9 +812,14 @@ const BoardDetailPage = () => {
                 </div>
               </div>
 
-              <div className="whitespace-pre-wrap break-words border-b border-slate-200 py-7 text-[15px] font-medium leading-7 text-slate-800">
-                {detail.boardCn}
+              <div className="break-words pb-3 pt-7 text-[15px] font-medium leading-7 text-slate-800">
+                <BoardContentViewer content={detail.boardCn} />
               </div>
+
+              <BoardAttachmentImage
+                attachmentFileId={detail.boardAtchFileId}
+                alt={`${detail.boardSj} 첨부 이미지`}
+              />
 
               <section className="border-b border-slate-200 py-5">
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">

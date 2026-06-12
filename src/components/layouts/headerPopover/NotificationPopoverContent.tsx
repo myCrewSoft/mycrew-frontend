@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Clock, Megaphone, UserPlus, X } from 'lucide-react'
 import { notificationApi } from '../../../api/notificationApi'
-import type { NotificationResponse } from '../../../api/notificationApi'
 import { useApi, useApiList } from '../../../hooks/useApi'
+import type { NotificationResponse } from '../../../types'
 
 type NotificationType = 'approval' | 'schedule' | 'notice' | 'member'
 
@@ -22,11 +22,15 @@ const notificationIcon = {
 
 const mapNotificationType = (typeCode: string): NotificationType => {
   switch (typeCode) {
-    case 'APPROVAL':
-      return 'approval'
-    case 'SCHEDULE':
+    case '01':
       return 'schedule'
-    case 'MEMBER':
+    case '02':
+      return 'approval'
+    case '03':
+    case '04':
+      return 'notice'
+    case '05':
+    case '06':
       return 'member'
     default:
       return 'notice'
@@ -49,7 +53,15 @@ const formatTimeText = (sentAt: string) => {
   return `${Math.floor(diffMinutes / 1440)}일 전`
 }
 
-const NotificationPopoverContent = () => {
+interface NotificationPopoverContentProps {
+  refreshSignal?: number
+  onNotificationsChanged?: () => void | Promise<unknown>
+}
+
+const NotificationPopoverContent = ({
+  refreshSignal,
+  onNotificationsChanged,
+}: NotificationPopoverContentProps) => {
   const [deletedNotificationIds, setDeletedNotificationIds] = useState<
     number[]
   >([])
@@ -70,18 +82,19 @@ const NotificationPopoverContent = () => {
 
   useEffect(() => {
     void fetchNotifications().catch(() => undefined)
-  }, [fetchNotifications])
+  }, [fetchNotifications, refreshSignal])
 
   const visibleNotifications = useMemo(() => {
     return (notifications ?? []).filter(
       (notification) =>
-        !deletedNotificationIds.includes(notification.notificationId),
+        !deletedNotificationIds.includes(notification.alrmRcvrId),
     )
   }, [deletedNotificationIds, notifications])
 
-  const handleDeleteNotification = async (notificationId: number) => {
-    await deleteNotification(notificationId)
-    setDeletedNotificationIds((current) => [...current, notificationId])
+  const handleDeleteNotification = async (alrmRcvrId: number) => {
+    await deleteNotification(alrmRcvrId)
+    setDeletedNotificationIds((current) => [...current, alrmRcvrId])
+    await onNotificationsChanged?.()
   }
 
   if (loading) {
@@ -111,15 +124,13 @@ const NotificationPopoverContent = () => {
   return (
     <ul className="max-h-[272px] divide-y divide-slate-100 overflow-y-auto">
       {visibleNotifications.map((notification) => {
-        const notificationType = mapNotificationType(
-          notification.notificationTypeCode,
-        )
+        const notificationType = mapNotificationType(notification.alrmTypeCd)
         const Icon = notificationIcon[notificationType]
-        const unread = notification.confirmedAt === null
+        const unread = notification.alrmCfmtnDt === null
 
         return (
           <li
-            key={notification.notificationId}
+            key={notification.alrmRcvrId}
             className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50 ${
               unread ? 'bg-white' : 'bg-slate-50 opacity-60'
             }`}
@@ -135,7 +146,7 @@ const NotificationPopoverContent = () => {
             <div className="min-w-0 flex-1 pr-7">
               <div className="flex min-w-0 items-center gap-2 pr-14">
                 <p className="truncate text-sm font-bold text-slate-900">
-                  {notification.notificationTitle}
+                  {notification.alrmTtln}
                 </p>
 
                 {unread && (
@@ -144,20 +155,20 @@ const NotificationPopoverContent = () => {
               </div>
 
               <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">
-                {notification.notificationContent}
+                {notification.alrmCn}
               </p>
             </div>
 
             <div className="absolute right-4 top-2.5 flex flex-col items-end gap-1">
               <span className="whitespace-nowrap text-xs font-medium text-slate-500">
-                {formatTimeText(notification.sentAt)}
+                {formatTimeText(notification.alrmSndngDt)}
               </span>
 
               <button
                 type="button"
                 aria-label="알림 삭제"
                 onClick={() =>
-                  void handleDeleteNotification(notification.notificationId)
+                  void handleDeleteNotification(notification.alrmRcvrId)
                 }
                 className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 opacity-0 transition-all hover:bg-slate-200 hover:text-slate-700 group-hover:opacity-100"
               >

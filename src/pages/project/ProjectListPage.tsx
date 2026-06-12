@@ -112,6 +112,7 @@ const RegisterDrawer = ({
   onSuccess: () => void
 }) => {
   const { auth } = useAuth()
+
   const [projNm, setProjNm] = useState('')
   const [projCn, setProjCn] = useState('')
   const [startDate, setStartDate] = useState<Date | null>(null)
@@ -156,7 +157,6 @@ const RegisterDrawer = ({
       projBgngYmd: formatDate(startDate),
       projEndYmd: formatDate(endDate),
       projMemberList: [
-        ...(currentEmpId ? [{ empId: currentEmpId }] : []),  // 본인 자동 추가
         ...selectedMemberIds.map((id) => ({ empId: Number(id) })),
       ],
     }

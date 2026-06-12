@@ -12,3 +12,12 @@ body {
   margin: 0;
   overflow: hidden;
 }
+
+.board-content-viewer .toastui-editor-contents img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  cursor: zoom-in;
+  image-rendering: auto;
+}

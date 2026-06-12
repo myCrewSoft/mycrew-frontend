@@ -36,6 +36,7 @@ export interface RoleListResponse {
 export interface RoleEmployeeResponse {
   roleAssignmentId: number;
   empId: number;
+  prflImgFileId: number | null;
   employeeName: string;
   deptCd: string | null;
   deptName: string | null;
@@ -140,6 +141,7 @@ export interface DepartmentDeleteRequestDTO {
 export interface AdminDepartmentMemberResponseDTO {
   empId: number;
   empNm: string;
+  prflImgFileId: number | null;
   deptCd: string;
   deptNm: string;
   jobGrdCd: string | null;

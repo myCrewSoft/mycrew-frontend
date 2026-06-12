@@ -15,6 +15,7 @@ import FormField from '../../components/common/form/formField/FormField';
 import { useAuth } from '../../store/AuthContext';
 
 const firstLoginEmailStorageKey = 'firstLoginEmailAddr';
+const firstLoginNotificationRefreshKey = 'firstLoginNotificationRefresh';
 
 function getFirstLoginErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
@@ -93,6 +94,7 @@ export default function FirstLoginPage() {
       });
 
       sessionStorage.removeItem(firstLoginEmailStorageKey);
+      sessionStorage.setItem(firstLoginNotificationRefreshKey, 'true');
       localStorage.removeItem('firstLoginRequired');
       refreshAuth();
       navigate('/components', { replace: true });

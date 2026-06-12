@@ -18,8 +18,6 @@ export default function InviteMemberModal({
   open,
   onClose,
   projId,
-  employees,
-  departments,
   onSuccess,
 }: InviteMemberModalProps) {
 
@@ -60,8 +58,10 @@ export default function InviteMemberModal({
     >
       <EmployeeSearchPicker
         variant="detailed"
-        employees={employees}
-        departments={departments}
+        remoteSearch
+        showAllOnEmpty
+        showDepartmentFilter
+        fixedParams={{ excludeProjId: projId }}
         selectedEmployeeIds={selectedIds}
         onChange={setSelectedIds}
       />
