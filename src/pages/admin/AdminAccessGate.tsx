@@ -14,6 +14,7 @@ import AdminOrgChartPage from './AdminOrgChartPage';
 import AdminPage from './AdminPage';
 import AdminRanksPage from './AdminRanksPage';
 import AdminRolesPage from './AdminRolesPage';
+import AdminBoardsPage from './AdminBoardsPage';
 import { AdminDepartmentsProvider } from './adminDepartmentsContext';
 import { AdminRanksProvider } from './adminRanksContext';
 import { AdminRolesProvider } from './adminRolesContext';
@@ -173,6 +174,14 @@ export default function AdminAccessGate() {
     return (
       <AdminLayout access={access}>
         <AdminOrgChartPage />
+      </AdminLayout>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/boards')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminBoardsPage />
       </AdminLayout>
     );
   }

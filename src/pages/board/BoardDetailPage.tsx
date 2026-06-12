@@ -18,7 +18,7 @@ import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyStat
 import Textarea from '../../components/common/form/textarea/Textarea'
 import BoardWriteForm from './BoardWriteForm'
 import BoardAttachmentImage from './BoardAttachmentImage'
-import { Viewer } from '@toast-ui/react-editor'
+import BoardContentViewer from './BoardContentViewer'
 import { boardApi, type BoardMutationRequest } from '../../api/boardApi'
 import {
   boardDetailApi,
@@ -813,7 +813,7 @@ const BoardDetailPage = () => {
               </div>
 
               <div className="break-words pb-3 pt-7 text-[15px] font-medium leading-7 text-slate-800">
-                <Viewer initialValue={detail.boardCn ?? ''} />
+                <BoardContentViewer content={detail.boardCn} />
               </div>
 
               <BoardAttachmentImage
