@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LayoutDashboard, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { adminNavItems } from './adminLayoutConfig';
 import {
   getPrimaryNavLinkClass,
@@ -24,20 +24,6 @@ export default function AdminPrimarySidebar({
         </Link>
 
         <nav className="flex w-full flex-col gap-1">
-          <Link
-            to="/admin/dashboard"
-            className={getPrimaryNavLinkClass(
-              pathname === '/admin' ||
-                pathname === '/admin/' ||
-                pathname.startsWith('/admin/dashboard'),
-            )}
-          >
-            <LayoutDashboard size={22} />
-            <span className="text-[11px] font-bold leading-none tracking-tight">
-              대시보드
-            </span>
-          </Link>
-
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const active = pathname.startsWith(item.path);

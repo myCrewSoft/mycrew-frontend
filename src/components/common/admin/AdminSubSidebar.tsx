@@ -13,12 +13,13 @@ export default function AdminSubSidebar() {
   const pathname = location.pathname;
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
 
-  // 대시보드(관리자 메인)와 조직도는 서브 사이드바 없음
+  // 대시보드(관리자 메인)·조직도·결재 양식 관리는 자체 레이아웃을 써서 별도 서브 사이드바 없음
   if (
     pathname === '/admin' ||
     pathname === '/admin/' ||
     pathname.startsWith('/admin/dashboard') ||
-    pathname.startsWith('/admin/org')
+    pathname.startsWith('/admin/org') ||
+    pathname.startsWith('/admin/templates')
   ) {
     return null;
   }

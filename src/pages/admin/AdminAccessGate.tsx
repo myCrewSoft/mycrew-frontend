@@ -8,6 +8,7 @@ import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import DashboardPage from '../dashboard/DashboardPage';
 import { ADMIN_DASHBOARD_LAYOUT } from '../dashboard/dashboard.config';
+import ApprovalTemplatePage from '../approval/ApprovalTemplatePage';
 import AdminEmployeesPage from './AdminEmployeesPage';
 import AdminDepartmentsPage from './AdminDepartmentsPage';
 import AdminOrgChartPage from './AdminOrgChartPage';
@@ -136,6 +137,15 @@ export default function AdminAccessGate() {
           storageKey="mycrew.admin.dashboard.layout"
           defaultLayout={ADMIN_DASHBOARD_LAYOUT}
         />
+      </AdminLayout>
+    );
+  }
+
+  // 결재 양식 관리 (전체 양식 조회 + 생성/수정/삭제, 기안 기능은 숨김)
+  if (location.pathname.startsWith('/admin/templates')) {
+    return (
+      <AdminLayout access={access}>
+        <ApprovalTemplatePage manageOnly />
       </AdminLayout>
     );
   }
