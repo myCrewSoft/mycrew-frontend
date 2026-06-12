@@ -33,25 +33,6 @@ const STATUS_LABEL: Record<string, string> = {
   '03': '완료',
   '04': '중단',
 }
-// ── 마일스톤 아이콘 ───────────────────────────────────────────────
-const MilestoneIcon = ({ status }: { status: 'done' | 'in_progress' | 'pending' }) => {
-  if (status === 'done')
-    return (
-      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
-        <CheckCircle2 size={16} className="text-blue-600" />
-      </div>
-    )
-  if (status === 'in_progress')
-    return (
-      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 shadow-md shadow-blue-200">
-        <Circle size={10} className="fill-white text-white" />
-      </div>
-    )
-  return (
-    <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white">
-      <Circle size={10} className="text-slate-300" />
-    </div>
-  )
 const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'success'> = {
   '01': 'warning',
   '02': 'primary',

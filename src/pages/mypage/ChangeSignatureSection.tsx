@@ -14,14 +14,6 @@ const getErrorMessage = (error: unknown) => {
   return '전자서명 변경 중 문제가 발생했습니다.';
 };
 
-// 업로드 응답이 number 이거나 { fileId } / { atchFileId } 형태일 수 있어 모두 처리한다.
-const extractFileId = (
-  data: number | { fileId?: number; atchFileId?: number } | undefined,
-): number | null => {
-  if (typeof data === 'number') return data;
-  return data?.fileId ?? data?.atchFileId ?? null;
-};
-
 interface ChangeSignatureSectionProps {
   state: MyPageState;
 }
@@ -82,14 +74,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
     setSubmitting(true);
 
     try {
-      const uploadResponse = await mypageApi.uploadStampImage(selectedFile);
-      const fileId = extractFileId(uploadResponse.data.data);
-
-      if (!fileId) {
-        throw new Error('업로드된 파일 ID를 받지 못했습니다.');
-      }
-
-      await mypageApi.changeSignature({ mbrStampFileId: fileId });
+      await mypageApi.changeSignature(selectedFile);
 
       showToast({ title: '전자서명 이미지가 변경되었습니다.', variant: 'success' });
       setSelectedFile(null);
