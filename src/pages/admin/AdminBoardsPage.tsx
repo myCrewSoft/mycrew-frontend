@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Eye,
   FileText,
@@ -10,7 +10,10 @@ import {
   Plus,
   RefreshCw,
   Send,
+  ShieldAlert,
   ShieldQuestion,
+  Sparkles,
+  Square,
   ThumbsUp,
   Trash2,
 } from 'lucide-react'
@@ -67,6 +70,62 @@ interface AdminBoardDetailParams {
   boardType: AdminBoardKind
   boardId: number
   deptCd?: string
+}
+
+interface BoardRiskAnalysis {
+  riskScore: number
+  reason: string
+}
+
+// GET 방식의 스트리밍 API는 URL 길이 제한이 있으므로 인코딩된 메시지 크기를 제한합니다.
+// 제목은 항상 포함하고, 본문은 허용 범위 안에서 최대한 많이 전달합니다.
+const buildBoardAnalysisMessage = (board: BoardResponse) => {
+  const document = new DOMParser().parseFromString(board.boardCn ?? '', 'text/html')
+  const content = document.body.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+  const prefix = `게시글 제목: ${board.boardSj}\n게시글 내용: `
+  const maxEncodedLength = 6000
+
+  let low = 0
+  let high = content.length
+
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    const candidate = `${prefix}${content.slice(0, middle)}`
+
+    if (encodeURIComponent(candidate).length <= maxEncodedLength) {
+      low = middle
+    } else {
+      high = middle - 1
+    }
+  }
+
+  return `${prefix}${content.slice(0, low)}`
+}
+
+// AI 응답이 마크다운 코드 블록으로 감싸져도 내부 JSON만 찾아 안전하게 변환합니다.
+const parseBoardRiskAnalysis = (content: string): BoardRiskAnalysis => {
+  const jsonStart = content.indexOf('{')
+  const jsonEnd = content.lastIndexOf('}')
+
+  if (jsonStart < 0 || jsonEnd <= jsonStart) {
+    throw new Error('분석 결과 형식을 확인할 수 없습니다.')
+  }
+
+  const parsed = JSON.parse(content.slice(jsonStart, jsonEnd + 1)) as {
+    risk_score?: unknown
+    reason?: unknown
+  }
+  const riskScore = Number(parsed.risk_score)
+  const reason = typeof parsed.reason === 'string' ? parsed.reason.trim() : ''
+
+  if (!Number.isFinite(riskScore) || riskScore < 0 || riskScore > 100 || !reason) {
+    throw new Error('분석 결과에 필요한 값이 없습니다.')
+  }
+
+  return {
+    riskScore: Math.round(riskScore),
+    reason,
+  }
 }
 
 // 관리자 화면에서 선택한 게시판 종류에 맞는 상세 조회 API를 호출합니다.
@@ -177,6 +236,10 @@ const AdminBoardsPage = () => {
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentContent, setEditingCommentContent] = useState('')
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
+  const [riskAnalysis, setRiskAnalysis] = useState<BoardRiskAnalysis | null>(null)
+  const [analyzingRisk, setAnalyzingRisk] = useState(false)
+  const analysisAbortControllerRef = useRef<AbortController | null>(null)
+  const analysisRequestIdRef = useRef('')
   // 현재 열려 있는 게시글의 좋아요 여부와 개수를 별도로 관리합니다.
   // 상세 응답과 좋아요 전용 API의 응답 시점이 다르기 때문입니다.
   const [likeState, setLikeState] = useState({
@@ -360,6 +423,11 @@ const AdminBoardsPage = () => {
 
   const openBoardDetail = async (board: BoardResponse) => {
     // 새 게시글을 열 때 이전 게시글의 댓글 편집 및 좋아요 상태를 초기화합니다.
+    analysisAbortControllerRef.current?.abort()
+    analysisAbortControllerRef.current = null
+    analysisRequestIdRef.current = ''
+    setAnalyzingRisk(false)
+    setRiskAnalysis(null)
     setEditingCommentId(null)
     setEditingCommentContent('')
     setDeletingCommentId(null)
@@ -411,6 +479,81 @@ const AdminBoardsPage = () => {
       })
     }
   }
+
+  const stopRiskAnalysis = () => {
+    const requestId = analysisRequestIdRef.current
+
+    analysisAbortControllerRef.current?.abort()
+    analysisAbortControllerRef.current = null
+    analysisRequestIdRef.current = ''
+    setAnalyzingRisk(false)
+
+    if (requestId) {
+      void boardApi.stopBoardRiskAnalysis(requestId).catch(() => undefined)
+    }
+  }
+
+  const closeBoardDetail = () => {
+    stopRiskAnalysis()
+    setRiskAnalysis(null)
+    setDetailTarget(null)
+    setCommentContent('')
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+  }
+
+  const analyzeBoardRisk = async () => {
+    if (!detailTarget || analyzingRisk) return
+
+    const requestId = `board-risk-${detailTarget.boardId}-${Date.now()}`
+    const abortController = new AbortController()
+    let accumulated = ''
+
+    analysisAbortControllerRef.current = abortController
+    analysisRequestIdRef.current = requestId
+    setRiskAnalysis(null)
+    setAnalyzingRisk(true)
+
+    try {
+      await boardApi.streamBoardRiskAnalysis({
+        boardId: detailTarget.boardId,
+        message: buildBoardAnalysisMessage(detailTarget),
+        requestId,
+        onMessage: (chunk) => {
+          accumulated += chunk
+        },
+        signal: abortController.signal,
+      })
+
+      if (analysisRequestIdRef.current !== requestId) return
+
+      setRiskAnalysis(parseBoardRiskAnalysis(accumulated))
+    } catch (analysisError) {
+      if (analysisError instanceof DOMException && analysisError.name === 'AbortError') {
+        return
+      }
+
+      showToast({
+        title: '게시글 위험도 분석에 실패했습니다.',
+        description: analysisError instanceof Error
+          ? analysisError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    } finally {
+      if (analysisRequestIdRef.current === requestId) {
+        analysisAbortControllerRef.current = null
+        analysisRequestIdRef.current = ''
+        setAnalyzingRisk(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      analysisAbortControllerRef.current?.abort()
+    }
+  }, [])
 
   const handleLikeToggle = async () => {
     if (!detailTarget || !currentEmployeeId || togglingLike) return
@@ -935,18 +1078,15 @@ const AdminBoardsPage = () => {
         title="관리자 게시글 상세"
         description={`${boardLabelByType[boardType]} 운영 상세 정보`}
         size="xl"
-        onClose={() => {
-          setDetailTarget(null)
-          setCommentContent('')
-          setEditingCommentId(null)
-          setEditingCommentContent('')
-        }}
+        onClose={closeBoardDetail}
         footer={
           <>
             <Button
               variant="primary"
               leftIcon={<Pencil size={15} />}
               onClick={() => {
+                stopRiskAnalysis()
+                setRiskAnalysis(null)
                 setEditTarget(detailTarget)
                 setDetailTarget(null)
               }}
@@ -957,13 +1097,15 @@ const AdminBoardsPage = () => {
               variant="danger"
               leftIcon={<Trash2 size={15} />}
               onClick={() => {
+                stopRiskAnalysis()
+                setRiskAnalysis(null)
                 setDeleteTarget(detailTarget)
                 setDetailTarget(null)
               }}
             >
               게시글 삭제
             </Button>
-            <Button variant="outline" onClick={() => setDetailTarget(null)}>
+            <Button variant="outline" onClick={closeBoardDetail}>
               닫기
             </Button>
           </>
@@ -1026,7 +1168,67 @@ const AdminBoardsPage = () => {
               alt={`${detailTarget.boardSj} 첨부 이미지`}
             />
 
-            <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={18} className="text-blue-600" />
+                  <h4 className="text-sm font-bold text-slate-900">
+                    AI 게시글 위험 분석
+                  </h4>
+                </div>
+
+                {analyzingRisk ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Square size={13} fill="currentColor" />}
+                    onClick={stopRiskAnalysis}
+                  >
+                    분석 중단
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<ShieldAlert size={15} />}
+                    onClick={() => void analyzeBoardRisk()}
+                  >
+                    {riskAnalysis ? '다시 분석' : '위험도 분석'}
+                  </Button>
+                )}
+              </div>
+
+              {analyzingRisk && (
+                <div className="mt-4 flex min-h-24 items-center justify-center rounded-md border border-dashed border-blue-200 bg-blue-50/60 text-sm font-semibold text-blue-600">
+                  게시글 내용을 분석하고 있습니다.
+                </div>
+              )}
+
+              {!analyzingRisk && riskAnalysis && (
+                <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400">
+                        위험도
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-slate-900">
+                        {riskAnalysis.riskScore}%
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-400">
+                        분석 사유
+                      </p>
+                      <p className="mt-1 break-words text-sm font-medium leading-6 text-slate-700">
+                        {riskAnalysis.reason}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-4">
               <Badge variant="neutral">
                 댓글 {detailTarget.commentList?.length ?? 0}
               </Badge>
