@@ -40,25 +40,25 @@ const ProjectSubSidebarContent = () => {
           icon={LayoutGrid}
           label="전체 프로젝트"
           path="/project"
-          active={location.pathname === '/project' || location.pathname === '/project'}
+          active={location.pathname === '/project' && !location.search}
         />
         <SubSidebarMenuItem
           icon={Circle}
           label="진행 중"
-          path="/project/list?status=in_progress"
-          active={false}
+          path="/project?status=02"
+          active={location.pathname === '/project' && location.search === '?status=02'}
         />
         <SubSidebarMenuItem
           icon={CheckCircle2}
           label="완료"
-          path="/project/list?status=completed"
-          active={false}
+          path="/project?status=03"
+          active={location.pathname === '/project' && location.search === '?status=03'}
         />
         <SubSidebarMenuItem
           icon={Ban}
           label="중단"
-          path="/project/list?status=stopped"
-          active={false}
+          path="/project?status=04"
+          active={location.pathname === '/project' && location.search === '?status=04'}
         />
       </SubSidebarSection>
 

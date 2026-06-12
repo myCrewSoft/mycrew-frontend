@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ImageUp, Signature } from 'lucide-react';
 import { ApiError } from '../../api/axiosInstance';
 import { mypageApi } from '../../api/myPageAPi';
@@ -8,22 +8,36 @@ import { useToast } from '../../components/common/toast/useToast';
 import type { MyPageState } from '../../hooks/useMyPage';
 import useImage from '../../hooks/useImage';
 
-const getErrorMessage = (error: unknown) =>
-  error instanceof ApiError ? error.message : '전자서명 변경 중 문제가 발생했습니다.';
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return '전자서명 변경 중 문제가 발생했습니다.';
+};
+
+// 업로드 응답이 number 이거나 { fileId } / { atchFileId } 형태일 수 있어 모두 처리한다.
+const extractFileId = (
+  data: number | { fileId?: number; atchFileId?: number } | undefined,
+): number | null => {
+  if (typeof data === 'number') return data;
+  return data?.fileId ?? data?.atchFileId ?? null;
+};
 
 interface ChangeSignatureSectionProps {
   state: MyPageState;
 }
+
 function SignatureImage({ fileId, alt }: { fileId: number; alt: string }) {
-  const src = useImage(fileId)
-  if (!src) return null
+  const src = useImage(fileId);
+
+  if (!src) return null;
+
   return (
     <img
       src={src}
       alt={alt}
       className="max-h-28 max-w-full object-contain"
     />
-  )
+  );
 }
 
 export default function ChangeSignatureSection({ state }: ChangeSignatureSectionProps) {
@@ -42,17 +56,23 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       setPreviewUrl(null);
       return;
     }
+
     const url = URL.createObjectURL(selectedFile);
     setPreviewUrl(url);
+
     return () => URL.revokeObjectURL(url);
   }, [selectedFile]);
 
-  const handleSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelect = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
+
     if (file && !file.type.startsWith('image/')) {
       showToast({ title: '이미지 파일만 업로드할 수 있습니다.', variant: 'danger' });
+      event.target.value = '';
+      setSelectedFile(null);
       return;
     }
+
     setSelectedFile(file);
   };
 
@@ -60,13 +80,25 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
     if (!selectedFile || submitting) return;
 
     setSubmitting(true);
+
     try {
-      await mypageApi.changeSignature(selectedFile);
+      const uploadResponse = await mypageApi.uploadStampImage(selectedFile);
+      const fileId = extractFileId(uploadResponse.data.data);
+
+      if (!fileId) {
+        throw new Error('업로드된 파일 ID를 받지 못했습니다.');
+      }
+
+      await mypageApi.changeSignature({ mbrStampFileId: fileId });
+
       showToast({ title: '전자서명 이미지가 변경되었습니다.', variant: 'success' });
       setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       await reload();
-      
     } catch (error) {
       showToast({
         title: '전자서명 변경 실패',
@@ -77,7 +109,7 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
       setSubmitting(false);
     }
   };
-  
+
   return (
     <ContentCard
       title="전자서명 이미지 변경"
@@ -134,11 +166,13 @@ export default function ChangeSignatureSection({ state }: ChangeSignatureSection
           >
             이미지 선택
           </Button>
+
           {selectedFile && (
             <span className="truncate text-xs font-semibold text-slate-500">
               {selectedFile.name}
             </span>
           )}
+
           <Button
             type="button"
             variant="primary"

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { Camera, Loader2 } from 'lucide-react';
 import { ApiError } from '../../api/axiosInstance';
 import { mypageApi } from '../../api/myPageAPi';
@@ -37,10 +37,11 @@ interface ProfileSectionProps {
   state: MyPageState;
 }
 
-const getUploadErrorMessage = (error: unknown) =>
-  error instanceof ApiError
-    ? error.message
-    : '프로필 이미지 변경 중 문제가 발생했습니다.';
+const getUploadErrorMessage = (error: unknown) => {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return '프로필 이미지 변경 중 문제가 발생했습니다.';
+};
 
 export default function ProfileSection({ state }: ProfileSectionProps) {
   const { myPage, loading, error, reload } = state;
@@ -53,11 +54,13 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
     fileInputRef.current?.click();
   };
 
-  const handleImageChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleImageChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
-    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
@@ -69,9 +72,15 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
     }
 
     setUploading(true);
+
     try {
       await mypageApi.changeProfileImage(file);
-      showToast({ title: '프로필 이미지가 변경되었습니다.', variant: 'success' });
+
+      showToast({
+        title: '프로필 이미지가 변경되었습니다.',
+        variant: 'success',
+      });
+
       await reload();
     } catch (uploadError) {
       showToast({
@@ -117,7 +126,7 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
 
               <button
                 type="button"
-                onClick={() => void handlePickImage()}
+                onClick={handlePickImage}
                 disabled={uploading}
                 aria-label="프로필 이미지 변경"
                 title="프로필 이미지 변경"
@@ -135,6 +144,7 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
               <h2 className="text-xl font-bold text-slate-950">
                 {formatMyPageValue(myPage.empNm, '사용자')}
               </h2>
+
               <p className="mt-2 text-sm font-semibold text-slate-500">
                 {getMyPageMeta(myPage)}
               </p>
@@ -166,8 +176,14 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
               label="휴대전화"
               value={formatMyPageValue(myPage.mblTelno)}
             />
-            <InfoItem label="입사일" value={formatMyPageDate(myPage.entcoYmd)} />
-            <InfoItem label="주소" value={formatAddress(myPage.zip, myPage.addr)} />
+            <InfoItem
+              label="입사일"
+              value={formatMyPageDate(myPage.entcoYmd)}
+            />
+            <InfoItem
+              label="주소"
+              value={formatAddress(myPage.zip, myPage.addr)}
+            />
             <InfoItem label="역할" value={getRoleNames(myPage)} />
           </dl>
         </div>
