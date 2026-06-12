@@ -178,7 +178,7 @@ const ProjectDetailPage = () => {
 
       {tab === 'tasks' && (
         <ProjectTasksTab
-          projectId={projectId}
+          projectId={project.projId}
           viewMode={taskViewMode}
           createModalOpen={taskCreateModalOpen}
           createStatus={taskCreateStatus}
