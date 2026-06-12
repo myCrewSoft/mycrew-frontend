@@ -1,9 +1,8 @@
 // src/pages/project/ProjectListPage.tsx
 
 import { Calendar, Plus, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { employeeApi } from '../../api/employeeApi'
 import { projectApi } from '../../api/projectApi'
 import Button from '../../components/common/button/Button'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
@@ -118,18 +117,7 @@ const RegisterDrawer = ({
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
   const [selectedMemberIds, setSelectedMemberIds] = useState<Array<string | number>>([])
-
-  const { data: employeeData, execute: fetchEmployees } = useApiList(
-    employeeApi.lookupEmployees,
-    { immediate: false },
-  )
-  const employees: EmployeeSearchItem[] = employeeData ?? []
-  const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
-
-  useEffect(() => {
-    if (!open) return
-    void fetchEmployees({})
-  }, [open, fetchEmployees])
+  const currentEmpId = auth.payload?.sub ? Number(auth.payload.sub) : undefined
 
   const { execute: createProject, loading: creating } = useApi(
     projectApi.createProject,
