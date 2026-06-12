@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Viewer } from '@toast-ui/react-editor'
+import Viewer  from '@toast-ui/editor'
 import { ZoomIn } from 'lucide-react'
 import { getImage } from '../../api/fileApi'
 import Modal from '../../components/common/overlay/modal/Modal'
@@ -72,7 +72,7 @@ const BoardContentViewer = ({ content = '' }: BoardContentViewerProps) => {
           }
         }}
       >
-        <Viewer key={displayContent} initialValue={displayContent} />
+        <Viewer.arguments key={displayContent} initialValue={displayContent} />
       </div>
 
       <Modal
