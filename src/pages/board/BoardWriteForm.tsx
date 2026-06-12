@@ -194,12 +194,17 @@ const BoardWriteForm = ({
   useEffect(() => {
     if (!editorHostRef.current) return
 
+    const editorHost = editorHostRef.current
     const editor = new ToastEditor({
-      el: editorHostRef.current,
+      el: editorHost,
       initialValue: initialContent,
       initialEditType: 'wysiwyg',
       previewStyle: 'vertical',
-      height: '350px',
+      // Toast Editor의 자동 높이 기능을 사용해 내용만큼 입력 영역을 늘립니다.
+      // 고정 높이를 사용하지 않으므로 짧은 글의 빈 공간과 좁은 내부 스크롤이 사라집니다.
+      height: 'auto',
+      // 작성 화면의 남는 공간을 활용할 수 있도록 빈 글의 기본 입력 높이는 확보합니다.
+      minHeight: '400px',
       usageStatistics: false,
       useCommandShortcut: true,
       hideModeSwitch: true,
@@ -208,7 +213,7 @@ const BoardWriteForm = ({
         ['hr', 'quote'],
         ['ul', 'ol', 'task', 'indent', 'outdent'],
         ['table', 'link'],
-        ['code', 'codeblock'],
+        ['code'],
       ],
       events: {
         change: () => {
@@ -221,7 +226,27 @@ const BoardWriteForm = ({
     editor.changeMode('wysiwyg', true)
     editorRef.current = editor
 
+    const handleEmptyTableDelete = (event: KeyboardEvent) => {
+      if (event.key !== 'Backspace' && event.key !== 'Delete') return
+
+      const selectionNode = window.getSelection()?.anchorNode
+      const selectionElement = selectionNode instanceof Element
+        ? selectionNode
+        : selectionNode?.parentElement
+      const selectedTable = selectionElement?.closest('table')
+
+      // Toast UI는 새 표를 만들 때 내용이 없는 머리글 행도 함께 생성합니다.
+      // 빈 표 안에서 Delete/Backspace를 누르면 셀이 아니라 표 전체를 삭제합니다.
+      if (!selectedTable || selectedTable.textContent?.trim()) return
+
+      event.preventDefault()
+      editor.exec('removeTable')
+    }
+
+    editorHost.addEventListener('keydown', handleEmptyTableDelete)
+
     return () => {
+      editorHost.removeEventListener('keydown', handleEmptyTableDelete)
       editor.destroy()
       editorRef.current = null
     }
@@ -387,12 +412,11 @@ const BoardWriteForm = ({
           </label>
           <div className="overflow-hidden rounded-md border border-slate-300 bg-white">
             <div className="board-toast-editor">
-              <div ref={editorHostRef} />
+              <div ref={editorHostRef} className="board-write-editor" />
             </div>
 
             <div className="flex h-10 items-center justify-between border-t border-slate-200 px-5 text-sm font-medium text-slate-500">
               <span>입력 바이트: {contentByteLength.toLocaleString()} / 10,000 byte</span>
-              <span>임시저장 준비 중</span>
             </div>
           </div>
 

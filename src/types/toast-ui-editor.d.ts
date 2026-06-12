@@ -27,6 +27,7 @@ declare module '@toast-ui/editor' {
     constructor(options: EditorOptions)
 
     changeMode(mode: EditorMode, isWithoutFocus?: boolean): void
+    exec(command: string, payload?: Record<string, unknown>): void
     getMarkdown(): string
     destroy(): void
   }

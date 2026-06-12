@@ -9,13 +9,21 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Send,
   ShieldQuestion,
+  ThumbsUp,
   Trash2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../../api/adminApi'
 import { boardApi } from '../../api/boardApi'
+import {
+  boardDetailApi,
+  type BoardCommentMutationRequest,
+  type BoardLikeResponse,
+} from '../../api/boardDetailApi'
 import { ApiError } from '../../api/axiosInstance'
+import { profileApi } from '../../api/profileApi'
 import {
   projectBoardApi,
   type ProjectBoardListParams,
@@ -27,11 +35,13 @@ import DataTable from '../../components/common/dataDisplay/dataTable/DataTable'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
+import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
 import type { BoardKind, BoardListParams } from '../../types/board'
 import type {
+  BoardCommentUpdateRequest,
   BoardResponse,
   BoardSideBarResponse,
   PageBoardResponse,
@@ -51,6 +61,30 @@ type AdminBoardKind = BoardKind | 'project'
 
 type DepartmentBoardOption = BoardSideBarResponse & {
   deptCd?: string
+}
+
+interface AdminBoardDetailParams {
+  boardType: AdminBoardKind
+  boardId: number
+  deptCd?: string
+}
+
+// 관리자 화면에서 선택한 게시판 종류에 맞는 상세 조회 API를 호출합니다.
+// 프로젝트 게시판은 일반 게시판과 상세 조회 주소가 달라 별도로 분기합니다.
+const getAdminBoardDetail = ({
+  boardType,
+  boardId,
+  deptCd,
+}: AdminBoardDetailParams) => {
+  if (boardType === 'project') {
+    return projectBoardApi.getBoardDetail(boardId)
+  }
+
+  return boardDetailApi.getBoardDetail({
+    boardType,
+    boardId,
+    deptCd,
+  })
 }
 
 const boardTypeOptions: BoardTypeOption[] = [
@@ -87,6 +121,46 @@ const formatAuthor = (board: BoardResponse, type: AdminBoardKind) => {
   return `${board.empNm?.trim() || '사원'}(${board.frstRgtrId})`
 }
 
+const formatCommentAuthor = (
+  employeeId: number | undefined,
+  type: AdminBoardKind,
+  currentEmployeeId: number | null,
+  currentEmployeeName: string,
+) => {
+  if (type === 'anonymous') return '익명'
+
+  if (employeeId === currentEmployeeId && currentEmployeeName) {
+    return `${currentEmployeeName}(${employeeId})`
+  }
+
+  return `사원(${employeeId ?? '-'})`
+}
+
+const getCurrentEmployeeId = () => {
+  const employeeId = Number(localStorage.getItem('empId'))
+
+  return Number.isFinite(employeeId) && employeeId > 0 ? employeeId : null
+}
+
+// 좋아요 조회 API의 응답 필드가 달라져도 화면이 동작하도록
+// 가능한 필드명을 확인하고, 값이 없으면 전달받은 fallback을 사용합니다.
+const parseBoardLikeState = (
+  response: BoardLikeResponse,
+  fallback: { isLiked: boolean; likeCnt: number },
+) => {
+  const likedValue = response.isLiked ?? response.liked
+  const countValue = response.likeCnt ?? response.likeCount ?? response.count
+
+  return {
+    isLiked: typeof likedValue === 'boolean'
+      ? likedValue
+      : fallback.isLiked,
+    likeCnt: typeof countValue === 'number' && Number.isFinite(countValue)
+      ? countValue
+      : fallback.likeCnt,
+  }
+}
+
 const AdminBoardsPage = () => {
   const navigate = useNavigate()
   const { showToast } = useToast()
@@ -99,6 +173,17 @@ const AdminBoardsPage = () => {
   const [detailTarget, setDetailTarget] = useState<BoardResponse | null>(null)
   const [editTarget, setEditTarget] = useState<BoardResponse | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BoardResponse | null>(null)
+  const [commentContent, setCommentContent] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
+  const [editingCommentContent, setEditingCommentContent] = useState('')
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
+  // 현재 열려 있는 게시글의 좋아요 여부와 개수를 별도로 관리합니다.
+  // 상세 응답과 좋아요 전용 API의 응답 시점이 다르기 때문입니다.
+  const [likeState, setLikeState] = useState({
+    boardId: 0,
+    isLiked: false,
+    likeCnt: 0,
+  })
 
   const {
     data: pageData,
@@ -127,6 +212,61 @@ const AdminBoardsPage = () => {
     loading: deleting,
     execute: deleteBoard,
   } = useApi<null, [number]>(boardApi.deleteBoard, { immediate: false })
+  const {
+    loading: detailLoading,
+    execute: loadBoardDetail,
+  } = useApi<BoardResponse, [AdminBoardDetailParams]>(
+    getAdminBoardDetail,
+    { immediate: false },
+  )
+  const {
+    data: currentProfile,
+  } = useApi(profileApi.getMyProfile)
+  const {
+    loading: creatingComment,
+    execute: createBoardComment,
+  } = useApi<number, [BoardCommentMutationRequest]>(
+    boardDetailApi.createBoardComment,
+    { immediate: false },
+  )
+  const {
+    loading: updatingComment,
+    execute: updateBoardComment,
+  } = useApi<number, [BoardCommentUpdateRequest]>(
+    boardDetailApi.updateBoardComment,
+    { immediate: false },
+  )
+  const {
+    loading: deletingComment,
+    execute: deleteBoardComment,
+  } = useApi<string, [number]>(
+    boardDetailApi.deleteBoardComment,
+    { immediate: false },
+  )
+  const {
+    execute: fetchBoardLike,
+  } = useApi<BoardLikeResponse, [number, number]>(
+    boardDetailApi.getBoardLike,
+    { immediate: false },
+  )
+  const {
+    loading: togglingLike,
+    execute: toggleBoardLike,
+  } = useApi<boolean, [number, number]>(
+    boardDetailApi.toggleBoardLike,
+    { immediate: false },
+  )
+
+  const currentEmployeeId = getCurrentEmployeeId()
+  const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  // 다른 게시글의 좋아요 상태가 잠깐 표시되지 않도록 boardId가 같은지 확인합니다.
+  const currentLikeState = detailTarget && likeState.boardId === detailTarget.boardId
+    ? likeState
+    : {
+        boardId: detailTarget?.boardId ?? 0,
+        isLiked: detailTarget?.isLiked ?? false,
+        likeCnt: detailTarget?.likeCnt ?? 0,
+      }
 
   const departmentOptions = useMemo(() => {
     const departmentBoard = sidebarData?.find(
@@ -216,6 +356,273 @@ const AdminBoardsPage = () => {
       keyword,
       departmentCode: selectedDepartmentCode,
     })
+  }
+
+  const openBoardDetail = async (board: BoardResponse) => {
+    // 새 게시글을 열 때 이전 게시글의 댓글 편집 및 좋아요 상태를 초기화합니다.
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setDeletingCommentId(null)
+    setCommentContent('')
+    setLikeState({
+      boardId: board.boardId,
+      isLiked: board.isLiked ?? false,
+      likeCnt: board.likeCnt ?? 0,
+    })
+    setDetailTarget(board)
+
+    try {
+      // 상세 내용과 현재 사용자의 좋아요 상태는 서로 독립적인 API이므로
+      // Promise.all로 동시에 요청해 모달 로딩 시간을 줄입니다.
+      const [detailResponse, likeResponse] = await Promise.all([
+        loadBoardDetail({
+          boardType,
+          boardId: board.boardId,
+          deptCd: board.deptCd || selectedDepartmentCode,
+        }),
+        currentEmployeeId
+          ? fetchBoardLike(board.boardId, currentEmployeeId).catch(() => null)
+          : Promise.resolve(null),
+      ])
+
+      if (detailResponse.data) {
+        setDetailTarget(detailResponse.data)
+      }
+
+      // 좋아요 전용 API가 실패하거나 일부 필드를 주지 않는 경우에는
+      // 상세 응답 또는 목록 응답의 좋아요 값을 대신 사용합니다.
+      const fallback = {
+        isLiked: detailResponse.data?.isLiked ?? board.isLiked ?? false,
+        likeCnt: detailResponse.data?.likeCnt ?? board.likeCnt ?? 0,
+      }
+
+      setLikeState({
+        boardId: board.boardId,
+        ...parseBoardLikeState(likeResponse?.data ?? {}, fallback),
+      })
+    } catch (detailError) {
+      setDetailTarget(null)
+      showToast({
+        title: '게시글 상세 정보를 불러오지 못했습니다.',
+        description: detailError instanceof ApiError
+          ? detailError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const handleLikeToggle = async () => {
+    if (!detailTarget || !currentEmployeeId || togglingLike) return
+
+    const boardId = detailTarget.boardId
+    // 현재 모달과 likeState의 게시글이 다르면 상세 데이터의 값을 기준으로 시작합니다.
+    const currentLikeState = likeState.boardId === boardId
+      ? likeState
+      : {
+          boardId,
+          isLiked: detailTarget.isLiked ?? false,
+          likeCnt: detailTarget.likeCnt ?? 0,
+        }
+
+    try {
+      // 같은 API가 좋아요 등록과 취소를 토글 방식으로 처리합니다.
+      const toggleResponse = await toggleBoardLike(boardId, currentEmployeeId)
+      const nextLiked = toggleResponse.data ?? !currentLikeState.isLiked
+      // 토글 API가 좋아요 개수를 주지 않을 때 사용할 임시 화면 값입니다.
+      const fallback = {
+        isLiked: nextLiked,
+        likeCnt: Math.max(
+          0,
+          currentLikeState.likeCnt + (nextLiked ? 1 : -1),
+        ),
+      }
+
+      const likeResponse = await fetchBoardLike(
+        boardId,
+        currentEmployeeId,
+      ).catch(() => null)
+      // 토글 직후 서버의 최종 상태를 다시 조회해 화면과 DB 값을 맞춥니다.
+      const nextLikeState = parseBoardLikeState(
+        likeResponse?.data ?? {},
+        fallback,
+      )
+
+      setLikeState({
+        boardId,
+        ...nextLikeState,
+      })
+      // 상세 객체도 함께 갱신해 모달 안의 다른 좋아요 표시와 값을 일치시킵니다.
+      setDetailTarget((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            isLiked: nextLikeState.isLiked,
+            likeCnt: nextLikeState.likeCnt,
+          }
+        : currentDetail)
+    } catch (likeError) {
+      showToast({
+        title: '좋아요 처리에 실패했습니다.',
+        description: likeError instanceof ApiError
+          ? likeError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const toggleCommentEdit = (
+    commentId: number | undefined,
+    commentContent: string | undefined,
+  ) => {
+    if (!commentId) return
+
+    if (editingCommentId === commentId) {
+      setEditingCommentId(null)
+      setEditingCommentContent('')
+      return
+    }
+
+    setEditingCommentId(commentId)
+    setEditingCommentContent(commentContent ?? '')
+  }
+
+  const submitComment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const trimmedContent = commentContent.trim()
+    if (
+      !detailTarget ||
+      !trimmedContent ||
+      creatingComment ||
+      detailTarget.cmntUseYn?.toUpperCase() === 'N'
+    ) {
+      return
+    }
+
+    const topLevelCommentCount = (detailTarget.commentList ?? []).filter(
+      (comment) => !comment.commentPrtId,
+    ).length
+
+    try {
+      const response = await createBoardComment({
+        boardId: detailTarget.boardId,
+        commentCn: trimmedContent,
+        commentPrtId: null,
+        commentDepth: 0,
+        commentOrder: topLevelCommentCount + 1,
+      })
+
+      // 등록 직후 상세 API를 다시 호출하지 않고 응답받은 댓글 ID로 목록을 갱신합니다.
+      setDetailTarget((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            commentList: [
+              ...(currentDetail.commentList ?? []),
+              {
+                commentId: response.data,
+                boardId: currentDetail.boardId,
+                commentCn: trimmedContent,
+                wrterEmpId: currentEmployeeId ?? undefined,
+                wrteDt: new Date().toISOString(),
+                commentDepth: 0,
+                commentOrder: topLevelCommentCount + 1,
+              },
+            ],
+          }
+        : currentDetail)
+      setCommentContent('')
+      showToast({
+        title: '댓글을 등록했습니다.',
+        variant: 'success',
+      })
+    } catch (commentError) {
+      showToast({
+        title: '댓글을 등록하지 못했습니다.',
+        description: commentError instanceof ApiError
+          ? commentError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const submitCommentEdit = async (
+    event: React.FormEvent<HTMLFormElement>,
+    commentId: number,
+  ) => {
+    event.preventDefault()
+
+    const trimmedContent = editingCommentContent.trim()
+    if (!trimmedContent || updatingComment) return
+
+    try {
+      await updateBoardComment({
+        commentId,
+        commentCn: trimmedContent,
+      })
+
+      // 수정 성공 후 상세 API를 다시 호출하지 않고 해당 댓글만 즉시 교체합니다.
+      setDetailTarget((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            commentList: (currentDetail.commentList ?? []).map((comment) =>
+              comment.commentId === commentId
+                ? { ...comment, commentCn: trimmedContent }
+                : comment,
+            ),
+          }
+        : currentDetail)
+      setEditingCommentId(null)
+      setEditingCommentContent('')
+      showToast({
+        title: '댓글을 수정했습니다.',
+        variant: 'success',
+      })
+    } catch (commentError) {
+      showToast({
+        title: '댓글을 수정하지 못했습니다.',
+        description: commentError instanceof ApiError
+          ? commentError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const removeComment = async (commentId: number) => {
+    if (deletingComment) return
+    if (!window.confirm('댓글을 삭제하시겠습니까?')) return
+
+    setDeletingCommentId(commentId)
+
+    try {
+      await deleteBoardComment(commentId)
+      // 부모 댓글을 삭제하면 화면에서도 연결된 답글을 함께 제거합니다.
+      setDetailTarget((currentDetail) => currentDetail
+        ? {
+            ...currentDetail,
+            commentList: (currentDetail.commentList ?? []).filter((comment) =>
+              comment.commentId !== commentId &&
+              comment.commentPrtId !== commentId,
+            ),
+          }
+        : currentDetail)
+      showToast({
+        title: '댓글을 삭제했습니다.',
+        variant: 'success',
+      })
+    } catch (commentError) {
+      showToast({
+        title: '댓글을 삭제하지 못했습니다.',
+        description: commentError instanceof ApiError
+          ? commentError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    } finally {
+      setDeletingCommentId(null)
+    }
   }
 
   const confirmDelete = async () => {
@@ -437,12 +844,14 @@ const AdminBoardsPage = () => {
                   {
                     key: 'boardId',
                     header: '번호',
-                    className: 'w-20',
+                    className: 'w-20 text-center',
+                    headerClassName: '!text-center',
                     render: (board) => board.boardId,
                   },
                   {
                     key: 'title',
                     header: '제목',
+                    headerClassName: '!text-center',
                     render: (board) => (
                       <div className="flex min-w-0 items-center gap-2">
                         {board.imprtntYn?.toUpperCase() === 'Y' && (
@@ -460,38 +869,44 @@ const AdminBoardsPage = () => {
                   {
                     key: 'author',
                     header: '작성자',
-                    className: 'w-44',
+                    className: 'w-52 text-center',
+                    headerClassName: '!text-center',
                     render: (board) => formatAuthor(board, boardType),
                   },
                   {
                     key: 'date',
                     header: '작성일',
-                    className: 'w-32',
+                    className: 'w-36 text-center',
+                    headerClassName: '!text-center',
                     render: (board) => formatDate(board.frstRegDt),
                   },
                   {
                     key: 'view',
                     header: '조회',
-                    className: 'w-20 text-right',
+                    className: 'w-24 text-center',
+                    headerClassName: '!text-center',
                     render: (board) => board.viewCnt?.toLocaleString() ?? 0,
                   },
                   {
                     key: 'actions',
                     header: '관리',
-                    className: 'w-44 text-right',
+                    className: 'w-56 text-center',
+                    headerClassName: '!text-center',
                     render: (board) => (
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-nowrap items-center justify-center gap-2 whitespace-nowrap">
                         <Button
                           variant="outline"
                           size="sm"
+                          className="shrink-0"
                           leftIcon={<Eye size={14} />}
-                          onClick={() => setDetailTarget(board)}
+                          onClick={() => void openBoardDetail(board)}
                         >
                           상세
                         </Button>
                         <Button
                           variant="danger"
                           size="sm"
+                          className="shrink-0"
                           leftIcon={<Trash2 size={14} />}
                           onClick={() => setDeleteTarget(board)}
                         >
@@ -520,7 +935,12 @@ const AdminBoardsPage = () => {
         title="관리자 게시글 상세"
         description={`${boardLabelByType[boardType]} 운영 상세 정보`}
         size="xl"
-        onClose={() => setDetailTarget(null)}
+        onClose={() => {
+          setDetailTarget(null)
+          setCommentContent('')
+          setEditingCommentId(null)
+          setEditingCommentContent('')
+        }}
         footer={
           <>
             <Button
@@ -549,7 +969,13 @@ const AdminBoardsPage = () => {
           </>
         }
       >
-        {detailTarget && (
+        {detailLoading && (
+          <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500">
+            게시글 상세 정보와 댓글을 불러오는 중입니다.
+          </div>
+        )}
+
+        {!detailLoading && detailTarget && (
           <article>
             <div className="border-b border-slate-200 pb-5">
               <div className="flex flex-wrap items-start gap-2">
@@ -604,9 +1030,25 @@ const AdminBoardsPage = () => {
               <Badge variant="neutral">
                 댓글 {detailTarget.commentList?.length ?? 0}
               </Badge>
-              <Badge variant="neutral">
-                좋아요 {detailTarget.likeCnt ?? 0}
-              </Badge>
+              <button
+                type="button"
+                title={currentLikeState.isLiked ? '좋아요 취소' : '좋아요'}
+                // 스크린 리더에도 현재 좋아요 선택 상태를 전달합니다.
+                aria-pressed={currentLikeState.isLiked}
+                disabled={!currentEmployeeId || togglingLike}
+                onClick={() => void handleLikeToggle()}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  currentLikeState.isLiked
+                    ? 'border-blue-200 bg-blue-50 text-blue-600'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-600'
+                }`}
+              >
+                <ThumbsUp
+                  size={14}
+                  fill={currentLikeState.isLiked ? 'currentColor' : 'none'}
+                />
+                좋아요 {currentLikeState.likeCnt}
+              </button>
               <Badge variant={detailTarget.cmntUseYn === 'Y' ? 'success' : 'danger'}>
                 댓글 {detailTarget.cmntUseYn === 'Y' ? '허용' : '중지'}
               </Badge>
@@ -616,6 +1058,165 @@ const AdminBoardsPage = () => {
                 </Badge>
               ) : null}
             </div>
+
+            <section className="mt-6 border-t border-slate-200 pt-5">
+              <div className="mb-3 flex items-center gap-2">
+                <MessageSquare size={17} className="text-slate-500" />
+                <h4 className="text-sm font-bold text-slate-900">
+                  댓글 {detailTarget.commentList?.length ?? 0}
+                </h4>
+              </div>
+
+              {detailTarget.cmntUseYn?.toUpperCase() !== 'N' ? (
+                <form
+                  className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3"
+                  onSubmit={(event) => void submitComment(event)}
+                >
+                  <Textarea
+                    value={commentContent}
+                    onChange={(event) => setCommentContent(event.target.value)}
+                    placeholder="댓글을 입력하세요."
+                    maxLength={1000}
+                    className="min-h-24 resize-none rounded-md bg-white"
+                  />
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium text-slate-400">
+                      {commentContent.length}/1000
+                    </span>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      leftIcon={<Send size={14} />}
+                      loading={creatingComment}
+                      disabled={!commentContent.trim()}
+                    >
+                      댓글 등록
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-500">
+                  댓글 등록이 중지된 게시글입니다.
+                </div>
+              )}
+
+              {(detailTarget.commentList?.length ?? 0) > 0 ? (
+                <div className="divide-y divide-slate-200 rounded-md border border-slate-200">
+                  {detailTarget.commentList?.map((comment, index) => (
+                    <div
+                      key={comment.commentId ?? index}
+                      className={`px-4 py-3 ${
+                        comment.commentDepth ? 'bg-slate-50 pl-10' : 'bg-white'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="font-bold text-slate-800">
+                          {formatCommentAuthor(
+                            comment.wrterEmpId,
+                            boardType,
+                            currentEmployeeId,
+                            currentEmployeeName,
+                          )}
+                        </span>
+                        {Boolean(comment.commentDepth) && (
+                          <Badge variant="neutral">답글</Badge>
+                        )}
+                        <span className="text-slate-400">
+                          {formatDate(comment.wrteDt)}
+                        </span>
+                      </div>
+                      {editingCommentId === comment.commentId &&
+                      comment.commentId ? (
+                        <form
+                          className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+                          onSubmit={(event) =>
+                            void submitCommentEdit(event, comment.commentId as number)
+                          }
+                        >
+                          <Textarea
+                            value={editingCommentContent}
+                            onChange={(event) =>
+                              setEditingCommentContent(event.target.value)
+                            }
+                            maxLength={1000}
+                            autoFocus
+                            className="min-h-20 resize-none rounded-md"
+                          />
+                          <div className="mt-2 flex items-center justify-between gap-3">
+                            <span className="text-xs font-medium text-slate-400">
+                              {editingCommentContent.length}/1000
+                            </span>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  toggleCommentEdit(
+                                    comment.commentId,
+                                    comment.commentCn,
+                                  )
+                                }
+                              >
+                                취소
+                              </Button>
+                              <Button
+                                type="submit"
+                                size="sm"
+                                loading={updatingComment}
+                                disabled={!editingCommentContent.trim()}
+                              >
+                                수정 완료
+                              </Button>
+                            </div>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                            {comment.commentCn}
+                          </p>
+                          {comment.wrterEmpId === currentEmployeeId &&
+                            comment.commentId && (
+                            <div className="mt-2 flex items-center gap-3">
+                              <button
+                                type="button"
+                                className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+                                onClick={() =>
+                                  toggleCommentEdit(
+                                    comment.commentId,
+                                    comment.commentCn,
+                                  )
+                                }
+                              >
+                                수정
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deletingComment}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                onClick={() =>
+                                  void removeComment(comment.commentId as number)
+                                }
+                              >
+                                <Trash2 size={12} />
+                                {deletingCommentId === comment.commentId
+                                  ? '삭제 중'
+                                  : '삭제'}
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed border-slate-200 px-4 py-8 text-center text-sm font-medium text-slate-400">
+                  등록된 댓글이 없습니다.
+                </div>
+              )}
+            </section>
           </article>
         )}
       </Modal>

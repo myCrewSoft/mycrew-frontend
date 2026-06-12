@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Building2,
+  Eye,
   FileText,
   Megaphone,
   MessageSquare,
@@ -386,11 +387,19 @@ const BoardPage = () => {
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white">
         {!loading && !errorMsg && boardList.length > 0 && (
-          <div className="flex h-14 items-center border-b border-slate-100 bg-slate-50 px-6 text-sm font-semibold text-slate-500">
-            <div className="w-24">번호</div>
-            <div className="flex-1">제목</div>
-            <div className="w-40">작성자</div>
-            <div className="w-40">작성일</div>
+          <div className="grid h-14 grid-cols-[80px_minmax(280px,1fr)_220px_150px_110px_110px] items-center gap-x-6 border-b border-slate-100 bg-slate-50 px-6 text-[15px] font-bold text-slate-600">
+            <div className="text-center">번호</div>
+            <div className="text-center">제목</div>
+            <div className="text-center">작성자</div>
+            <div className="text-center">작성일</div>
+            <div className="flex items-center justify-center gap-1.5">
+              <MessageSquare size={14} />
+              댓글 수
+            </div>
+            <div className="flex items-center justify-center gap-1.5">
+              <Eye size={14} />
+              조회 수
+            </div>
           </div>
         )}
 
@@ -430,7 +439,14 @@ const BoardPage = () => {
         )}
 
         {!loading && !errorMsg && boardList.length > 0 && (
-          <div className="flex-1 overflow-y-auto">
+          <div
+            className="grid min-h-0 flex-1 content-start overflow-y-auto"
+            style={{
+              gridTemplateRows: boardList.length >= 10
+                ? `repeat(${boardList.length}, minmax(64px, 1fr))`
+                : `repeat(${boardList.length}, 64px)`,
+            }}
+          >
             {boardList.map((board) => (
               <div
                 key={board.boardId}
@@ -442,25 +458,33 @@ const BoardPage = () => {
                     openBoardDetail(board.boardId)
                   }
                 }}
-                className="flex h-14 cursor-pointer items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50"
+                className="grid min-h-16 cursor-pointer grid-cols-[80px_minmax(280px,1fr)_220px_150px_110px_110px] items-center gap-x-6 border-b border-slate-100 px-6 text-[15px] transition-colors hover:bg-slate-50"
               >
-                <div className="w-24 text-slate-600">{board.boardId}</div>
-                <div className="flex flex-1 items-center gap-1 font-medium text-slate-800">
+                <div className="text-center font-medium text-slate-600">
+                  {board.boardId}
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-slate-800">
                   {isImportantBoard(board) && (
                     <Badge variant="warning" size="sm" className="shrink-0 rounded-md">
                       중요
                     </Badge>
                   )}
-                  <span>{board.boardSj}</span>
+                  <span className="truncate">{board.boardSj}</span>
                   {board.boardAtchFileId !== null && (
-                    <Paperclip size={14} className="text-slate-400" />
+                    <Paperclip size={14} className="shrink-0 text-slate-400" />
                   )}
                 </div>
-                <div className="w-40 text-slate-700">
+                <div className="text-center text-slate-700">
                   {formatBoardAuthor(board, boardType)}
                 </div>
-                <div className="w-40 text-slate-500">
+                <div className="text-center text-slate-500">
                   {board.frstRegDt?.split('T')[0].replace(/-/g, '.')}
+                </div>
+                <div className="text-center font-medium text-slate-500">
+                  {board.commentList?.length ?? 0}
+                </div>
+                <div className="text-center font-medium text-slate-500">
+                  {board.viewCnt?.toLocaleString() ?? 0}
                 </div>
               </div>
             ))}
