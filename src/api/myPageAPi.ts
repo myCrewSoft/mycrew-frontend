@@ -5,6 +5,7 @@ import type {
   ChangeEmailRequest,
   ChangeJobDutyRequest,
   ChangePasswordRequest,
+  ChangeProfileInfoRequest,
   EmployeeMyPage,
 } from '../types/myPage';
 
@@ -27,6 +28,10 @@ export const mypageApi = {
     ),
   changeJobDuty: (request: ChangeJobDutyRequest) =>
     axiosInstance.patch<ApiResponse<string>>('/api/mypage/job-duty', request),
+
+  // 개인정보(이름/휴대전화/주소)를 변경한다. (PATCH /api/mypage/profile-info)
+  changeProfileInfo: (request: ChangeProfileInfoRequest) =>
+    axiosInstance.patch<ApiResponse<string>>('/api/mypage/profile-info', request),
 
   // 전자서명 이미지를 업로드/변경한다. 백엔드가 fileService를 경유해 저장하고
   // 새로 저장된 파일 ID(Long)를 반환한다. (PATCH /api/mypage/signature)

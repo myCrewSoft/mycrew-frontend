@@ -516,7 +516,8 @@ const LeaveView = () => {
               <tr className="bg-blue-50 text-xs font-bold text-slate-600">
                 <th className="px-4 py-3">사원</th>
                 <th className="px-4 py-3">부서</th>
-                <th className="px-4 py-3 text-right">부여</th>
+                <th className="px-4 py-3 text-right">기본</th>
+                <th className="px-4 py-3 text-right">추가부여</th>
                 <th className="px-4 py-3 text-right">사용</th>
                 <th className="px-4 py-3 text-right">잔여</th>
                 <th className="px-4 py-3">연차 부여</th>
@@ -525,7 +526,7 @@ const LeaveView = () => {
             <tbody className="divide-y divide-slate-200">
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
                     사원이 없습니다.
                   </td>
                 </tr>
@@ -534,6 +535,7 @@ const LeaveView = () => {
                   <tr key={r.empId} className="font-semibold text-slate-900">
                     <td className="px-4 py-3">{r.empNm}</td>
                     <td className="px-4 py-3 text-slate-600">{r.deptNm ?? '-'}</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{r.baseDay}일</td>
                     <td className="px-4 py-3 text-right">{r.grantedDay}일</td>
                     <td className="px-4 py-3 text-right text-slate-600">{r.usedDay}일</td>
                     <td className="px-4 py-3 text-right font-black text-emerald-600">

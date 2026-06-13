@@ -48,6 +48,8 @@ export interface AtndStats {
   stdWorkMinWk: number
   maxOtMinWk: number
   remainAnnualLeave: number
+  annualLeaveDef: number
+  usedAnnualLeave: number
 }
 
 /** 근태 이력(일자별) */
@@ -234,6 +236,7 @@ export interface LeaveBalance {
   empId: number
   empNm: string
   deptNm?: string | null
+  baseDay: number
   grantedDay: number
   usedDay: number
   remainDay: number

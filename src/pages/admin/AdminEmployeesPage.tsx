@@ -5,12 +5,14 @@ import {
   Building2,
   Eye,
   IdCard,
+  MapPin,
   RefreshCw,
   ShieldCheck,
   ShieldMinus,
   UserPlus,
   Users,
 } from 'lucide-react';
+import { useDaumPostcode } from '../../hooks/useDaumPostcode';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
@@ -212,6 +214,7 @@ const DetailRow = ({
 export default function AdminEmployeesPage() {
   const [searchParams] = useSearchParams();
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
+  const { open: openPostcode } = useDaumPostcode();
   const [employees, setEmployees] = useState<AdminEmployeeListItem[]>([]);
   const [pagination, setPagination] = useState<PageInfo | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -821,6 +824,18 @@ export default function AdminEmployeesPage() {
       ...current,
       [key]: value,
     }));
+  };
+
+  const handleSearchRegisterAddress = () => {
+    void openPostcode((data) => {
+      setRegisterForm((current) => ({
+        ...current,
+        zip: data.zonecode,
+        addr: data.address,
+      }));
+    }).catch(() => {
+      setRegisterError('우편번호 서비스를 불러오지 못했습니다.');
+    });
   };
 
   const resetRegisterForm = () => {
@@ -1540,17 +1555,33 @@ export default function AdminEmployeesPage() {
               updateRegisterForm('mblTelno', event.target.value)
             }
           />
-          <FormField
-            label="우편번호"
-            required
-            value={registerForm.zip}
-            onChange={(event) => updateRegisterForm('zip', event.target.value)}
-          />
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <FormField
+                label="우편번호"
+                required
+                readOnly
+                placeholder="주소 검색"
+                value={registerForm.zip}
+                onChange={(event) => updateRegisterForm('zip', event.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              leftIcon={<MapPin size={15} />}
+              onClick={handleSearchRegisterAddress}
+              className="h-10 shrink-0 whitespace-nowrap"
+            >
+              주소 검색
+            </Button>
+          </div>
           <div className="md:col-span-2">
             <FormField
               label="주소"
               required
               value={registerForm.addr}
+              placeholder="주소 검색 후 상세주소 입력"
               onChange={(event) =>
                 updateRegisterForm('addr', event.target.value)
               }

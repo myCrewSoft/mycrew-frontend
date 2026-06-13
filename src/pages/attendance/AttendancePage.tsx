@@ -1,5 +1,18 @@
-import { useEffect, useState } from 'react'
-import { LogIn, LogOut, Clock } from 'lucide-react'
+import { type ComponentType, useEffect, useState } from 'react'
+import {
+  LogIn,
+  LogOut,
+  Clock,
+  Briefcase,
+  Hourglass,
+  CheckCircle2,
+  AlertTriangle,
+  AlarmClock,
+  DoorOpen,
+  Coffee,
+  Plane,
+  CalendarCheck,
+} from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
@@ -71,6 +84,13 @@ const PERIOD_TABS: { value: AtndPeriod; label: string }[] = [
 const AttendancePage = () => {
   const [period, setPeriod] = useState<AtndPeriod>('WEEK')
   const [acting, setActing] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+
+  // 근무 중 경과 시간을 라이브로 갱신 (30초 간격)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
 
   const { data: today, execute: refetchToday } = useApi(attendanceApi.getToday)
   const { data: stats, execute: fetchStats } = useApi(attendanceApi.getStats, {
@@ -106,9 +126,18 @@ const AttendancePage = () => {
   const checkedIn = today?.checkedIn ?? false
   const checkedOut = today?.checkedOut ?? false
 
-  // 주간 근무 진행률 (남은 근무 기반)
+  // 오늘 근무 중 경과 시간(분) — 출근했고 아직 퇴근 전이면 라이브로 계산
+  const working = checkedIn && !checkedOut
+  const todayElapsedMin =
+    working && today?.wrkStartDtm
+      ? Math.max(0, Math.floor((now - new Date(today.wrkStartDtm).getTime()) / 60000))
+      : 0
+
+  // 주간 근무 진행률 (완료분 + 진행중 오늘분)
   const stdWk = stats?.stdWorkMinWk ?? 0
-  const workedWk = stdWk - (stats?.remainingWorkMin ?? 0)
+  const stdDay = 8 * 60
+  const completedWk = stdWk - (stats?.remainingWorkMin ?? 0)
+  const workedWk = completedWk + Math.min(todayElapsedMin, stdDay)
   const progress = stdWk > 0 ? Math.min(100, Math.round((workedWk / stdWk) * 100)) : 0
 
   return (
@@ -142,6 +171,18 @@ const AttendancePage = () => {
                 출근 {formatTime(today?.wrkStartDtm)} · 퇴근{' '}
                 {formatTime(today?.wrkEndDtm)}
               </p>
+              {working && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
+                  <Clock size={13} className="animate-pulse" />
+                  오늘 근무 {formatMin(todayElapsedMin)} 경과
+                </div>
+              )}
+              {checkedOut && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                  <CheckCircle2 size={13} className="text-emerald-500" />
+                  오늘 실근무 {formatMin(today?.workMin)}
+                </div>
+              )}
             </div>
           </div>
 
@@ -179,21 +220,35 @@ const AttendancePage = () => {
               주 소정근로 {formatMin(stdWk)} 기준
             </p>
           </div>
-          <div className="rounded bg-emerald-50 px-4 py-2 text-right">
-            <p className="text-xs font-semibold text-slate-600">잔여 연차</p>
-            <p className="text-lg font-black text-emerald-600">
-              {stats?.remainAnnualLeave ?? 0}일
-            </p>
+          <div className="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-2.5">
+            <CalendarCheck size={22} className="text-emerald-500" />
+            <div className="text-right">
+              <p className="text-xs font-semibold text-slate-600">잔여 연차</p>
+              <p className="text-xl font-black text-emerald-600">
+                {stats?.remainAnnualLeave ?? 0}일
+              </p>
+              <p className="text-[11px] font-semibold text-slate-400">
+                기본 {stats?.annualLeaveDef ?? 0} · 사용 {stats?.usedAnnualLeave ?? 0}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="mt-5">
           <div className="flex items-end justify-between">
-            <strong className="text-3xl font-black text-slate-950">
-              {formatMin(workedWk > 0 ? workedWk : 0)}
-            </strong>
+            <div className="flex items-end gap-2">
+              <strong className="text-3xl font-black text-slate-950">
+                {formatMin(workedWk > 0 ? workedWk : 0)}
+              </strong>
+              {working && (
+                <span className="mb-1 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                  근무 중
+                </span>
+              )}
+            </div>
             <span className="text-xs font-bold text-slate-500">
-              남은 {formatMin(stats?.remainingWorkMin)}
+              남은 {formatMin(Math.max(0, stdWk - workedWk))}
             </span>
           </div>
           <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-200">
@@ -244,15 +299,15 @@ const AttendancePage = () => {
           {stats?.periodLabel}
         </p>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCell label="실근무" value={formatMin(stats?.workMin)} accent="blue" />
-          <StatCell label="연장근무" value={formatMin(stats?.otMin)} accent="blue" />
-          <StatCell label="승인근무" value={formatMin(stats?.approvedOtMin)} accent="green" />
-          <StatCell label="초과근무" value={formatMin(stats?.excessMin)} accent="red" />
-          <StatCell label="지각" value={`${stats?.lateCnt ?? 0}회`} accent="red" />
-          <StatCell label="조퇴" value={`${stats?.earlyLeaveCnt ?? 0}회`} accent="red" />
-          <StatCell label="반차" value={`${stats?.halfDayCnt ?? 0}회`} accent="blue" />
-          <StatCell label="사용 휴가" value={`${stats?.leaveUseDay ?? 0}일`} accent="green" />
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard icon={Briefcase} tone="blue" label="실근무" value={formatMin(stats?.workMin)} />
+          <MetricCard icon={Hourglass} tone="indigo" label="연장근무" value={formatMin(stats?.otMin)} />
+          <MetricCard icon={CheckCircle2} tone="emerald" label="승인근무" value={formatMin(stats?.approvedOtMin)} />
+          <MetricCard icon={AlertTriangle} tone="red" label="초과근무" value={formatMin(stats?.excessMin)} />
+          <MetricCard icon={AlarmClock} tone="amber" label="지각" value={`${stats?.lateCnt ?? 0}회`} />
+          <MetricCard icon={DoorOpen} tone="orange" label="조퇴" value={`${stats?.earlyLeaveCnt ?? 0}회`} />
+          <MetricCard icon={Coffee} tone="violet" label="반차" value={`${stats?.halfDayCnt ?? 0}회`} />
+          <MetricCard icon={Plane} tone="emerald" label="사용 휴가" value={`${stats?.leaveUseDay ?? 0}일`} />
         </div>
       </section>
 
@@ -385,25 +440,45 @@ const AttendancePage = () => {
   )
 }
 
-const accentMap: Record<'green' | 'red' | 'blue', string> = {
-  green: 'text-emerald-500',
-  red: 'text-red-600',
-  blue: 'text-blue-600',
+type MetricTone = 'blue' | 'indigo' | 'emerald' | 'red' | 'amber' | 'orange' | 'violet'
+
+const toneMap: Record<MetricTone, { icon: string; ring: string }> = {
+  blue: { icon: 'bg-blue-50 text-blue-600', ring: 'hover:border-blue-200' },
+  indigo: { icon: 'bg-indigo-50 text-indigo-600', ring: 'hover:border-indigo-200' },
+  emerald: { icon: 'bg-emerald-50 text-emerald-600', ring: 'hover:border-emerald-200' },
+  red: { icon: 'bg-red-50 text-red-600', ring: 'hover:border-red-200' },
+  amber: { icon: 'bg-amber-50 text-amber-600', ring: 'hover:border-amber-200' },
+  orange: { icon: 'bg-orange-50 text-orange-600', ring: 'hover:border-orange-200' },
+  violet: { icon: 'bg-violet-50 text-violet-600', ring: 'hover:border-violet-200' },
 }
 
-const StatCell = ({
+type IconType = ComponentType<{ size?: number; className?: string }>
+
+const MetricCard = ({
+  icon: Icon,
+  tone,
   label,
   value,
-  accent,
 }: {
+  icon: IconType
+  tone: MetricTone
   label: string
   value: string
-  accent: 'green' | 'red' | 'blue'
-}) => (
-  <div className="rounded-lg border border-slate-200 px-4 py-4">
-    <p className="text-xs font-semibold text-slate-500">{label}</p>
-    <p className={`mt-1 text-xl font-black ${accentMap[accent]}`}>{value}</p>
-  </div>
-)
+}) => {
+  const t = toneMap[tone]
+  return (
+    <div
+      className={`flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-colors ${t.ring}`}
+    >
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${t.icon}`}>
+        <Icon size={18} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <p className="mt-0.5 truncate text-lg font-black text-slate-900">{value}</p>
+      </div>
+    </div>
+  )
+}
 
 export default AttendancePage
