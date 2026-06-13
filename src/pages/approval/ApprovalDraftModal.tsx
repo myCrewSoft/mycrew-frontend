@@ -9,7 +9,12 @@ import Modal from '../../components/common/overlay/modal/Modal'
 import type { EmployeeLookupResponse } from '../../types'
 import type { ApprovalTemplateResponse } from '../../types/approval'
 import type { AtndLeaveType } from '../../api/attendanceApi'
-import type { DraftFormState, LeaveDraftInfo, SelectedApprover } from './approval.types'
+import type {
+  DraftFormState,
+  LeaveDraftInfo,
+  OtDraftInfo,
+  SelectedApprover,
+} from './approval.types'
 
 // lookup 응답의 profileImageUrl(`/api/files/images/{id}`)에서 파일 ID만 추출한다.
 const extractProfileFileId = (
@@ -35,6 +40,10 @@ type Props = {
   leaveInfo?: LeaveDraftInfo
   leaveTypes?: AtndLeaveType[]
   onLeaveInfoChange?: (next: LeaveDraftInfo) => void
+  // ── 초과근무 신청 모드(옵션) ──
+  otMode?: boolean
+  otInfo?: OtDraftInfo
+  onOtInfoChange?: (next: OtDraftInfo) => void
   title?: string
   description?: string
   submitLabel?: string
@@ -54,6 +63,9 @@ export default function ApprovalDraftModal({
   leaveInfo,
   leaveTypes = [],
   onLeaveInfoChange,
+  otMode = false,
+  otInfo,
+  onOtInfoChange,
   title,
   description,
   submitLabel,
@@ -255,6 +267,51 @@ export default function ApprovalDraftModal({
                     onChange={(e) =>
                       onLeaveInfoChange({ ...leaveInfo, reqRsn: e.target.value })
                     }
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* 초과근무 신청 모드: 초과근무 정보 입력 */}
+            {otMode && otInfo && onOtInfoChange && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <p className="mb-3 text-sm font-black text-amber-700">초과근무 정보</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">일자</span>
+                    <input
+                      type="date"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otYmd}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otYmd: e.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">시작 시각</span>
+                    <input
+                      type="time"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otBgnTm}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otBgnTm: e.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">종료 시각</span>
+                    <input
+                      type="time"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otEndTm}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otEndTm: e.target.value })}
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-600">사유</span>
+                  <input
+                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                    placeholder="예: 긴급 배포 대응"
+                    value={otInfo.reqRsn}
+                    onChange={(e) => onOtInfoChange({ ...otInfo, reqRsn: e.target.value })}
                   />
                 </label>
               </div>

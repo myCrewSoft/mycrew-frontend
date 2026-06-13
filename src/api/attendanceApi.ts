@@ -256,6 +256,44 @@ const grantLeave = (payload: {
   return axiosInstance.post<ApiResponse<void>>('/api/admin/attendance/leave/grant', payload)
 }
 
+// ── 초과근무 사전신청 API ─────────────────────────────────────────
+
+/** 내 초과근무 신청 내역 */
+export interface MyOt {
+  otReqId: number
+  drftDocSn: number
+  otDt: string
+  otBgnDtm: string
+  otEndDtm: string
+  approvedMin?: number | null
+  aprvlSttusCd: string
+  rflctYn: string
+}
+
+/** 초과근무 신청 요청 */
+export interface OtApplyPayload {
+  otYmd: string
+  otBgnTm: string
+  otEndTm: string
+  reqRsn?: string
+  docTtl: string
+  tmplatCd?: string
+  aprvlFullCn?: string
+  aprvlHopeDt?: string
+  atchFileId?: number
+  approvalLines: ApprovalLinePayload[]
+}
+
+// 내 초과근무 신청 내역을 조회합니다.
+const getMyOts = () => {
+  return axiosInstance.get<ApiResponse<MyOt[]>>('/api/attendance/ot')
+}
+
+// 초과근무를 사전 신청합니다. (전자결재 문서 생성 + 결재요청)
+const applyOt = (payload: OtApplyPayload) => {
+  return axiosInstance.post<ApiResponse<number>>('/api/attendance/ot', payload)
+}
+
 export const attendanceApi = {
   getToday,
   checkIn,
@@ -269,4 +307,8 @@ export const attendanceApi = {
   getLeaveTypes,
   getMyLeaves,
   applyLeave,
+  getLeaveBalances,
+  grantLeave,
+  getMyOts,
+  applyOt,
 }

@@ -7,6 +7,7 @@ import { useApi } from '../../hooks/useApi'
 import { ApiError } from '../../api/axiosInstance'
 import { attendanceApi, type AtndPeriod } from '../../api/attendanceApi'
 import LeaveApply from './LeaveApply'
+import OtApply from './OtApply'
 
 // ── 표시 헬퍼 ────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ const AttendancePage = () => {
     immediateArgs: [30],
   })
   const { data: leaves, execute: refetchLeaves } = useApi(attendanceApi.getMyLeaves)
+  const { data: ots, execute: refetchOts } = useApi(attendanceApi.getMyOts)
 
   useEffect(() => {
     void fetchStats(period)
@@ -163,6 +165,7 @@ const AttendancePage = () => {
               퇴근
             </Button>
             <LeaveApply onApplied={() => { void refetchLeaves(); }} />
+            <OtApply onApplied={() => { void refetchOts(); }} />
           </div>
         </div>
       </section>
@@ -287,6 +290,48 @@ const AttendancePage = () => {
                     <td className="px-5 py-4">
                       <Badge variant={leaveStatusVariant(lv.aprvlSttusCd)} size="sm">
                         {leaveStatusLabel(lv.aprvlSttusCd)}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </ContentCard>
+
+      {/* 내 초과근무 신청 내역 */}
+      <ContentCard title="내 초과근무 신청 내역" className="overflow-hidden rounded-lg">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="bg-blue-50 text-xs font-bold text-slate-600">
+                <th className="px-5 py-3">일자</th>
+                <th className="px-5 py-3">시간</th>
+                <th className="px-5 py-3">승인 시간</th>
+                <th className="px-5 py-3">결재</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {(ots ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-5 py-10 text-center text-slate-400">
+                    초과근무 신청 내역이 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                (ots ?? []).map((ot) => (
+                  <tr key={ot.otReqId} className="font-semibold text-slate-900">
+                    <td className="px-5 py-4">{formatDate(ot.otDt)}</td>
+                    <td className="px-5 py-4">
+                      {formatTime(ot.otBgnDtm)} ~ {formatTime(ot.otEndDtm)}
+                    </td>
+                    <td className="px-5 py-4 font-black text-blue-600">
+                      {ot.rflctYn === 'Y' ? formatMin(ot.approvedMin) : '-'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <Badge variant={leaveStatusVariant(ot.aprvlSttusCd)} size="sm">
+                        {leaveStatusLabel(ot.aprvlSttusCd)}
                       </Badge>
                     </td>
                   </tr>

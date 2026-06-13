@@ -48,6 +48,21 @@ export const defaultLeaveDraftInfo: LeaveDraftInfo = {
   reqRsn: '',
 }
 
+// 초과근무 신청 모드에서 기안 모달이 추가로 받는 초과근무 정보
+export type OtDraftInfo = {
+  otYmd: string
+  otBgnTm: string
+  otEndTm: string
+  reqRsn: string
+}
+
+export const defaultOtDraftInfo: OtDraftInfo = {
+  otYmd: '',
+  otBgnTm: '',
+  otEndTm: '',
+  reqRsn: '',
+}
+
 export type TemplateFormState = {
   tmplatCd: string
   tmplatNm: string
