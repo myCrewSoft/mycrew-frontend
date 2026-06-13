@@ -12,6 +12,7 @@ import ApprovalTemplatePage from '../approval/ApprovalTemplatePage';
 import AdminEmployeesPage from './AdminEmployeesPage';
 import AdminDepartmentsPage from './AdminDepartmentsPage';
 import AdminOrgChartPage from './AdminOrgChartPage';
+import AdminAttendancePage from './AdminAttendancePage';
 import AdminPage from './AdminPage';
 import AdminRanksPage from './AdminRanksPage';
 import AdminRolesPage from './AdminRolesPage';
@@ -184,6 +185,14 @@ export default function AdminAccessGate() {
     return (
       <AdminLayout access={access}>
         <AdminOrgChartPage />
+      </AdminLayout>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/attendance')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminAttendancePage />
       </AdminLayout>
     );
   }

@@ -8,7 +8,13 @@ import FormField from '../../components/common/form/formField/FormField'
 import Modal from '../../components/common/overlay/modal/Modal'
 import type { EmployeeLookupResponse } from '../../types'
 import type { ApprovalTemplateResponse } from '../../types/approval'
-import type { DraftFormState, SelectedApprover } from './approval.types'
+import type { AtndLeaveType } from '../../api/attendanceApi'
+import type {
+  DraftFormState,
+  LeaveDraftInfo,
+  OtDraftInfo,
+  SelectedApprover,
+} from './approval.types'
 
 // lookup 응답의 profileImageUrl(`/api/files/images/{id}`)에서 파일 ID만 추출한다.
 const extractProfileFileId = (
@@ -29,6 +35,18 @@ type Props = {
   onApproversChange: (next: SelectedApprover[]) => void
   onClose: () => void
   onSubmit: () => Promise<void>
+  // ── 휴가 신청 모드(옵션) ──
+  leaveMode?: boolean
+  leaveInfo?: LeaveDraftInfo
+  leaveTypes?: AtndLeaveType[]
+  onLeaveInfoChange?: (next: LeaveDraftInfo) => void
+  // ── 초과근무 신청 모드(옵션) ──
+  otMode?: boolean
+  otInfo?: OtDraftInfo
+  onOtInfoChange?: (next: OtDraftInfo) => void
+  title?: string
+  description?: string
+  submitLabel?: string
 }
 
 export default function ApprovalDraftModal({
@@ -41,6 +59,16 @@ export default function ApprovalDraftModal({
   onApproversChange,
   onClose,
   onSubmit,
+  leaveMode = false,
+  leaveInfo,
+  leaveTypes = [],
+  onLeaveInfoChange,
+  otMode = false,
+  otInfo,
+  onOtInfoChange,
+  title,
+  description,
+  submitLabel,
 }: Props) {
   const [templates, setTemplates] = useState<ApprovalTemplateResponse[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(false)
@@ -160,8 +188,11 @@ export default function ApprovalDraftModal({
   return (
     <Modal
       open={open}
-      title="기안서 작성"
-      description="결재 양식을 선택하고 내용을 작성한 뒤, 오른쪽에서 결재자를 순서대로 지정하세요."
+      title={title ?? '기안서 작성'}
+      description={
+        description ??
+        '결재 양식을 선택하고 내용을 작성한 뒤, 오른쪽에서 결재자를 순서대로 지정하세요.'
+      }
       onClose={onClose}
       size="xl"
       maxWidthClassName="max-w-7xl"
@@ -171,7 +202,7 @@ export default function ApprovalDraftModal({
             취소
           </Button>
           <Button loading={saving} leftIcon={<Send size={16} />} onClick={() => void onSubmit()}>
-            임시저장
+            {submitLabel ?? '임시저장'}
           </Button>
         </>
       }
@@ -182,6 +213,110 @@ export default function ApprovalDraftModal({
         {/* ── 왼쪽: 기안서 내용 ── */}
         <div className="approval-draft-layout__main">
           <div className="approval-draft-form">
+            {/* 휴가 신청 모드: 휴가 정보 입력 */}
+            {leaveMode && leaveInfo && onLeaveInfoChange && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                <p className="mb-3 text-sm font-black text-blue-700">휴가 정보</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">휴가 종류</span>
+                    <select
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-blue-500"
+                      value={leaveInfo.leaveTypeCd}
+                      onChange={(e) =>
+                        onLeaveInfoChange({ ...leaveInfo, leaveTypeCd: e.target.value })
+                      }
+                    >
+                      <option value="">선택</option>
+                      {leaveTypes.map((t) => (
+                        <option key={t.leaveTypeCd} value={t.leaveTypeCd}>
+                          {t.leaveTypeNm}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">시작일</span>
+                    <input
+                      type="date"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-blue-500"
+                      value={leaveInfo.leaveBgnYmd}
+                      onChange={(e) =>
+                        onLeaveInfoChange({ ...leaveInfo, leaveBgnYmd: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">종료일</span>
+                    <input
+                      type="date"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-blue-500"
+                      value={leaveInfo.leaveEndYmd}
+                      onChange={(e) =>
+                        onLeaveInfoChange({ ...leaveInfo, leaveEndYmd: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-600">사유</span>
+                  <input
+                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-blue-500"
+                    placeholder="예: 개인 사유"
+                    value={leaveInfo.reqRsn}
+                    onChange={(e) =>
+                      onLeaveInfoChange({ ...leaveInfo, reqRsn: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+            )}
+
+            {/* 초과근무 신청 모드: 초과근무 정보 입력 */}
+            {otMode && otInfo && onOtInfoChange && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <p className="mb-3 text-sm font-black text-amber-700">초과근무 정보</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">일자</span>
+                    <input
+                      type="date"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otYmd}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otYmd: e.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">시작 시각</span>
+                    <input
+                      type="time"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otBgnTm}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otBgnTm: e.target.value })}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-slate-600">종료 시각</span>
+                    <input
+                      type="time"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                      value={otInfo.otEndTm}
+                      onChange={(e) => onOtInfoChange({ ...otInfo, otEndTm: e.target.value })}
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 flex flex-col gap-1">
+                  <span className="text-xs font-bold text-slate-600">사유</span>
+                  <input
+                    className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-medium outline-none focus:border-amber-500"
+                    placeholder="예: 긴급 배포 대응"
+                    value={otInfo.reqRsn}
+                    onChange={(e) => onOtInfoChange({ ...otInfo, reqRsn: e.target.value })}
+                  />
+                </label>
+              </div>
+            )}
+
             <FormField
               label="기안서 제목"
               placeholder="예: 신규 장비 구매 품의"

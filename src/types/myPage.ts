@@ -81,3 +81,10 @@ export interface ChangePasswordRequest {
 export interface ChangeJobDutyRequest {
   jobDutyCn: string;
 }
+
+export interface ChangeProfileInfoRequest {
+  empNm: string;
+  mblTelno?: string;
+  zip?: string;
+  addr?: string;
+}
