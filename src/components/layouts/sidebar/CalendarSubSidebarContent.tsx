@@ -1,4 +1,18 @@
 import { useRef, useState } from 'react'
+
+const STORAGE_KEY_OPENED_GROUPS = 'calendar_opened_groups'
+
+const loadOpenedGroups = (): string[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_OPENED_GROUPS)
+    if (!stored) return ['basic']
+    const parsed = JSON.parse(stored) as unknown
+    if (Array.isArray(parsed)) return parsed as string[]
+  } catch {
+    // ignore parse errors
+  }
+  return ['basic']
+}
 import type FullCalendarComponent from '@fullcalendar/react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -125,15 +139,13 @@ const CalendarSubSidebarContent = () => {
   );
 
   // 일정 그룹 접기/펼치기 상태입니다.
-  const [openedGroupIds, setOpenedGroupIds] = useState<string[]>([
-    'basic',
-    'project',
-    'etc',
-  ]);
+  const [openedGroupIds, setOpenedGroupIds] = useState<string[]>(loadOpenedGroups);
 
   const [activeTooltipScheduleId, setActiveTooltipScheduleId] = useState<
     string | null
   >(null);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const moveMiniCalendar = (direction: 'prev' | 'next') => {
     const calendarApi = miniCalendarRef.current?.getApi()
@@ -150,11 +162,13 @@ const CalendarSubSidebarContent = () => {
   };
 
   const toggleGroup = (groupId: string) => {
-    setOpenedGroupIds((current) =>
-      current.includes(groupId)
+    setOpenedGroupIds((current) => {
+      const next = current.includes(groupId)
         ? current.filter((id) => id !== groupId)
-        : [...current, groupId],
-    )
+        : [...current, groupId]
+      localStorage.setItem(STORAGE_KEY_OPENED_GROUPS, JSON.stringify(next))
+      return next
+    })
   };
 
   const toggleFilter = (scheduleTypeCode: ScheduleTypeCode) => {
@@ -296,13 +310,72 @@ const CalendarSubSidebarContent = () => {
         <div className="flex h-11 items-center justify-between border-b border-slate-200 px-4">
           <h3 className="text-sm font-bold text-slate-950">일정 목록</h3>
 
-          <button
-            type="button"
-            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-            aria-label="일정 목록 설정"
-          >
-            <Settings size={15} />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((prev) => !prev)}
+              className={`rounded-md p-1 transition-colors hover:bg-slate-100 hover:text-slate-700 ${
+                settingsOpen ? 'bg-slate-100 text-slate-700' : 'text-slate-400'
+              }`}
+              aria-label="일정 목록 설정"
+            >
+              <Settings size={15} />
+            </button>
+
+            {settingsOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-black/20"
+                  onClick={() => setSettingsOpen(false)}
+                />
+                <div className="fixed left-1/2 top-1/2 z-50 w-64 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-100 px-4 py-2.5">
+                    <p className="text-xs font-bold text-slate-700">일정 표시 설정</p>
+                  </div>
+                  <div className="py-1.5">
+                    {calendarFilterGroups.map((group) => (
+                      <div key={group.id}>
+                        <p className="px-4 pb-1 pt-2 text-[11px] font-bold text-slate-400">
+                          {group.title}
+                        </p>
+                        {group.items.map((item) => {
+                          const checked = checkedScheduleTypeCodes.includes(
+                            item.scheduleTypeCode,
+                          )
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => toggleFilter(item.scheduleTypeCode)}
+                              className="flex h-8 w-full items-center gap-2.5 px-4 text-left transition-colors hover:bg-slate-50"
+                              aria-pressed={checked}
+                            >
+                              <span
+                                className="h-3.5 w-3.5 shrink-0 rounded"
+                                style={{
+                                  backgroundColor: checked ? item.color : 'transparent',
+                                  border: `2px solid ${item.color}`,
+                                }}
+                              />
+                              <span
+                                className={`truncate text-sm ${
+                                  checked
+                                    ? 'font-semibold text-slate-700'
+                                    : 'font-medium text-slate-400 line-through'
+                                }`}
+                              >
+                                {item.label}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="divide-y divide-slate-100">
@@ -333,12 +406,9 @@ const CalendarSubSidebarContent = () => {
                       )
 
                       return (
-                        <button
+                        <div
                           key={item.id}
-                          type="button"
-                          onClick={() => toggleFilter(item.scheduleTypeCode)}
-                          className="flex h-8 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-slate-50"
-                          aria-pressed={checked}
+                          className="flex h-8 w-full items-center gap-3 px-4"
                         >
                           <span
                             className="h-3.5 w-3.5 shrink-0 rounded"
@@ -349,7 +419,6 @@ const CalendarSubSidebarContent = () => {
                               border: `2px solid ${item.color}`,
                             }}
                           />
-
                           <span
                             className={`truncate text-sm ${
                               checked
@@ -359,7 +428,7 @@ const CalendarSubSidebarContent = () => {
                           >
                             {item.label}
                           </span>
-                        </button>
+                        </div>
                       )
                     })}
                   </div>
