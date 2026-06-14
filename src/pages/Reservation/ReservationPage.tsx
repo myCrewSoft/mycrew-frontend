@@ -6,6 +6,7 @@ import {
   type CSSProperties,
 } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import PageComponent from '../../components/layouts/PageComponent'
@@ -79,6 +80,7 @@ const getReservationBlockStyle = (
 }
 
 const ReservationPage = () => {
+  const navigate = useNavigate()
   const {
     selectedDate,
     setSelectedDate,
@@ -333,7 +335,11 @@ const ReservationPage = () => {
                             style={getReservationBlockStyle(reservation)}
                             onClick={(event) => {
                               event.stopPropagation()
+                              if (reservation.mtngId) {
+                                navigate(`/meeting?detailMeetingId=${reservation.mtngId}`)
+                              }
                             }}
+                            title={reservation.mtngId ? '연결된 회의 상세 보기' : undefined}
                           >
                             {reservation.title || reservation.reserverName}
                           </button>
