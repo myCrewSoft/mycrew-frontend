@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   CalendarPlus,
   CalendarClock,
-  ChevronDown,
   CheckCircle2,
   Clock,
   Download,
@@ -14,10 +13,9 @@ import {
   History,
   Link2,
   Pencil,
-  Play,
+  PhoneOff,
   Save,
   Send,
-  Sparkles,
   Trash2,
   Users,
   UserPlus,
@@ -25,66 +23,80 @@ import {
   X,
 } from 'lucide-react'
 import { meetingApi } from '../../api/meetingApi'
+import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Button from '../../components/common/button/Button'
 import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import FormField from '../../components/common/form/formField/FormField'
 import Textarea from '../../components/common/form/textarea/Textarea'
 import Tabs from '../../components/common/tabs/Tabs'
+import { useToast } from '../../components/common/toast/useToast'
 import PageComponent from '../../components/layouts/PageComponent'
 import { useApi } from '../../hooks/useApi'
-import type {
-  VideoConfCreateRequest,
-  VideoConfResponse,
-  VideoMomResponse,
-} from '../../types'
+import type { RoomResponse } from '../../types'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
-import type { VideoPtcptResponse } from '../../types'
+import type {
+  MeetingDetail,
+  MeetingCreateRequest,
+  MeetingListItem,
+  MeetingMinutesResponse,
+  MeetingParticipant,
+  MeetingStatus,
+  MeetingTypeCode,
+} from '../../types/meeting.dto'
 
-// 탭 필터 타입
-type MeetingListFilter = 'scheduled' | 'live' | 'ended'
-
-// confSttusCd 코드값
-// 01: 대기(scheduled) / 02: 진행 중(live) / 03: 종료(ended)
-const getStatusFromCd = (cd?: string): MeetingListFilter => {
-  if (cd === '02') return 'live'
-  if (cd === '03') return 'ended'
-  return 'scheduled'
-}
-
-const filterTabs: Array<{ value: MeetingListFilter; label: string }> = [
+const filterTabs: Array<{ value: MeetingStatus; label: string }> = [
   { value: 'scheduled', label: '예약된 회의' },
   { value: 'live', label: '진행 중' },
   { value: 'ended', label: '지난 회의' },
 ]
 
-const filterPathMap: Record<MeetingListFilter, string> = {
+const filterPathMap: Record<MeetingStatus, string> = {
   scheduled: '/meeting/scheduled',
   live: '/meeting/list',
   ended: '/meeting/history',
 }
 
-const getFilterFromPath = (pathname: string): MeetingListFilter => {
+const getFilterFromPath = (pathname: string): MeetingStatus => {
   if (pathname.includes('/minutes')) return 'ended'
   if (pathname.includes('/history')) return 'ended'
   if (pathname.includes('/list')) return 'live'
   return 'scheduled'
 }
 
-const statusLabelMap: Record<MeetingListFilter, string> = {
+const statusLabelMap: Record<MeetingStatus, string> = {
   scheduled: '예약됨',
   live: '진행 중',
   ended: '종료',
 }
 
-const statusBadgeVariantMap: Record <
-  MeetingListFilter,
+const statusBadgeVariantMap: Record<
+  MeetingStatus,
   'primary' | 'success' | 'neutral' | 'danger' | 'outline'
 > = {
   scheduled: 'neutral',
   live: 'success',
   ended: 'outline',
+}
+
+const meetingTypeLabelMap: Record<MeetingTypeCode, string> = {
+  '01': '온라인',
+  '02': '오프라인',
+  '03': '혼합',
+}
+
+const getMeetingTypeLabel = (code?: string | null) =>
+  meetingTypeLabelMap[code as MeetingTypeCode] ?? '오프라인'
+
+const getRecordingLabel = (meeting: MeetingListItem | MeetingDetail) => {
+  if (meeting.vconfId === null) return '해당 없음'
+  if ('rcrdgAtchFileId' in meeting) {
+    return meeting.rcrdgAtchFileId ? '생성 완료' : '녹취록 없음'
+  }
+  if (meeting.mtngSttus === 'ended') return '상세에서 확인'
+  return '회의 종료 후 생성'
 }
 
 const toDateKey = (date: Date) =>
@@ -99,7 +111,7 @@ const addDays = (date: Date, days: number) => {
 }
 
 
-const formatTime = (dateTime?: string) => {
+const formatTime = (dateTime?: string | null) => {
   if (!dateTime) return ''
   const date = new Date(dateTime)
   if (Number.isNaN(date.getTime())) return ''
@@ -115,7 +127,7 @@ const formatDateTitle = (dateKey: string) => {
   return `${Number(month)}월 ${Number(day)}일 · ${year}`
 }
 
-const formatDateTime = (dateTime?: string) => {
+const formatDateTime = (dateTime?: string | null) => {
   if (!dateTime) return '-'
   const date = new Date(dateTime)
   if (Number.isNaN(date.getTime())) return '-'
@@ -129,17 +141,25 @@ const formatDateTime = (dateTime?: string) => {
   }).format(date)
 }
 
-const getMeetingDateKey = (meeting: VideoConfResponse) =>
+const toDateTimeInputValue = (dateTime?: string | null) => {
+  if (!dateTime) return ''
+  const date = new Date(dateTime)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
+const getMeetingDateKey = (meeting: MeetingListItem) =>
   toDateKey(new Date(meeting.beginDt ?? ''))
 
-const getInitial = (name?: string) => (name ?? '?').trim().charAt(0) || '?'
-
 // 예약됨(01)·진행 중(02) 모두 입장 가능
-const canJoinMeeting = (meeting: VideoConfResponse) =>
-  meeting.confSttusCd === '01' || meeting.confSttusCd === '02'
+const canJoinMeeting = (meeting: MeetingListItem | MeetingDetail) =>
+  meeting.vconfId !== null &&
+  (meeting.mtngSttus === 'scheduled' || meeting.mtngSttus === 'live')
 
 // 회의록 상태 한글 변환
-const getMomStatusLabel = (cd?: string) => {
+const getMomStatusLabel = (cd?: string | null) => {
   const map: Record<string, string> = {
     '01': 'AI 초안',
     '02': '편집 중',
@@ -149,12 +169,12 @@ const getMomStatusLabel = (cd?: string) => {
   return cd ? (map[cd] ?? '생성 중') : '생성 중'
 }
 
-// 결재 시작 여부 (검토 중 이상이면 결재 진행 중)
-const isApprovalStarted = (cd?: string) =>
+// 전자결재 요청 여부
+const isApprovalStarted = (cd?: string | null) =>
   cd === '03' || cd === '04'
 
-const groupMeetingsByDate = (meetings: VideoConfResponse[]) =>
-  meetings.reduce<Record<string, VideoConfResponse[]>>((groups, meeting) => {
+const groupMeetingsByDate = (meetings: MeetingListItem[]) =>
+  meetings.reduce<Record<string, MeetingListItem[]>>((groups, meeting) => {
     const dateKey = getMeetingDateKey(meeting)
     return {
       ...groups,
@@ -162,112 +182,89 @@ const groupMeetingsByDate = (meetings: VideoConfResponse[]) =>
     }
   }, {})
 
-const createMinutesDraft = (meeting: VideoConfResponse) =>
-  `안건 1. ${meeting.vconfNm ?? ''}
-- 주요 논의 내용을 정리합니다.
-- 담당자별 후속 작업을 확인합니다.
-- 일정과 공유 범위를 확정합니다.
-
-결정 사항
-- 회의 종료 후 녹취록을 기반으로 회의록 초안을 보정합니다.
-- 참석자 검토 후 결재 요청을 발송합니다.`
-
-// 회의록 수정 이력은 VideoMomResponse.videoMomHist에서 오므로
-// 별도 fallback 타입 정의
+// 회의록 수정 이력 표시용 화면 타입입니다.
 interface MinutesRevision {
   revisionId: number
   version: number
   content: string
   modifiedByName: string
   modifiedAt: string
-  changeMemo?: string
 }
 
-interface ApprovalMember {
-  id: number | undefined
-  name: string
-  role: string
-  status: string
-}
-
-const createFallbackRevisions = (
-  meeting: VideoConfResponse,
-  currentContent: string,
-): MinutesRevision[] => {
-  const baseId = meeting.vconfId ?? 0
-  return [
-    {
-      revisionId: baseId * 10 + 3,
-      version: 3,
-      content: currentContent,
-      modifiedByName: meeting.crtrNm ?? 'AI 회의록',
-      modifiedAt: new Date().toISOString(),
-      changeMemo: '결정 사항과 액션 아이템을 보완했습니다.',
-    },
-    {
-      revisionId: baseId * 10 + 2,
-      version: 2,
-      content: `${currentContent}\n\n수정 전 메모\n- 참석자 의견을 추가로 정리하기 전 버전입니다.`,
-      modifiedByName: '김지수',
-      modifiedAt: addDays(new Date(), -1).toISOString(),
-      changeMemo: '참석자 발언 요약을 추가했습니다.',
-    },
-    {
-      revisionId: baseId * 10 + 1,
-      version: 1,
-      content: `초안\n- ${meeting.vconfNm} 회의가 종료된 뒤 자동 생성된 최초 회의록입니다.\n- 검토 전 내용이므로 담당자 확인이 필요합니다.`,
-      modifiedByName: 'AI 회의록',
-      modifiedAt: addDays(new Date(), -2).toISOString(),
-      changeMemo: 'AI가 생성한 최초 초안입니다.',
-    },
-  ]
-}
-
-// 회의록 예약 폼 타입 (백엔드 VideoConfCreateRequest 기반)
-type ScheduleForm = VideoConfCreateRequest & {
+// 서버 전송 필드와 화면 전용 체크박스 상태를 함께 관리합니다.
+type ScheduleForm = Omit<MeetingCreateRequest, 'mtngTypeCd'> & {
   beginDt: string
   endDt: string
+  confRmId: number | null
+  useVideoConference: boolean
+  useMeetingRoom: boolean
 }
 
 const createDefaultScheduleForm = (): ScheduleForm => {
   const tomorrow = addDays(new Date(), 1)
   return {
-    vconfNm: '',
+    mtngNm: '',
     beginDt: `${toDateKey(tomorrow)}T10:00`,
     endDt: `${toDateKey(tomorrow)}T11:00`,
+    confRmId: null,
     ptcptEmpIds: [],
+    useVideoConference: true,
+    useMeetingRoom: false,
   }
 }
 const MeetingPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { showToast } = useToast()
 
   const selectedFilter = useMemo(
     () => getFilterFromPath(location.pathname),
     [location.pathname],
   )
 
-  const [selectedMeeting, setSelectedMeeting] = useState<VideoConfResponse | null>(null)
-  const [selectedMinutesMeeting, setSelectedMinutesMeeting] = useState<VideoConfResponse | null>(null)
+  const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
+  const [selectedMinutesMeeting, setSelectedMinutesMeeting] = useState<MeetingDetail | null>(null)
   const [selectedMinutesRevision, setSelectedMinutesRevision] = useState<MinutesRevision | null>(null)
-  const [momData, setMomData] = useState<VideoMomResponse | null>(null)
+  const [momData, setMomData] = useState<MeetingMinutesResponse | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
   const [meetingDateTo, setMeetingDateTo] = useState('')
   const [minutesContent, setMinutesContent] = useState('')
   const [minutesEditing, setMinutesEditing] = useState(false)
   const [schedulePanelOpen, setSchedulePanelOpen] = useState(false)
+  const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>(createDefaultScheduleForm)
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Array<string | number>>([])
+  const [scheduleValidationMessage, setScheduleValidationMessage] = useState('')
 
-  const { data: meetings, execute: fetchMeetings } = useApi<VideoConfResponse[], []>(
-    meetingApi.getConfList,
+  const { data: meetings, execute: fetchMeetings } = useApi<MeetingListItem[], []>(
+    meetingApi.getMeetingList,
     { immediate: false },
   )
 
   const { loading: createConfLoading, execute: createConf } = useApi(
-    meetingApi.createConf,
+    meetingApi.createMeeting,
     { immediate: false },
+  )
+
+  const { loading: updateMeetingLoading, execute: execUpdateMeeting } = useApi(
+    meetingApi.updateMeeting,
+    { immediate: false },
+  )
+
+  const { loading: deleteMeetingLoading, execute: execDeleteMeeting } = useApi(
+    meetingApi.deleteMeeting,
+    { immediate: false },
+  )
+
+  const { execute: fetchMeetingDetail } = useApi(
+    meetingApi.getMeeting,
+    { immediate: false },
+  )
+
+  const { data: meetingRooms } = useApi<RoomResponse[]>(
+    meetingRoomReservationApi.getMeetingRooms,
+    { initialData: [] },
   )
 
   const { execute: issueToken } = useApi(
@@ -275,8 +272,18 @@ const MeetingPage = () => {
     { immediate: false },
   )
 
+  const { loading: endMeetingLoading, execute: execEndMeeting } = useApi(
+    meetingApi.endConf,
+    { immediate: false },
+  )
+
   const { execute: fetchMom } = useApi(
     meetingApi.getMom,
+    { immediate: false },
+  )
+
+  const { loading: createEmptyMomLoading, execute: execCreateEmptyMom } = useApi(
+    meetingApi.createEmptyMom,
     { immediate: false },
   )
 
@@ -286,35 +293,35 @@ const MeetingPage = () => {
   )
 
   const { execute: execRequestReview } = useApi(
-    meetingApi.requestMomReview,
+    meetingApi.requestMomApproval,
     { immediate: false },
   )
 
   useEffect(() => {
     void fetchMeetings().catch(() => {
-      // 백엔드가 없을 때도 fallback 데이터로 화면 확인 가능
+      // 조회 오류는 useApi의 error 상태에서 관리합니다.
     })
   }, [fetchMeetings, selectedFilter])
 
   const meetingList = useMemo(() => meetings ?? [], [meetings])
 
   const filteredMeetings = meetingList
-    .filter((meeting:VideoConfResponse) => getStatusFromCd(meeting.confSttusCd) === selectedFilter)
-    .filter((meeting:VideoConfResponse) => {
+    .filter((meeting: MeetingListItem) => meeting.mtngSttus === selectedFilter)
+    .filter((meeting: MeetingListItem) => {
       if (!meetingSearchKeyword.trim()) return true
       const keyword = meetingSearchKeyword.trim().toLowerCase()
-      return [meeting.vconfNm, meeting.crtrNm, meeting.roomNm].some(
+      return [meeting.mtngNm, meeting.crtrNm, meeting.roomNm].some(
         (value) => value?.toLowerCase().includes(keyword),
       )
     })
-    .filter((meeting:VideoConfResponse) => {
+    .filter((meeting: MeetingListItem) => {
       const dateKey = getMeetingDateKey(meeting)
       if (meetingDateFrom && dateKey < meetingDateFrom) return false
       if (meetingDateTo && dateKey > meetingDateTo) return false
       return true
     })
     .sort(
-      (a:VideoConfResponse, b:VideoConfResponse) =>
+      (a: MeetingListItem, b: MeetingListItem) =>
         new Date(a.beginDt ?? '').getTime() - new Date(b.beginDt ?? '').getTime(),
     )
 
@@ -324,7 +331,7 @@ const MeetingPage = () => {
   const tabsWithCount = filterTabs.map((tab) => ({
     ...tab,
     count: meetingList.filter(
-      (meeting:VideoConfResponse) => getStatusFromCd(meeting.confSttusCd) === tab.value,
+      (meeting: MeetingListItem) => meeting.mtngSttus === tab.value,
     ).length,
   }))
 
@@ -337,44 +344,19 @@ const MeetingPage = () => {
     setMeetingDateTo('')
   }
 
-  // 즉시 회의 시작 - 회의 생성 후 토큰 발급 → LiveKit 입장
-  const handleStartInstantMeeting = useCallback(async () => {
-    try {
-      const tomorrow = addDays(new Date(), 0)
-      const created = await createConf({
-        vconfNm: '즉시 화상회의',
-        beginDt: tomorrow.toISOString(),
-        endDt: addDays(tomorrow, 1).toISOString(),
-        ptcptEmpIds: [],
-      })
-
-      if (created.data?.vconfId) {
-        const tokenRes = await issueToken(created.data.vconfId)
-        if (tokenRes.data?.token) {
-          // LiveKit 입장은 별도 회의실 페이지로 이동
-          navigate(`/meeting/room/${created.data.vconfId}`, {
-            state: {
-              token: tokenRes.data.token,
-              roomNm: tokenRes.data.roomNm,
-            },
-          })
-        }
-      }
-    } catch {
-      // 에러 처리는 추후 토스트로 교체
-    }
-  }, [createConf, issueToken, navigate])
-
   // 회의 입장 버튼 - 토큰 발급 후 LiveKit 회의실 페이지로 이동
   const handleJoinMeeting = useCallback(
-    async (meeting: VideoConfResponse) => {
+    async (meeting: MeetingListItem | MeetingDetail) => {
+      if (meeting.vconfId === null) return
       try {
-        const tokenRes = await issueToken(meeting.vconfId!)
+        const tokenRes = await issueToken(meeting.vconfId)
         if (tokenRes.data?.token) {
           navigate(`/meeting/room/${meeting.vconfId}`, {
             state: {
               token: tokenRes.data.token,
               roomNm: tokenRes.data.roomNm,
+              mtngId: meeting.mtngId,
+              canEnd: meeting.canEnd,
             },
           })
         }
@@ -385,39 +367,73 @@ const MeetingPage = () => {
     [issueToken, navigate],
   )
 
-  const handlePrimaryMeetingAction = (meeting: VideoConfResponse) => {
+  const openMeetingDetail = useCallback(
+    async (mtngId: number) => {
+      const response = await fetchMeetingDetail(mtngId)
+      if (response.data) setSelectedMeeting(response.data)
+    },
+    [fetchMeetingDetail],
+  )
+
+  const handlePrimaryMeetingAction = (meeting: MeetingListItem) => {
     // 진행 중인 회의는 바로 입장, 그 외(예약됨·종료)는 상세 모달 먼저 표시
-    if (meeting.confSttusCd === '02') {
+    if (meeting.mtngSttus === 'live' && meeting.vconfId !== null) {
       void handleJoinMeeting(meeting)
       return
     }
-    setSelectedMeeting(meeting)
+    void openMeetingDetail(meeting.mtngId)
+  }
+
+  const handleEndMeeting = async (meeting: MeetingListItem | MeetingDetail) => {
+    if (meeting.vconfId === null || !meeting.canEnd) return
+    if (!window.confirm(`'${meeting.mtngNm}' 회의를 종료하시겠습니까?`)) return
+
+    try {
+      await execEndMeeting(meeting.vconfId)
+      setSelectedMeeting(null)
+      await fetchMeetings()
+      showToast({
+        title: '회의를 종료했습니다.',
+        description: '종료된 회의는 지난 회의에서 확인할 수 있습니다.',
+        variant: 'success',
+      })
+    } catch {
+      showToast({
+        title: '회의 종료에 실패했습니다.',
+        description: '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
   }
 
   const openMinutesWorkspace = useCallback(
-    async (meeting: VideoConfResponse) => {
+    async (meeting: MeetingListItem | MeetingDetail) => {
+      const detail =
+        'ptcptList' in meeting
+          ? meeting
+          : (await fetchMeetingDetail(meeting.mtngId)).data
+
+      if (!detail) return
       setSelectedMeeting(null)
-      setSelectedMinutesMeeting(meeting)
+      setSelectedMinutesMeeting(detail)
       setSelectedMinutesRevision(null)
       setMinutesEditing(false)
 
       try {
-        // execute가 ApiResponse<VideoMomResponse> 반환
-        // res.data가 VideoMomResponse
-        const res = await fetchMom(meeting.vconfId)
+        const res = await fetchMom(detail.mtngId)
         if (res.data?.momCn) {
           setMinutesContent(res.data.momCn)
           setMomData(res.data)
         } else {
-          setMinutesContent(createMinutesDraft(meeting))
+          setMinutesContent('')
           setMomData(null)
         }
       } catch {
-        setMinutesContent(createMinutesDraft(meeting))
+        setMinutesContent('')
         setMomData(null)
       }
     },
-    [fetchMom],
+    [fetchMeetingDetail, fetchMom],
   )
 
   const closeMinutesWorkspace = () => {
@@ -428,10 +444,9 @@ const MeetingPage = () => {
   }
 
   const handleSaveMom = async () => {
-    if (!selectedMinutesMeeting?.vconfId) return
+    if (!selectedMinutesMeeting) return
     try {
-      const res = await execUpdateMom(selectedMinutesMeeting.vconfId, { momCn: minutesContent })
-      // res.data가 VideoMomResponse
+      const res = await execUpdateMom(selectedMinutesMeeting.mtngId, { momCn: minutesContent })
       if (res.data) setMomData(res.data)
       setMinutesEditing(false)
     } catch {
@@ -439,44 +454,182 @@ const MeetingPage = () => {
     }
   }
 
-  const handleRequestReview = async () => {
-    if (!selectedMinutesMeeting?.vconfId) return
+  const handleStartOfflineMinutes = async () => {
+    if (!selectedMinutesMeeting || selectedMinutesMeeting.vconfId !== null) return
+
     try {
-      await execRequestReview(selectedMinutesMeeting.vconfId)
+      await execCreateEmptyMom(selectedMinutesMeeting.mtngId)
+      const res = await fetchMom(selectedMinutesMeeting.mtngId)
+      if (res.data) {
+        setMomData(res.data)
+        setMinutesContent(res.data.momCn ?? '')
+        setMinutesEditing(true)
+      }
+      showToast({
+        title: '회의록 작성을 시작합니다.',
+        description: '회의 내용을 직접 입력한 뒤 저장해 주세요.',
+        variant: 'success',
+      })
+    } catch (error) {
+      showToast({
+        title: '회의록을 생성하지 못했습니다.',
+        description:
+          error instanceof Error
+            ? error.message
+            : '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const handleRequestReview = async () => {
+    if (!selectedMinutesMeeting) return
+    try {
+      await execRequestReview(selectedMinutesMeeting.mtngId)
       // 검토 요청 후 회의록 다시 조회
-      const res = await fetchMom(selectedMinutesMeeting.vconfId)
+      const res = await fetchMom(selectedMinutesMeeting.mtngId)
       if (res.data) setMomData(res.data)
     } catch {
       // 에러 처리는 추후 토스트로 교체
     }
   }
 
-  const handleDownloadTranscript = (meeting: VideoConfResponse) => {
-    // rcrdgId가 있으면 다운로드 API 호출, 없으면 기본 경로
-    window.location.assign(
-      `/api/v1/video-conferences/recordings/${meeting.vconfId}/download`,
-    )
-  }
+  const handleDownloadRecording = useCallback(
+    async (meeting: MeetingListItem | MeetingDetail) => {
+      const detail =
+        'rcrdgAtchFileId' in meeting
+          ? meeting
+          : (await fetchMeetingDetail(meeting.mtngId)).data
+
+      if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) return
+
+      window.location.assign(
+        meetingApi.getRcrdgDownloadUrl(
+          detail.vconfId,
+          detail.rcrdgAtchFileId,
+        ),
+      )
+    },
+    [fetchMeetingDetail],
+  )
 
   const handleScheduleFormChange = (
     field: keyof ScheduleForm,
-    value: string | boolean | number[],
+    value: string | boolean | number | number[] | null,
   ) => {
+    setScheduleValidationMessage('')
     setScheduleForm((current : ScheduleForm) => ({ ...current, [field]: value }))
   }
 
+  const closeSchedulePanel = () => {
+    setSchedulePanelOpen(false)
+    setEditingMeetingId(null)
+    setScheduleForm(createDefaultScheduleForm())
+    setSelectedEmployeeIds([])
+    setScheduleValidationMessage('')
+  }
+
+  const handleEditMeeting = (meeting: MeetingDetail) => {
+    const usesVideoConference =
+      meeting.mtngTypeCd === '01' || meeting.mtngTypeCd === '03'
+    const usesMeetingRoom = meeting.confRmId !== null
+
+    setEditingMeetingId(meeting.mtngId)
+    setScheduleForm({
+      mtngNm: meeting.mtngNm,
+      beginDt: toDateTimeInputValue(meeting.beginDt),
+      endDt: toDateTimeInputValue(meeting.endDt),
+      confRmId: meeting.confRmId,
+      ptcptEmpIds: meeting.ptcptList.map((participant) => participant.empId),
+      useVideoConference: usesVideoConference,
+      useMeetingRoom: usesMeetingRoom,
+    })
+    setSelectedEmployeeIds(
+      meeting.ptcptList.map((participant) => participant.empId),
+    )
+    setScheduleValidationMessage('')
+    setSelectedMeeting(null)
+    setSchedulePanelOpen(true)
+  }
+
+  const handleDeleteMeeting = async (meeting: MeetingDetail) => {
+    if (!window.confirm(`'${meeting.mtngNm}' 회의를 삭제하시겠습니까?`)) return
+
+    try {
+      await execDeleteMeeting(meeting.mtngId)
+      setSelectedMeeting(null)
+      await fetchMeetings()
+      showToast({
+        title: '회의를 삭제했습니다.',
+        description: '예약된 회의 목록에서 제거되었습니다.',
+        variant: 'success',
+      })
+    } catch {
+      showToast({
+        title: '회의 삭제에 실패했습니다.',
+        description: '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
   const handleSubmitScheduleMeeting = async () => {
+    if (!scheduleForm.mtngNm.trim()) {
+      setScheduleValidationMessage('회의 제목을 입력해주세요.')
+      return
+    }
+
+    if (!scheduleForm.beginDt || !scheduleForm.endDt) {
+      setScheduleValidationMessage('회의 시작 일시와 종료 일시를 입력해주세요.')
+      return
+    }
+
+    if (new Date(scheduleForm.beginDt) >= new Date(scheduleForm.endDt)) {
+      setScheduleValidationMessage('종료 일시는 시작 일시보다 늦어야 합니다.')
+      return
+    }
+
+    if (scheduleForm.useMeetingRoom && scheduleForm.confRmId === null) {
+      setScheduleValidationMessage('사용할 회의실을 선택해주세요.')
+      return
+    }
+
     const ptcptEmpIds = selectedEmployeeIds
       .map((value) => Number(value))
       .filter((value) => Number.isFinite(value))
 
-    await createConf({ ...scheduleForm, ptcptEmpIds })
+    const mtngTypeCd: MeetingTypeCode =
+      scheduleForm.useVideoConference && scheduleForm.useMeetingRoom
+        ? '03'
+        : scheduleForm.useVideoConference
+          ? '01'
+          : '02'
 
-    setSchedulePanelOpen(false)
-    setScheduleForm(createDefaultScheduleForm())
-    setSelectedEmployeeIds([])
+    const payload = {
+      mtngNm: scheduleForm.mtngNm,
+      mtngTypeCd,
+      beginDt: scheduleForm.beginDt,
+      endDt: scheduleForm.endDt,
+      confRmId: scheduleForm.useMeetingRoom
+        ? scheduleForm.confRmId
+        : null,
+      ptcptEmpIds,
+    }
+
+    if (editingMeetingId !== null) {
+      await execUpdateMeeting(editingMeetingId, payload)
+      showToast({
+        title: '회의 정보를 수정했습니다.',
+        description: '변경한 내용이 예약된 회의에 반영되었습니다.',
+        variant: 'success',
+      })
+    } else {
+      await createConf(payload)
+    }
+
+    closeSchedulePanel()
     navigate('/meeting/scheduled')
-    void fetchMeetings()
+    await fetchMeetings()
   }
 
   useEffect(() => {
@@ -486,31 +639,28 @@ const MeetingPage = () => {
 
     if (action === 'reserve') {
       queueMicrotask(() => {
+        setEditingMeetingId(null)
+        setScheduleForm(createDefaultScheduleForm())
+        setSelectedEmployeeIds([])
+        setScheduleValidationMessage('')
         setSchedulePanelOpen(true)
         navigate(location.pathname, { replace: true })
       })
     }
 
-    if (action === 'instant') {
-      queueMicrotask(() => {
-        void handleStartInstantMeeting()
-        navigate(location.pathname, { replace: true })
-      })
-    }
-
     if (Number.isFinite(detailMeetingId) && detailMeetingId > 0) {
-      const target = meetingList.find((m:VideoConfResponse) => m.vconfId === detailMeetingId)
+      const target = meetingList.find((m: MeetingListItem) => m.mtngId === detailMeetingId)
       if (target) {
         queueMicrotask(() => {
           setSelectedMinutesMeeting(null)
-          setSelectedMeeting(target)
+          void openMeetingDetail(target.mtngId)
           navigate(location.pathname, { replace: true })
         })
       }
     }
 
     if (Number.isFinite(minutesMeetingId) && minutesMeetingId > 0) {
-      const target = meetingList.find((m:VideoConfResponse) => m.vconfId === minutesMeetingId)
+      const target = meetingList.find((m: MeetingListItem) => m.mtngId === minutesMeetingId)
       if (target) {
         queueMicrotask(() => {
           setSelectedMeeting(null)
@@ -520,11 +670,11 @@ const MeetingPage = () => {
       }
     }
   }, [
-    handleStartInstantMeeting,
     location.pathname,
     location.search,
     meetingList,
     navigate,
+    openMeetingDetail,
     openMinutesWorkspace,
   ])
 
@@ -533,33 +683,22 @@ const MeetingPage = () => {
   // ─────────────────────────────────────────────────────────────
 
   if (selectedMinutesMeeting) {
+    const isOfflineMeeting = selectedMinutesMeeting.vconfId === null
     const approvalStarted = isApprovalStarted(
       momData?.momSttusCd ?? selectedMinutesMeeting.momSttusCd,
     )
 
-    const approvalMembers = (selectedMinutesMeeting.ptcptList ?? []).map((p: VideoPtcptResponse) => ({
-      id: p.empId,
-      name: p.empNm ?? '참여자',
-      role: p.deptNm ?? '회의 참여자',
-      status: '미결재',
+    const revisions: MinutesRevision[] = (momData?.histList ?? []).map((history, index) => ({
+      revisionId: history.histId,
+      version: (momData?.histList.length ?? 0) - index,
+      content: history.momCn,
+      modifiedByName: history.edtrNm,
+      modifiedAt: history.editDt,
     }))
-
-    const completedCount = approvalMembers.filter((m: ApprovalMember) => m.status === '완료').length
-
-    const revisions: MinutesRevision[] = momData?.histList?.length
-        ? momData.histList.map((h, idx: number) => ({
-          revisionId: h.histId ?? idx,
-          version: momData.histList!.length - idx,
-          content: h.momCn ?? '',
-          modifiedByName: String(h.edtrId ?? 'AI 회의록'),
-          modifiedAt: h.editDt ?? new Date().toISOString(),
-          changeMemo: undefined,
-        }))
-      : createFallbackRevisions(selectedMinutesMeeting, minutesContent)
 
     return (
       <PageComponent
-        title={selectedMinutesMeeting.vconfNm ?? '회의록'}
+        title={selectedMinutesMeeting.mtngNm ?? '회의록'}
         description="AI 초안을 검토하고 수정한 뒤 참석자 결재를 요청합니다."
         actions={
           <Button
@@ -573,12 +712,20 @@ const MeetingPage = () => {
       >
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-5">
-            <section className="rounded-xl border border-blue-100 bg-blue-50/80 px-5 py-4">
-              <p className="flex items-center gap-2 text-sm font-bold text-blue-800">
-                <CheckCircle2 size={18} />
-                AI 회의록이 생성되었습니다. 검토 후 결재 요청을 보낼 수 있습니다.
-              </p>
-            </section>
+            {momData ? (
+              <section className="rounded-xl border border-blue-100 bg-blue-50/80 px-5 py-4">
+                <p className="flex items-center gap-2 text-sm font-bold text-blue-800">
+                  <CheckCircle2 size={18} />
+                  회의록이 생성되었습니다. 내용을 확인한 뒤 전자결재를 요청할 수 있습니다.
+                </p>
+              </section>
+            ) : (
+              <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-sm font-bold text-slate-600">
+                  아직 생성된 회의록이 없습니다.
+                </p>
+              </section>
+            )}
 
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
@@ -612,7 +759,7 @@ const MeetingPage = () => {
                 <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
                   <dt>녹취록</dt>
                   <dd className="mt-1 text-emerald-700">
-                    {selectedMinutesMeeting.confSttusCd === '01' ? '회의 종료 후 생성' : '생성 완료'}
+                    {getRecordingLabel(selectedMinutesMeeting)}
                   </dd>
                 </div>
               </dl>
@@ -625,18 +772,28 @@ const MeetingPage = () => {
                   회의 내용
                 </h3>
                 <Button
-                  variant="outline"
+                  variant={!momData && isOfflineMeeting ? 'primary' : 'outline'}
                   size="sm"
-                  leftIcon={minutesEditing ? <Save size={15} /> : <Pencil size={15} />}
+                  disabled={!momData && !isOfflineMeeting}
+                  loading={createEmptyMomLoading}
+                  leftIcon={
+                    minutesEditing ? <Save size={15} /> : <Pencil size={15} />
+                  }
                   onClick={() => {
                     if (minutesEditing) {
                       void handleSaveMom()
+                    } else if (!momData && isOfflineMeeting) {
+                      void handleStartOfflineMinutes()
                     } else {
                       setMinutesEditing(true)
                     }
                   }}
                 >
-                  {minutesEditing ? '저장' : '수정'}
+                  {minutesEditing
+                    ? '저장'
+                    : !momData && isOfflineMeeting
+                      ? '회의록 작성'
+                      : '수정'}
                 </Button>
               </div>
               {minutesEditing ? (
@@ -647,7 +804,7 @@ const MeetingPage = () => {
                 />
               ) : (
                 <div className="whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm font-semibold leading-7 text-slate-700">
-                  {minutesContent}
+                  {minutesContent || '회의록 내용이 없습니다.'}
                 </div>
               )}
             </section>
@@ -655,102 +812,55 @@ const MeetingPage = () => {
 
           <div className="flex h-fit flex-col gap-4 xl:sticky xl:top-6">
             <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              {approvalStarted ? (
-                <>
-                  <h3 className="text-base font-bold text-slate-950">참여자 결재 현황</h3>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-blue-600"
-                      style={{
-                        width: `${approvalMembers.length ? (completedCount / approvalMembers.length) * 100 : 0}%`,
-                      }}
-                    />
-                  </div>
-                  <p className="mt-2 text-sm font-bold text-slate-500">
-                    {completedCount} / {approvalMembers.length}명 결재 완료
-                  </p>
-                  <div className="mt-5 flex flex-col gap-2">
-                    {approvalMembers.map((member : ApprovalMember) => (
-                      <div
-                        key={member.id}
-                        className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
-                            {getInitial(member.name)}
-                          </span>
-                          <span>
-                            <span className="block text-sm font-bold text-slate-900">{member.name}</span>
-                            <span className="text-xs font-semibold text-slate-400">{member.role}</span>
-                          </span>
-                        </div>
-                        <Badge variant={member.status === '완료' ? 'success' : 'neutral'}>
-                          {member.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-base font-bold text-slate-950">참여자 결재 준비</h3>
-                    <Badge variant="warning">요청 전</Badge>
-                  </div>
-                  <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3">
-                    <p className="text-sm font-bold text-blue-800">
-                      회의록 검토가 끝나면 참여자에게 결재 요청을 보낼 수 있습니다.
-                    </p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-blue-700">
-                      요청 전에는 참여자에게 알림이 가지 않고, 요청 후에는 순서 없이 각자 결재할 수 있습니다.
-                    </p>
-                  </div>
-                  <div className="mt-5 border-t border-slate-100 pt-4">
-                    <p className="text-xs font-bold text-slate-500">결재 요청 대상 참여자</p>
-                    <div className="mt-3 flex flex-col gap-2">
-                      {approvalMembers.map((member : ApprovalMember) => (
-                        <div
-                          key={member.id}
-                          className="flex items-center justify-between gap-3 rounded-lg px-2 py-2"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                              {getInitial(member.name)}
-                            </span>
-                            <span>
-                              <span className="block text-sm font-bold text-slate-900">{member.name}</span>
-                              <span className="text-xs font-semibold text-slate-400">{member.role}</span>
-                            </span>
-                          </div>
-                          <Badge variant="outline">참여자 결재</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-bold text-slate-950">전자결재</h3>
+                <Badge variant={approvalStarted ? 'success' : 'warning'}>
+                  {approvalStarted ? '요청 완료' : '요청 전'}
+                </Badge>
+              </div>
+              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3">
+                <p className="text-sm font-bold text-blue-800">
+                  {approvalStarted
+                    ? `전자결재 문서가 생성되었습니다${momData?.drftDocSn ? ` (#${momData.drftDocSn})` : ''}.`
+                    : '회의록 검토가 끝나면 전자결재 시스템으로 결재를 요청할 수 있습니다.'}
+                </p>
+              </div>
 
               <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-5">
                 <Button
                   variant="outline"
+                  disabled={(!momData && !isOfflineMeeting) || approvalStarted}
+                  loading={createEmptyMomLoading}
                   leftIcon={<Pencil size={16} />}
-                  onClick={() => setMinutesEditing(true)}
+                  onClick={() => {
+                    if (!momData && isOfflineMeeting) {
+                      void handleStartOfflineMinutes()
+                    } else {
+                      setMinutesEditing(true)
+                    }
+                  }}
                 >
-                  회의록 수정
+                  {!momData && isOfflineMeeting ? '회의록 작성' : '회의록 수정'}
                 </Button>
                 <Button
+                  disabled={!momData || approvalStarted}
                   leftIcon={<Send size={16} />}
                   onClick={() => void handleRequestReview()}
                 >
                   결재 요청 발송
                 </Button>
-                <Button
-                  variant="outline"
-                  leftIcon={<Download size={16} />}
-                  onClick={() => handleDownloadTranscript(selectedMinutesMeeting)}
-                >
-                  녹취록 다운로드
-                </Button>
+                {selectedMinutesMeeting.vconfId !== null &&
+                  selectedMinutesMeeting.rcrdgAtchFileId && (
+                    <Button
+                      variant="outline"
+                      leftIcon={<Download size={16} />}
+                      onClick={() =>
+                        void handleDownloadRecording(selectedMinutesMeeting)
+                      }
+                    >
+                      녹취록 다운로드
+                    </Button>
+                  )}
               </div>
             </aside>
 
@@ -763,6 +873,11 @@ const MeetingPage = () => {
                 <Badge variant="outline">{revisions.length}개 버전</Badge>
               </div>
               <div className="mt-3 flex flex-col gap-2">
+                {revisions.length === 0 && (
+                  <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
+                    수정 이력이 없습니다.
+                  </p>
+                )}
                 {revisions.map((revision: MinutesRevision) => (
                   <div
                     key={revision.revisionId}
@@ -817,11 +932,6 @@ const MeetingPage = () => {
                 <p className="mt-2 text-sm font-semibold text-slate-500">
                   {selectedMinutesRevision.modifiedByName} · {formatDateTime(selectedMinutesRevision.modifiedAt)}
                 </p>
-                {selectedMinutesRevision.changeMemo && (
-                  <p className="mt-3 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2 text-sm font-bold text-blue-800">
-                    {selectedMinutesRevision.changeMemo}
-                  </p>
-                )}
               </div>
               <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
                 <div className="whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm font-semibold leading-7 text-slate-700">
@@ -846,36 +956,11 @@ const MeetingPage = () => {
 
   return (
     <PageComponent
-      title="화상회의"
-      description="예정된 회의, 진행 중인 회의, 지난 회의 기록을 한 곳에서 확인합니다."
+      title="회의"
+      description="온라인, 오프라인, 혼합 회의를 한 곳에서 확인하고 관리합니다."
     >
       <div className="flex w-full flex-col gap-6">
-        <section className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-xl border border-blue-100 bg-blue-50/70 p-6">
-            <div className="flex h-full flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm ring-1 ring-blue-100">
-                  <Sparkles size={22} />
-                </div>
-                <div className="min-w-0">
-                  <h1 className="text-xl font-bold text-slate-950">지금 바로 회의 시작</h1>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    링크를 생성하고 팀원을 즉시 초대하세요.
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                loading={createConfLoading}
-                leftIcon={<Play size={16} />}
-                onClick={() => void handleStartInstantMeeting()}
-                className="w-full md:w-auto"
-              >
-                바로 시작
-              </Button>
-            </div>
-          </article>
-
+        <section>
           <article className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-6">
             <div className="flex h-full flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="flex min-w-0 items-center gap-4">
@@ -906,11 +991,11 @@ const MeetingPage = () => {
             <Tabs
               items={tabsWithCount}
               value={selectedFilter}
-              onChange={(value) => navigate(filterPathMap[value as MeetingListFilter])}
+              onChange={(value) => navigate(filterPathMap[value as MeetingStatus])}
             />
             <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 lg:grid-cols-[minmax(260px,1fr)_170px_170px_auto] lg:items-end">
               <SearchInput
-                placeholder="화상회의 검색"
+                placeholder="회의명, 작성자, 화상 회의실 검색"
                 value={meetingSearchKeyword}
                 onChange={(e) => setMeetingSearchKeyword(e.target.value)}
                 wrapperClassName="w-full"
@@ -955,11 +1040,11 @@ const MeetingPage = () => {
               <section key={dateKey} className="flex flex-col gap-3">
                 <h2 className="text-sm font-bold text-slate-600">{formatDateTitle(dateKey)}</h2>
                 {groupedMeetings[dateKey].map((meeting) => {
-                  const isLive = meeting.confSttusCd === '02'
-                  const status = getStatusFromCd(meeting.confSttusCd)
+                  const isLive = meeting.mtngSttus === 'live'
+                  const status = meeting.mtngSttus
                   return (
                     <article
-                      key={meeting.vconfId}
+                      key={meeting.mtngId}
                       className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 transition-colors hover:border-blue-200 hover:bg-white"
                     >
                       <div className="flex flex-col gap-3">
@@ -967,10 +1052,13 @@ const MeetingPage = () => {
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="truncate text-lg font-bold text-slate-950">
-                                {meeting.vconfNm}
+                                {meeting.mtngNm}
                               </h3>
                               <Badge variant={statusBadgeVariantMap[status]}>
                                 {statusLabelMap[status]}
+                              </Badge>
+                              <Badge variant="outline">
+                                {getMeetingTypeLabel(meeting.mtngTypeCd)}
                               </Badge>
                             </div>
                             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-slate-600">
@@ -981,7 +1069,7 @@ const MeetingPage = () => {
                               </span>
                               <span className="inline-flex items-center gap-1.5">
                                 <Users size={16} />
-                                참여자 {meeting.ptcptList?.length ?? 0}명
+                                참여자 {meeting.ptcptCnt ?? 0}명
                               </span>
                               <span className="inline-flex items-center gap-1.5">
                                 <CalendarClock size={16} />
@@ -989,14 +1077,27 @@ const MeetingPage = () => {
                               </span>
                             </div>
                           </div>
-                          <Button
-                            variant={isLive ? 'primary' : 'outline'}
-                            leftIcon={isLive ? <Video size={16} /> : <FileText size={16} />}
-                            className="w-full lg:w-32"
-                            onClick={() => handlePrimaryMeetingAction(meeting)}
-                          >
-                            {isLive ? '회의 입장' : '상세 보기'}
-                          </Button>
+                          <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                            <Button
+                              variant={isLive && meeting.vconfId !== null ? 'primary' : 'outline'}
+                              leftIcon={isLive && meeting.vconfId !== null ? <Video size={16} /> : <FileText size={16} />}
+                              className="w-full lg:w-32"
+                              onClick={() => handlePrimaryMeetingAction(meeting)}
+                            >
+                              {isLive && meeting.vconfId !== null ? '회의 입장' : '상세 보기'}
+                            </Button>
+                            {isLive && meeting.vconfId !== null && meeting.canEnd && (
+                              <Button
+                                variant="danger"
+                                leftIcon={<PhoneOff size={16} />}
+                                className="w-full lg:w-32"
+                                loading={endMeetingLoading}
+                                onClick={() => void handleEndMeeting(meeting)}
+                              >
+                                회의 종료
+                              </Button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-3">
@@ -1006,7 +1107,7 @@ const MeetingPage = () => {
                               참여 정보
                             </p>
                             <p className="mt-1 text-sm font-bold text-slate-900">
-                              {meeting.ptcptList?.length ?? 0}명 참여 예정
+                              {meeting.ptcptCnt ?? 0}명 참여 예정
                             </p>
                           </div>
                           <button
@@ -1029,18 +1130,8 @@ const MeetingPage = () => {
                             </p>
                             <div className="mt-1 flex items-start justify-between gap-3 pr-9">
                               <p className="text-sm font-bold text-emerald-700">
-                                {meeting.confSttusCd === '01' ? '회의 종료 후 생성' : '생성 완료'}
+                                {getRecordingLabel(meeting)}
                               </p>
-                              {meeting.confSttusCd === '03' && (
-                                <button
-                                  type="button"
-                                  aria-label="녹취록 다운로드"
-                                  onClick={() => handleDownloadTranscript(meeting)}
-                                  className="absolute right-4 top-3 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
-                                >
-                                  <Download size={14} />
-                                </button>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -1052,13 +1143,6 @@ const MeetingPage = () => {
             ))
           )}
 
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="더 보기"
-            className="mx-auto"
-            leftIcon={<ChevronDown size={16} />}
-          />
         </section>
       </div>
 
@@ -1076,11 +1160,14 @@ const MeetingPage = () => {
             </button>
 
             <div className="px-8 pb-6 pt-8">
-              <Badge variant={statusBadgeVariantMap[getStatusFromCd(selectedMeeting.confSttusCd)]}>
-                {statusLabelMap[getStatusFromCd(selectedMeeting.confSttusCd)]}
+              <Badge variant={statusBadgeVariantMap[selectedMeeting.mtngSttus]}>
+                {statusLabelMap[selectedMeeting.mtngSttus]}
+              </Badge>
+              <Badge variant="outline">
+                {getMeetingTypeLabel(selectedMeeting.mtngTypeCd)}
               </Badge>
               <h2 className="mt-4 text-2xl font-bold leading-tight text-slate-950">
-                {selectedMeeting.vconfNm}
+                {selectedMeeting.mtngNm}
               </h2>
               <div className="mt-6 flex flex-col gap-3 text-sm font-bold text-slate-600">
                 <p className="flex items-center gap-3">
@@ -1090,7 +1177,7 @@ const MeetingPage = () => {
                 </p>
                 <p className="flex items-center gap-3">
                   <Link2 size={20} className="text-blue-700" />
-                  {selectedMeeting.roomNm ?? '온라인 회의실'}
+                  {selectedMeeting.confRmNm ?? selectedMeeting.roomNm ?? '회의실 미사용'}
                 </p>
               </div>
 
@@ -1100,14 +1187,15 @@ const MeetingPage = () => {
                 </h3>
                 <div className="mt-3 flex items-center gap-3">
                   <div className="flex -space-x-2">
-                    {(selectedMeeting.ptcptList ?? []).slice(0, 4).map((p: VideoPtcptResponse) => (
-                      <div
+                    {(selectedMeeting.ptcptList ?? []).slice(0, 4).map((p: MeetingParticipant) => (
+                      <ProfileAvatar
                         key={p.empId}
-                        title={p.empNm}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-white bg-blue-100 text-sm font-bold text-blue-800 shadow-sm"
-                      >
-                        {getInitial(p.empNm)}
-                      </div>
+                        fileId={p.prflImgFileId}
+                        name={p.empNm}
+                        size={40}
+                        rounded="xl"
+                        className="border-2 border-white shadow-sm"
+                      />
                     ))}
                   </div>
                   <p className="text-sm font-bold text-slate-600">
@@ -1138,77 +1226,103 @@ const MeetingPage = () => {
                     녹취록
                   </p>
                   <p className="mt-1 pr-9 text-sm font-bold text-emerald-700">
-                    {selectedMeeting.confSttusCd === '01' ? '회의 종료 후 생성' : '생성 완료'}
+                    {getRecordingLabel(selectedMeeting)}
                   </p>
-                  {selectedMeeting.confSttusCd === '03' && (
-                    <button
-                      type="button"
-                      aria-label="녹취록 다운로드"
-                      onClick={() => handleDownloadTranscript(selectedMeeting)}
-                      className="absolute right-4 top-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
-                    >
-                      <Download size={14} />
-                    </button>
-                  )}
+                  {selectedMeeting.vconfId !== null &&
+                    selectedMeeting.rcrdgAtchFileId && (
+                      <button
+                        type="button"
+                        aria-label="녹취록 다운로드"
+                        onClick={() =>
+                          void handleDownloadRecording(selectedMeeting)
+                        }
+                        className="absolute right-4 top-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        <Download size={14} />
+                      </button>
+                    )}
                 </div>
               </div>
+              {selectedMeeting.vconfId !== null &&
+                selectedMeeting.rcrdgAtchFileId && (
+                  <audio
+                    controls
+                    preload="metadata"
+                    className="mt-4 w-full"
+                    src={meetingApi.getRcrdgStreamUrl(
+                      selectedMeeting.vconfId,
+                      selectedMeeting.rcrdgAtchFileId,
+                    )}
+                  >
+                    브라우저가 오디오 재생을 지원하지 않습니다.
+                  </audio>
+                )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-100 px-8 py-5">
-              <div className="flex items-center gap-3 text-slate-500">
-                <button
-                  type="button"
-                  aria-label="회의 수정"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 hover:text-slate-900"
+            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-8 py-5">
+              <div className="flex gap-2">
+                <Button
+                  variant="danger"
+                  leftIcon={<Trash2 size={16} />}
+                  disabled={!selectedMeeting.canDelete}
+                  loading={deleteMeetingLoading}
+                  onClick={() => void handleDeleteMeeting(selectedMeeting)}
                 >
-                  <Pencil size={19} />
-                </button>
-                <button
-                  type="button"
-                  aria-label="회의 삭제"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-red-50 hover:text-red-600"
+                  삭제
+                </Button>
+                <Button
+                  variant="outline"
+                  leftIcon={<Pencil size={16} />}
+                  disabled={!selectedMeeting.canEdit}
+                  onClick={() => handleEditMeeting(selectedMeeting)}
                 >
-                  <Trash2 size={19} />
-                </button>
+                  수정
+                </Button>
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setSelectedMeeting(null)}>
                   닫기
                 </Button>
-                <Button
-                  disabled={!canJoinMeeting(selectedMeeting)}
-                  onClick={() => void handleJoinMeeting(selectedMeeting)}
-                >
-                  입장하기
-                </Button>
+                {selectedMeeting.vconfId !== null && (
+                  <Button
+                    disabled={!canJoinMeeting(selectedMeeting)}
+                    onClick={() => void handleJoinMeeting(selectedMeeting)}
+                  >
+                    입장하기
+                  </Button>
+                )}
               </div>
             </div>
           </section>
         </div>
       )}
 
-      {/* ── 회의 예약 패널 ── */}
+      {/* 회의 등록과 수정은 같은 폼을 사용해 입력 규칙을 한 곳에서 관리합니다. */}
       {schedulePanelOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35">
           <button
             type="button"
             aria-label="예약 패널 닫기"
             className="hidden flex-1 cursor-default md:block"
-            onClick={() => setSchedulePanelOpen(false)}
+            onClick={closeSchedulePanel}
           />
           <aside className="flex h-full w-full max-w-[520px] flex-col bg-white shadow-2xl">
             <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
-                <p className="text-xs font-bold text-blue-700">화상회의</p>
-                <h2 className="mt-1 text-xl font-bold text-slate-950">회의 예약</h2>
+                <p className="text-xs font-bold text-blue-700">통합 회의</p>
+                <h2 className="mt-1 text-xl font-bold text-slate-950">
+                  {editingMeetingId !== null ? '회의 수정' : '회의 예약'}
+                </h2>
                 <p className="mt-1 text-sm font-semibold text-slate-500">
-                  회의 정보를 입력하면 예약된 회의 목록에 반영됩니다.
+                  {editingMeetingId !== null
+                    ? '변경한 회의 정보를 저장합니다.'
+                    : '회의 정보를 입력하면 예약된 회의 목록에 반영됩니다.'}
                 </p>
               </div>
               <button
                 type="button"
                 aria-label="닫기"
-                onClick={() => setSchedulePanelOpen(false)}
+                onClick={closeSchedulePanel}
                 className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-slate-500 ring-1 ring-slate-200 transition-colors hover:bg-slate-50 hover:text-slate-900"
               >
                 <X size={20} />
@@ -1222,8 +1336,8 @@ const MeetingPage = () => {
                     <FormField
                       label="회의 제목"
                       placeholder="예: 신규 기능 기획 논의"
-                      value={scheduleForm.vconfNm}
-                      onChange={(e) => handleScheduleFormChange('vconfNm', e.target.value)}
+                      value={scheduleForm.mtngNm}
+                      onChange={(e) => handleScheduleFormChange('mtngNm', e.target.value)}
                     />
                   </div>
                 </section>
@@ -1246,6 +1360,57 @@ const MeetingPage = () => {
                   </div>
                 </section>
 
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h3 className="mb-4 text-sm font-bold text-slate-900">회의 진행 방식</h3>
+                  <div className="flex flex-col gap-3">
+                    <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={scheduleForm.useVideoConference}
+                        onChange={(event) =>
+                          handleScheduleFormChange('useVideoConference', event.target.checked)
+                        }
+                      />
+                      화상회의로 진행
+                    </label>
+                    <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={scheduleForm.useMeetingRoom}
+                        onChange={(event) => {
+                          const checked = event.target.checked
+                          handleScheduleFormChange('useMeetingRoom', checked)
+                          if (!checked) handleScheduleFormChange('confRmId', null)
+                        }}
+                      />
+                      회의실 사용
+                    </label>
+
+                    {scheduleForm.useMeetingRoom && (
+                      <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-bold text-slate-500">회의실</span>
+                        <select
+                          value={scheduleForm.confRmId ?? ''}
+                          onChange={(event) =>
+                            handleScheduleFormChange(
+                              'confRmId',
+                              event.target.value ? Number(event.target.value) : null,
+                            )
+                          }
+                          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400"
+                        >
+                          <option value="">회의실을 선택하세요</option>
+                          {(meetingRooms ?? []).map((room) => (
+                            <option key={room.roomId} value={room.roomId}>
+                              {room.roomName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                </section>
+
                 <EmployeeSearchPicker
                   variant="detailed"
                   remoteSearch
@@ -1259,15 +1424,19 @@ const MeetingPage = () => {
             </div>
 
             <footer className="flex justify-end gap-2 border-t border-slate-100 px-6 py-5">
-              <Button variant="outline" onClick={() => setSchedulePanelOpen(false)}>
+              <Button variant="outline" onClick={closeSchedulePanel}>
                 취소
               </Button>
+              {scheduleValidationMessage && (
+                <p className="mr-auto self-center text-sm font-semibold text-red-600">
+                  {scheduleValidationMessage}
+                </p>
+              )}
               <Button
-                loading={createConfLoading}
-                disabled={!scheduleForm.vconfNm.trim()}
+                loading={createConfLoading || updateMeetingLoading}
                 onClick={() => void handleSubmitScheduleMeeting()}
               >
-                예약 생성
+                {editingMeetingId !== null ? '수정 저장' : '예약 생성'}
               </Button>
             </footer>
           </aside>
