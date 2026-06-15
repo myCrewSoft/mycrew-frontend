@@ -21,7 +21,9 @@ import {
   Track,
   Participant,
 } from 'livekit-client'
+import { ApiError } from '../../api/axiosInstance'
 import { meetingApi } from '../../api/meetingApi'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 
 // ── 타입 ──────────────────────────────────────────────────────────
@@ -29,14 +31,28 @@ import EmployeeSearchPicker from '../../components/common/employeeSearch/Employe
 interface ChatMessage {
   id: number
   senderName: string
+  senderDepartment?: string
+  senderJobGrade?: string
+  senderProfileImageId?: number | null
   text: string
   isMe: boolean
   timestamp: Date
 }
 
+interface ParticipantProfile {
+  empId?: number
+  name: string
+  department?: string
+  jobGrade?: string
+  profileImageId?: number | null
+}
+
 interface ParticipantTile {
   identity: string
   name: string
+  department?: string
+  jobGrade?: string
+  profileImageId?: number | null
   videoTrack?: MediaStreamTrack
   audioTrack?: MediaStreamTrack
   isMuted: boolean
@@ -47,6 +63,9 @@ interface ParticipantTile {
 // ── 상수 ──────────────────────────────────────────────────────────
 
 const STT_CHUNK_INTERVAL_MS = 5000
+const DEFAULT_LIVEKIT_URL = `${
+  window.location.protocol === 'https:' ? 'wss' : 'ws'
+}://${window.location.hostname}:7880`
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────
 
@@ -56,16 +75,22 @@ const MeetingRoomPage = () => {
   const navigate = useNavigate()
 
   // navigate state로 전달받은 토큰과 방 이름
-  const { token, roomNm } = (location.state ?? {}) as {
+  const { token, roomNm, mtngId, canEnd } = (location.state ?? {}) as {
     token?: string
     roomNm?: string
+    mtngId?: number
+    canEnd?: boolean
   }
 
   const roomRef = useRef<Room | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingRecorderRef = useRef<MediaRecorder | null>(null)
   const sttChunksRef = useRef<Blob[]>([])
   const rcrdgChunksRef = useRef<Blob[]>([])
   const sttIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const participantProfileMapRef = useRef<Map<string, ParticipantProfile>>(
+    new Map(),
+  )
   // cleanup·handleLeave 에서 직접 끊을 때 Disconnected 이벤트가 navigate 하지 않도록
   const isIntentionalDisconnectRef = useRef(false)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
@@ -85,8 +110,60 @@ const MeetingRoomPage = () => {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteSelectedIds, setInviteSelectedIds] = useState<Array<string | number>>([])
   const [linkCopied, setLinkCopied] = useState(false)
+  const [connectionError, setConnectionError] = useState('')
+  const [connectionAttempt, setConnectionAttempt] = useState(0)
+  const [canEndMeeting, setCanEndMeeting] = useState(canEnd ?? false)
+  const [endingMeeting, setEndingMeeting] = useState(false)
 
   // ── 참여자 타일 업데이트 ────────────────────────────────────────
+
+  const getParticipantProfile = useCallback((participant: Participant) => {
+    const mappedProfile = participantProfileMapRef.current.get(
+      participant.identity,
+    )
+    let metadataProfile: Partial<ParticipantProfile> = {}
+    if (participant.metadata) {
+      try {
+        const metadata = JSON.parse(participant.metadata) as {
+          empId?: number | string
+          empNm?: string
+          name?: string
+          deptNm?: string
+          jobGrdNm?: string
+          prflImgFileId?: number | string | null
+        }
+        const parsedProfileImageId = Number(metadata.prflImgFileId)
+        metadataProfile = {
+          empId:
+            metadata.empId === undefined ? undefined : Number(metadata.empId),
+          name: metadata.empNm?.trim() || metadata.name?.trim(),
+          department: metadata.deptNm?.trim() || undefined,
+          jobGrade: metadata.jobGrdNm?.trim() || undefined,
+          profileImageId: Number.isFinite(parsedProfileImageId)
+            ? parsedProfileImageId
+            : null,
+        }
+      } catch {
+        // LiveKit metadata가 JSON이 아니면 identity를 대체값으로 사용합니다.
+      }
+    }
+
+    return {
+      empId: metadataProfile.empId ?? mappedProfile?.empId,
+      name:
+        (participant.name !== participant.identity
+          ? participant.name?.trim()
+          : undefined) ||
+        metadataProfile.name ||
+        mappedProfile?.name ||
+        participant.identity,
+      department:
+        metadataProfile.department ?? mappedProfile?.department,
+      jobGrade: metadataProfile.jobGrade ?? mappedProfile?.jobGrade,
+      profileImageId:
+        metadataProfile.profileImageId ?? mappedProfile?.profileImageId ?? null,
+    } satisfies ParticipantProfile
+  }, [])
 
   const updateParticipants = useCallback((room: Room) => {
     const tiles: ParticipantTile[] = []
@@ -94,10 +171,14 @@ const MeetingRoomPage = () => {
     const addTile = (participant: Participant, isLocal: boolean) => {
       const videoPublication = participant.getTrackPublication(Track.Source.Camera)
       const audioPublication = participant.getTrackPublication(Track.Source.Microphone)
+      const profile = getParticipantProfile(participant)
 
       tiles.push({
         identity: participant.identity,
-        name: participant.name ?? participant.identity,
+        name: profile.name,
+        department: profile.department,
+        jobGrade: profile.jobGrade,
+        profileImageId: profile.profileImageId,
         videoTrack: videoPublication?.track?.mediaStreamTrack,
         audioTrack: audioPublication?.track?.mediaStreamTrack,
         isMuted: audioPublication?.isMuted ?? true,
@@ -109,7 +190,42 @@ const MeetingRoomPage = () => {
     addTile(room.localParticipant, true)
     room.remoteParticipants.forEach((p) => addTile(p, false))
     setParticipants(tiles)
-  }, [])
+  }, [getParticipantProfile])
+
+  useEffect(() => {
+    if (!mtngId) return
+
+    let disposed = false
+    void meetingApi
+      .getMeeting(mtngId)
+      .then((response) => {
+        if (disposed) return
+
+        const meeting = response.data.data
+        setCanEndMeeting(meeting?.canEnd ?? false)
+        participantProfileMapRef.current = new Map(
+          (meeting?.ptcptList ?? []).map((participant) => [
+            String(participant.empId),
+            {
+              empId: participant.empId,
+              name: participant.empNm,
+              department: participant.deptNm,
+              jobGrade: participant.jobGrdNm,
+              profileImageId: participant.prflImgFileId,
+            },
+          ]),
+        )
+
+        if (roomRef.current) updateParticipants(roomRef.current)
+      })
+      .catch(() => {
+        if (!disposed) setCanEndMeeting(false)
+      })
+
+    return () => {
+      disposed = true
+    }
+  }, [mtngId, updateParticipants])
 
   // ── 녹음 중지 ───────────────────────────────────────────────────
 
@@ -120,6 +236,61 @@ const MeetingRoomPage = () => {
     }
     setIsRecording(false)
   }, [])
+
+  const discardFullRecording = useCallback(() => {
+    const recorder = recordingRecorderRef.current
+    if (!recorder) return
+
+    if (recorder.state === 'recording') recorder.stop()
+    recorder.stream.getTracks().forEach((track) => track.stop())
+    recordingRecorderRef.current = null
+    rcrdgChunksRef.current = []
+  }, [])
+
+  const uploadFullRecording = useCallback(async () => {
+    const recorder = recordingRecorderRef.current
+    if (!recorder || !vconfId) return
+
+    setUploadingRcrdg(true)
+    try {
+      const recordingBlob =
+        recorder.state === 'inactive'
+          ? new Blob(rcrdgChunksRef.current, { type: 'audio/webm' })
+          : await new Promise<Blob>((resolve, reject) => {
+              recorder.addEventListener(
+                'stop',
+                () => {
+                  resolve(
+                    new Blob(rcrdgChunksRef.current, {
+                      type: 'audio/webm',
+                    }),
+                  )
+                },
+                { once: true },
+              )
+              recorder.addEventListener(
+                'error',
+                () => reject(new Error('녹취 파일 생성에 실패했습니다.')),
+                { once: true },
+              )
+              recorder.stop()
+            })
+
+      if (recordingBlob.size === 0) return
+
+      const file = new File(
+        [recordingBlob],
+        `recording-${vconfId}.webm`,
+        { type: 'audio/webm' },
+      )
+      await meetingApi.uploadRcrdg(Number(vconfId), file)
+    } finally {
+      recorder.stream.getTracks().forEach((track) => track.stop())
+      recordingRecorderRef.current = null
+      rcrdgChunksRef.current = []
+      setUploadingRcrdg(false)
+    }
+  }, [vconfId])
 
   // ── STT 청크 전송 ───────────────────────────────────────────────
 
@@ -149,6 +320,7 @@ const MeetingRoomPage = () => {
         rcrdgRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) rcrdgChunksRef.current.push(e.data)
         }
+        recordingRecorderRef.current = rcrdgRecorder
         rcrdgRecorder.start()
         setIsRecording(true)
 
@@ -176,9 +348,6 @@ const MeetingRoomPage = () => {
           void sendSttChunk(chunk)
         }
 
-        // 전체 녹취록 저장용 참조
-        ;(window as Window & { _rcrdgRecorder?: MediaRecorder })._rcrdgRecorder =
-          rcrdgRecorder
       })
       .catch(() => {
         // 마이크 권한 거부 시 STT/녹취록 없이 진행
@@ -188,11 +357,14 @@ const MeetingRoomPage = () => {
   // ── LiveKit 연결 ────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!token || !roomNm) {
+    if (!token) {
       // 토큰 없이 직접 접근 시 뒤로 이동
       navigate(-1)
       return
     }
+
+    let disposed = false
+    isIntentionalDisconnectRef.current = false
 
     const room = new Room({
       adaptiveStream: true,
@@ -207,10 +379,16 @@ const MeetingRoomPage = () => {
     room.on(RoomEvent.TrackUnsubscribed, () => updateParticipants(room))
     room.on(RoomEvent.TrackMuted, () => updateParticipants(room))
     room.on(RoomEvent.TrackUnmuted, () => updateParticipants(room))
+    room.on(RoomEvent.ParticipantMetadataChanged, () =>
+      updateParticipants(room),
+    )
     room.on(RoomEvent.Disconnected, () => {
+      // StrictMode cleanup으로 폐기된 이전 Room 이벤트는 현재 화면에 영향을 주면 안 됩니다.
+      if (disposed || roomRef.current !== room) return
+
       setConnected(false)
       if (!isIntentionalDisconnectRef.current) {
-        navigate('/meeting/history')
+        setConnectionError('LiveKit 서버와의 연결이 종료되었습니다.')
       }
     })
 
@@ -220,11 +398,17 @@ const MeetingRoomPage = () => {
       try {
         const parsed = JSON.parse(new TextDecoder().decode(payload)) as { text?: string }
         if (!parsed.text) return
+        const senderProfile = participant
+          ? getParticipantProfile(participant)
+          : null
         setChatMessages((prev) => [
           ...prev,
           {
             id: Date.now(),
-            senderName: participant?.name ?? participant?.identity ?? '참여자',
+            senderName: senderProfile?.name ?? '참여자',
+            senderDepartment: senderProfile?.department,
+            senderJobGrade: senderProfile?.jobGrade,
+            senderProfileImageId: senderProfile?.profileImageId,
             text: parsed.text!,
             isMe: false,
             timestamp: new Date(),
@@ -236,24 +420,65 @@ const MeetingRoomPage = () => {
     })
 
     const connect = async () => {
-      await room.connect(
-        import.meta.env.VITE_LIVEKIT_URL as string,
-        token,
-      )
-      await room.localParticipant.enableCameraAndMicrophone()
-      setConnected(true)
-      updateParticipants(room)
-      startRecording()
+      const liveKitUrl =
+        import.meta.env.VITE_LIVEKIT_URL?.trim() || DEFAULT_LIVEKIT_URL
+
+      try {
+        await room.connect(liveKitUrl, token)
+        if (disposed || roomRef.current !== room) {
+          await room.disconnect()
+          return
+        }
+
+        setConnected(true)
+        updateParticipants(room)
+
+        try {
+          await room.localParticipant.enableCameraAndMicrophone()
+          if (disposed || roomRef.current !== room) return
+
+          updateParticipants(room)
+          startRecording()
+        } catch {
+          if (disposed || roomRef.current !== room) return
+
+          // 카메라·마이크 권한이 없어도 텍스트 채팅과 화면 공유로 회의에 참여할 수 있습니다.
+          setIsMuted(true)
+          setIsCameraOff(true)
+        }
+      } catch (error) {
+        if (disposed || roomRef.current !== room) return
+
+        setConnected(false)
+        setConnectionError(
+          error instanceof Error
+            ? error.message
+            : 'LiveKit 회의실에 연결하지 못했습니다.',
+        )
+      }
     }
 
     void connect()
 
     return () => {
-      isIntentionalDisconnectRef.current = true
+      disposed = true
+      if (roomRef.current === room) {
+        roomRef.current = null
+      }
       stopRecording()
+      discardFullRecording()
       void room.disconnect()
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    connectionAttempt,
+    discardFullRecording,
+    navigate,
+    startRecording,
+    stopRecording,
+    token,
+    getParticipantProfile,
+    updateParticipants,
+  ])
 
   // ── 비디오 트랙 → <video> 연결 ─────────────────────────────────
 
@@ -271,33 +496,43 @@ const MeetingRoomPage = () => {
     isIntentionalDisconnectRef.current = true
     stopRecording()
 
-    // 전체 녹취록 업로드
-    const rcrdgRecorder = (
-      window as Window & { _rcrdgRecorder?: MediaRecorder }
-    )._rcrdgRecorder
+    try {
+      await uploadFullRecording()
+    } catch {
+      // 녹취 업로드 실패가 사용자의 방 나가기를 막지는 않도록 합니다.
+    }
 
-    if (rcrdgRecorder && rcrdgChunksRef.current.length > 0 && vconfId) {
-      rcrdgRecorder.stop()
-      rcrdgRecorder.onstop = async () => {
-        const file = new File(
-          rcrdgChunksRef.current,
-          `recording-${vconfId}.webm`,
-          { type: 'audio/webm' },
-        )
-        setUploadingRcrdg(true)
-        try {
-          await meetingApi.uploadRcrdg(Number(vconfId), file)
-        } catch {
-          // 업로드 실패해도 회의 종료는 진행
-        } finally {
-          setUploadingRcrdg(false)
-        }
+    if (vconfId) {
+      try {
+        await meetingApi.leaveConf(Number(vconfId))
+      } catch {
+        // 퇴장 기록 실패가 사용자의 방 나가기를 막지는 않도록 합니다.
       }
     }
 
     await roomRef.current?.disconnect()
     navigate('/meeting/history')
-  }, [navigate, stopRecording, vconfId])
+  }, [navigate, stopRecording, uploadFullRecording, vconfId])
+
+  const handleEndMeeting = useCallback(async () => {
+    if (!vconfId) return
+    if (!window.confirm('모든 참여자의 회의를 종료하시겠습니까?')) return
+
+    setEndingMeeting(true)
+    try {
+      await meetingApi.endConf(Number(vconfId))
+      await handleLeave()
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? `${error.message} (${error.errorCode})`
+          : error instanceof Error
+            ? error.message
+            : '잠시 후 다시 시도해 주세요.'
+      window.alert(`회의를 종료하지 못했습니다.\n${message}`)
+      setEndingMeeting(false)
+    }
+  }, [handleLeave, vconfId])
 
   // ── 마이크 토글 ─────────────────────────────────────────────────
 
@@ -329,12 +564,12 @@ const MeetingRoomPage = () => {
   // ── 초대 링크 복사 ─────────────────────────────────────────────
 
   const handleCopyLink = useCallback(() => {
-    const link = `${window.location.origin}/meeting/list?detailMeetingId=${vconfId}`
+    const link = `${window.location.origin}/meeting/list?detailMeetingId=${mtngId ?? ''}`
     void navigator.clipboard.writeText(link).then(() => {
       setLinkCopied(true)
       setTimeout(() => setLinkCopied(false), 2000)
     })
-  }, [vconfId])
+  }, [mtngId])
 
   // ── 채팅 메시지 전송 ────────────────────────────────────────────
 
@@ -342,20 +577,24 @@ const MeetingRoomPage = () => {
     const trimmed = text.trim()
     if (!roomRef.current || !trimmed) return
     const local = roomRef.current.localParticipant
+    const senderProfile = getParticipantProfile(local)
     const payload = new TextEncoder().encode(JSON.stringify({ text: trimmed }))
     void local.publishData(payload, { reliable: true, topic: 'chat' })
     setChatMessages((prev) => [
       ...prev,
       {
         id: Date.now(),
-        senderName: local.name ?? local.identity ?? '나',
+        senderName: senderProfile.name,
+        senderDepartment: senderProfile.department,
+        senderJobGrade: senderProfile.jobGrade,
+        senderProfileImageId: senderProfile.profileImageId,
         text: trimmed,
         isMe: true,
         timestamp: new Date(),
       },
     ])
     setChatInput('')
-  }, [])
+  }, [getParticipantProfile])
 
   // 채팅 새 메시지 시 맨 아래 스크롤
   useEffect(() => {
@@ -368,8 +607,45 @@ const MeetingRoomPage = () => {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-600 border-t-blue-500" />
-          <p className="text-sm font-semibold text-slate-400">회의실 연결 중...</p>
+          {connectionError ? (
+            <>
+              <p className="text-base font-bold text-white">
+                회의실에 연결하지 못했습니다.
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-400">
+                {connectionError}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                LiveKit 주소: {import.meta.env.VITE_LIVEKIT_URL || DEFAULT_LIVEKIT_URL}
+              </p>
+              <div className="mt-5 flex justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConnectionError('')
+                    setConnectionAttempt((current) => current + 1)
+                  }}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-500"
+                >
+                  다시 연결
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/meeting/list')}
+                  className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300 hover:bg-slate-800"
+                >
+                  회의 목록
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-600 border-t-blue-500" />
+              <p className="text-sm font-semibold text-slate-400">
+                {roomNm ? `${roomNm} 연결 중...` : '회의실 연결 중...'}
+              </p>
+            </>
+          )}
         </div>
       </div>
     )
@@ -439,19 +715,29 @@ const MeetingRoomPage = () => {
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-700 text-2xl font-bold text-slate-300">
-                    {getInitial(p.name)}
-                  </span>
+                  <ProfileAvatar
+                    fileId={p.profileImageId}
+                    name={p.name}
+                    size={64}
+                    className="ring-2 ring-slate-600"
+                  />
                 </div>
               )}
-              <div className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-lg bg-slate-950/70 px-2 py-1">
+              <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-slate-950/75 px-2.5 py-1.5">
                 {p.isMuted ? (
                   <MicOff size={12} className="text-red-400" />
                 ) : (
                   <Mic size={12} className="text-green-400" />
                 )}
-                <span className="text-xs font-semibold text-white">
-                  {p.isLocal ? `${p.name} (나)` : p.name}
+                <span>
+                  <span className="block text-xs font-semibold text-white">
+                    {p.isLocal ? `${p.name} (나)` : p.name}
+                  </span>
+                  {(p.department || p.jobGrade) && (
+                    <span className="block text-[10px] font-semibold text-slate-300">
+                      {[p.department, p.jobGrade].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
                 </span>
               </div>
             </div>
@@ -480,7 +766,7 @@ const MeetingRoomPage = () => {
                   초대 링크
                 </p>
                 <p className="mt-1.5 break-all text-xs font-semibold text-slate-300">
-                  {`${window.location.origin}/meeting/list?detailMeetingId=${vconfId}`}
+                  {`${window.location.origin}/meeting/list?detailMeetingId=${mtngId ?? ''}`}
                 </p>
                 <button
                   type="button"
@@ -559,11 +845,21 @@ const MeetingRoomPage = () => {
             <div className="flex flex-col gap-2">
               {participants.map((p) => (
                 <div key={p.identity} className="flex items-center gap-3 rounded-lg px-2 py-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-300">
-                    {getInitial(p.name)}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-200">
-                    {p.isLocal ? `${p.name} (나)` : p.name}
+                  <ProfileAvatar
+                    fileId={p.profileImageId}
+                    name={p.name}
+                    size={32}
+                    className="ring-1 ring-slate-600"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-200">
+                      {p.isLocal ? `${p.name} (나)` : p.name}
+                    </span>
+                    {(p.department || p.jobGrade) && (
+                      <span className="block truncate text-xs font-semibold text-slate-500">
+                        {[p.department, p.jobGrade].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                   </span>
                   {p.isMuted && <MicOff size={12} className="ml-auto text-red-400" />}
                 </div>
@@ -597,9 +893,34 @@ const MeetingRoomPage = () => {
                     key={msg.id}
                     className={`flex flex-col gap-1 ${msg.isMe ? 'items-end' : 'items-start'}`}
                   >
-                    {!msg.isMe && (
-                      <span className="text-xs font-bold text-slate-400">{msg.senderName}</span>
-                    )}
+                    <div
+                      className={`flex items-center gap-2 ${
+                        msg.isMe ? 'flex-row-reverse' : ''
+                      }`}
+                    >
+                      <ProfileAvatar
+                        fileId={msg.senderProfileImageId}
+                        name={msg.senderName}
+                        size={24}
+                        className="ring-1 ring-slate-600"
+                      />
+                      <span
+                        className={`text-xs ${
+                          msg.isMe ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        <span className="block font-bold text-slate-300">
+                          {msg.isMe ? `${msg.senderName} (나)` : msg.senderName}
+                        </span>
+                        {(msg.senderDepartment || msg.senderJobGrade) && (
+                          <span className="block font-semibold text-slate-500">
+                            {[msg.senderDepartment, msg.senderJobGrade]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        )}
+                      </span>
+                    </div>
                     <div
                       className={`max-w-[85%] rounded-xl px-3 py-2 text-sm font-semibold ${
                         msg.isMe
@@ -690,17 +1011,30 @@ const MeetingRoomPage = () => {
         <button
           type="button"
           onClick={() => void handleLeave()}
-          disabled={uploadingRcrdg}
+          disabled={uploadingRcrdg || endingMeeting}
           className="flex h-12 w-28 items-center justify-center gap-2 rounded-full bg-red-600 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
         >
           <PhoneOff size={18} />
           {uploadingRcrdg ? '저장 중...' : '나가기'}
         </button>
+
+        <button
+          type="button"
+          title={
+            canEndMeeting
+              ? '모든 참여자의 회의를 종료합니다.'
+              : '서버에서 회의 종료 권한을 확인합니다.'
+          }
+          onClick={() => void handleEndMeeting()}
+          disabled={uploadingRcrdg || endingMeeting}
+          className="flex h-12 w-32 items-center justify-center gap-2 rounded-full border border-red-500 bg-red-950 text-sm font-bold text-red-300 transition-colors hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <PhoneOff size={18} />
+          {endingMeeting ? '종료 중...' : '회의 종료'}
+        </button>
       </footer>
     </div>
   )
 }
-
-const getInitial = (name: string) => name.trim().charAt(0) || '?'
 
 export default MeetingRoomPage
