@@ -1,27 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
-  CalendarPlus,
+  CalendarDays,
   CalendarClock,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Download,
-  Eye,
   FileText,
   FileVolume,
-  History,
+  LayoutList,
   Link2,
   Pencil,
+  Play,
   PhoneOff,
-  Save,
-  Send,
   Trash2,
   Users,
   UserPlus,
   Video,
   X,
 } from 'lucide-react'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import type FullCalendarComponent from '@fullcalendar/react'
+import type { EventClickArg, EventContentArg } from '@fullcalendar/core'
+import { formatMonthTitle } from '../../utils/date'
+import '../calendar/calendar.css'
 import { meetingApi } from '../../api/meetingApi'
 import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
@@ -30,18 +36,21 @@ import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyStat
 import Button from '../../components/common/button/Button'
 import EmployeeSearchPicker from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import FormField from '../../components/common/form/formField/FormField'
-import Textarea from '../../components/common/form/textarea/Textarea'
 import Tabs from '../../components/common/tabs/Tabs'
 import { useToast } from '../../components/common/toast/useToast'
 import PageComponent from '../../components/layouts/PageComponent'
 import { useApi } from '../../hooks/useApi'
-import type { RoomResponse } from '../../types'
+import type {
+  ReservationResponse,
+  RoomResponse,
+} from '../../types'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
+import MeetingRoomAvailabilityTimeline from './MeetingRoomAvailabilityTimeline'
+import MeetingMinutesPage from './MeetingMinutesPage'
 import type {
   MeetingDetail,
   MeetingCreateRequest,
   MeetingListItem,
-  MeetingMinutesResponse,
   MeetingParticipant,
   MeetingStatus,
   MeetingTypeCode,
@@ -58,6 +67,9 @@ const filterPathMap: Record<MeetingStatus, string> = {
   live: '/meeting/list',
   ended: '/meeting/history',
 }
+
+const EMPTY_MEETING_ROOMS: RoomResponse[] = []
+const EMPTY_ROOM_RESERVATIONS: ReservationResponse[] = []
 
 const getFilterFromPath = (pathname: string): MeetingStatus => {
   if (pathname.includes('/minutes')) return 'ended'
@@ -76,9 +88,9 @@ const statusBadgeVariantMap: Record<
   MeetingStatus,
   'primary' | 'success' | 'neutral' | 'danger' | 'outline'
 > = {
-  scheduled: 'neutral',
+  scheduled: 'primary',
   live: 'success',
-  ended: 'outline',
+  ended: 'neutral',
 }
 
 const meetingTypeLabelMap: Record<MeetingTypeCode, string> = {
@@ -87,8 +99,20 @@ const meetingTypeLabelMap: Record<MeetingTypeCode, string> = {
   '03': '혼합',
 }
 
+const meetingTypeBadgeVariantMap: Record<
+  MeetingTypeCode,
+  'violet' | 'warning' | 'info'
+> = {
+  '01': 'violet',
+  '02': 'warning',
+  '03': 'info',
+}
+
 const getMeetingTypeLabel = (code?: string | null) =>
   meetingTypeLabelMap[code as MeetingTypeCode] ?? '오프라인'
+
+const getMeetingTypeBadgeVariant = (code?: string | null) =>
+  meetingTypeBadgeVariantMap[code as MeetingTypeCode] ?? 'warning'
 
 const getRecordingLabel = (meeting: MeetingListItem | MeetingDetail) => {
   if (meeting.vconfId === null) return '해당 없음'
@@ -104,11 +128,24 @@ const toDateKey = (date: Date) =>
     date.getDate(),
   ).padStart(2, '0')}`
 
-const addDays = (date: Date, days: number) => {
-  const nextDate = new Date(date)
-  nextDate.setDate(nextDate.getDate() + days)
-  return nextDate
+const isDateTimeRangeValid = (beginDt: string, endDt: string) => {
+  const beginTimestamp = new Date(beginDt).getTime()
+  const endTimestamp = new Date(endDt).getTime()
+
+  return (
+    !Number.isNaN(beginTimestamp) &&
+    !Number.isNaN(endTimestamp) &&
+    beginTimestamp < endTimestamp
+  )
 }
+
+const isReservationOverlapping = (
+  beginDt: string,
+  endDt: string,
+  reservation: ReservationResponse,
+) =>
+  new Date(beginDt).getTime() < new Date(reservation.endDateTime).getTime() &&
+  new Date(endDt).getTime() > new Date(reservation.startDateTime).getTime()
 
 
 const formatTime = (dateTime?: string | null) => {
@@ -169,10 +206,6 @@ const getMomStatusLabel = (cd?: string | null) => {
   return cd ? (map[cd] ?? '생성 중') : '생성 중'
 }
 
-// 전자결재 요청 여부
-const isApprovalStarted = (cd?: string | null) =>
-  cd === '03' || cd === '04'
-
 const groupMeetingsByDate = (meetings: MeetingListItem[]) =>
   meetings.reduce<Record<string, MeetingListItem[]>>((groups, meeting) => {
     const dateKey = getMeetingDateKey(meeting)
@@ -182,14 +215,10 @@ const groupMeetingsByDate = (meetings: MeetingListItem[]) =>
     }
   }, {})
 
-// 회의록 수정 이력 표시용 화면 타입입니다.
-interface MinutesRevision {
-  revisionId: number
-  version: number
-  content: string
-  modifiedByName: string
-  modifiedAt: string
-}
+const isMeetingDetail = (
+  meeting: MeetingListItem | MeetingDetail,
+): meeting is MeetingDetail =>
+  Array.isArray((meeting as MeetingDetail).ptcptList)
 
 // 서버 전송 필드와 화면 전용 체크박스 상태를 함께 관리합니다.
 type ScheduleForm = Omit<MeetingCreateRequest, 'mtngTypeCd'> & {
@@ -201,11 +230,16 @@ type ScheduleForm = Omit<MeetingCreateRequest, 'mtngTypeCd'> & {
 }
 
 const createDefaultScheduleForm = (): ScheduleForm => {
-  const tomorrow = addDays(new Date(), 1)
+  const now = new Date()
+  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
+  const beginDt = localNow.toISOString().slice(0, 16)
+  const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000)
+  const localLater = new Date(oneHourLater.getTime() - oneHourLater.getTimezoneOffset() * 60_000)
+  const endDt = localLater.toISOString().slice(0, 16)
   return {
     mtngNm: '',
-    beginDt: `${toDateKey(tomorrow)}T10:00`,
-    endDt: `${toDateKey(tomorrow)}T11:00`,
+    beginDt,
+    endDt,
     confRmId: null,
     ptcptEmpIds: [],
     useVideoConference: true,
@@ -224,13 +258,13 @@ const MeetingPage = () => {
 
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
   const [selectedMinutesMeeting, setSelectedMinutesMeeting] = useState<MeetingDetail | null>(null)
-  const [selectedMinutesRevision, setSelectedMinutesRevision] = useState<MinutesRevision | null>(null)
-  const [momData, setMomData] = useState<MeetingMinutesResponse | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
   const [meetingDateTo, setMeetingDateTo] = useState('')
-  const [minutesContent, setMinutesContent] = useState('')
-  const [minutesEditing, setMinutesEditing] = useState(false)
+  const [meetingViewMode, setMeetingViewMode] = useState<'list' | 'calendar'>('list')
+  const [calendarView, setCalendarView] = useState<'dayGridMonth' | 'timeGridWeek'>('dayGridMonth')
+  const [calendarTitle, setCalendarTitle] = useState(() => formatMonthTitle(new Date()))
+  const meetingCalendarRef = useRef<FullCalendarComponent>(null)
   const [schedulePanelOpen, setSchedulePanelOpen] = useState(false)
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>(createDefaultScheduleForm)
@@ -264,7 +298,21 @@ const MeetingPage = () => {
 
   const { data: meetingRooms } = useApi<RoomResponse[]>(
     meetingRoomReservationApi.getMeetingRooms,
-    { initialData: [] },
+    { initialData: EMPTY_MEETING_ROOMS },
+  )
+
+  const {
+    data: roomReservations,
+    loading: roomReservationsLoading,
+    error: roomReservationsError,
+    execute: fetchRoomReservations,
+    reset: resetRoomReservations,
+  } = useApi<ReservationResponse[], [string, string]>(
+    meetingRoomReservationApi.getReservations,
+    {
+      immediate: false,
+      initialData: EMPTY_ROOM_RESERVATIONS,
+    },
   )
 
   const { execute: issueToken } = useApi(
@@ -277,31 +325,41 @@ const MeetingPage = () => {
     { immediate: false },
   )
 
-  const { execute: fetchMom } = useApi(
-    meetingApi.getMom,
-    { immediate: false },
-  )
-
-  const { loading: createEmptyMomLoading, execute: execCreateEmptyMom } = useApi(
-    meetingApi.createEmptyMom,
-    { immediate: false },
-  )
-
-  const { execute: execUpdateMom } = useApi(
-    meetingApi.updateMom,
-    { immediate: false },
-  )
-
-  const { execute: execRequestReview } = useApi(
-    meetingApi.requestMomApproval,
-    { immediate: false },
-  )
-
   useEffect(() => {
     void fetchMeetings().catch(() => {
       // 조회 오류는 useApi의 error 상태에서 관리합니다.
     })
   }, [fetchMeetings, selectedFilter])
+
+  const reservationBeginDate = scheduleForm.beginDt.slice(0, 10)
+  const reservationEndDate = scheduleForm.endDt.slice(0, 10)
+
+  useEffect(() => {
+    if (
+      !schedulePanelOpen ||
+      !reservationBeginDate ||
+      !reservationEndDate ||
+      !isDateTimeRangeValid(scheduleForm.beginDt, scheduleForm.endDt)
+    ) {
+      resetRoomReservations()
+      return
+    }
+
+    void fetchRoomReservations(
+      reservationBeginDate,
+      reservationEndDate,
+    ).catch(() => {
+      // 조회 오류는 타임라인 내부에서 안내합니다.
+    })
+  }, [
+    fetchRoomReservations,
+    reservationBeginDate,
+    reservationEndDate,
+    resetRoomReservations,
+    scheduleForm.beginDt,
+    scheduleForm.endDt,
+    schedulePanelOpen,
+  ])
 
   const meetingList = useMemo(() => meetings ?? [], [meetings])
 
@@ -327,6 +385,64 @@ const MeetingPage = () => {
 
   const groupedMeetings = groupMeetingsByDate(filteredMeetings)
   const dateKeys = Object.keys(groupedMeetings).sort()
+
+  const statusColorMap: Record<MeetingStatus, { bg: string; border: string }> = {
+    scheduled: { bg: '#3b82f6', border: '#2563eb' },
+    live:      { bg: '#10b981', border: '#059669' },
+    ended:     { bg: '#94a3b8', border: '#64748b' },
+  }
+
+  const calendarEvents = useMemo(
+    () =>
+      filteredMeetings.map((m) => ({
+        id: String(m.mtngId),
+        title: m.mtngNm ?? '',
+        start: m.beginDt ?? '',
+        end: m.endDt ?? '',
+        backgroundColor: statusColorMap[m.mtngSttus].bg,
+        borderColor: statusColorMap[m.mtngSttus].border,
+        textColor: '#ffffff',
+        extendedProps: { meeting: m },
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredMeetings],
+  )
+
+  const handleCalendarEventClick = (info: EventClickArg) => {
+    const meeting = info.event.extendedProps.meeting as MeetingListItem
+    handlePrimaryMeetingAction(meeting)
+  }
+
+  const moveCalendar = (direction: 'prev' | 'today' | 'next') => {
+    const api = meetingCalendarRef.current?.getApi()
+    if (!api) return
+    if (direction === 'prev') api.prev()
+    else if (direction === 'next') api.next()
+    else api.today()
+    setCalendarTitle(formatMonthTitle(api.getDate()))
+  }
+
+  const handleCalendarViewChange = (view: 'dayGridMonth' | 'timeGridWeek') => {
+    meetingCalendarRef.current?.getApi().changeView(view)
+    setCalendarView(view)
+  }
+
+  const renderMeetingCalendarEvent = (info: EventContentArg) => (
+    <div
+      className="calendar-main-event"
+      style={
+        {
+          '--calendar-event-bg': info.event.backgroundColor ?? '#3b82f6',
+          '--calendar-event-border': info.event.borderColor ?? '#2563eb',
+          '--calendar-event-color': '#ffffff',
+        } as React.CSSProperties
+      }
+    >
+      <span className="calendar-main-event-dot" />
+      <span className="calendar-main-event-time">{formatTime(info.event.startStr)}</span>
+      <span className="calendar-main-event-title">{info.event.title}</span>
+    </div>
+  )
 
   const tabsWithCount = filterTabs.map((tab) => ({
     ...tab,
@@ -409,90 +525,16 @@ const MeetingPage = () => {
   const openMinutesWorkspace = useCallback(
     async (meeting: MeetingListItem | MeetingDetail) => {
       const detail =
-        'ptcptList' in meeting
+        isMeetingDetail(meeting)
           ? meeting
           : (await fetchMeetingDetail(meeting.mtngId)).data
 
       if (!detail) return
       setSelectedMeeting(null)
       setSelectedMinutesMeeting(detail)
-      setSelectedMinutesRevision(null)
-      setMinutesEditing(false)
-
-      try {
-        const res = await fetchMom(detail.mtngId)
-        if (res.data?.momCn) {
-          setMinutesContent(res.data.momCn)
-          setMomData(res.data)
-        } else {
-          setMinutesContent('')
-          setMomData(null)
-        }
-      } catch {
-        setMinutesContent('')
-        setMomData(null)
-      }
     },
-    [fetchMeetingDetail, fetchMom],
+    [fetchMeetingDetail],
   )
-
-  const closeMinutesWorkspace = () => {
-    setSelectedMinutesMeeting(null)
-    setSelectedMinutesRevision(null)
-    setMinutesEditing(false)
-    setMomData(null)
-  }
-
-  const handleSaveMom = async () => {
-    if (!selectedMinutesMeeting) return
-    try {
-      const res = await execUpdateMom(selectedMinutesMeeting.mtngId, { momCn: minutesContent })
-      if (res.data) setMomData(res.data)
-      setMinutesEditing(false)
-    } catch {
-      // 에러 처리는 추후 토스트로 교체
-    }
-  }
-
-  const handleStartOfflineMinutes = async () => {
-    if (!selectedMinutesMeeting || selectedMinutesMeeting.vconfId !== null) return
-
-    try {
-      await execCreateEmptyMom(selectedMinutesMeeting.mtngId)
-      const res = await fetchMom(selectedMinutesMeeting.mtngId)
-      if (res.data) {
-        setMomData(res.data)
-        setMinutesContent(res.data.momCn ?? '')
-        setMinutesEditing(true)
-      }
-      showToast({
-        title: '회의록 작성을 시작합니다.',
-        description: '회의 내용을 직접 입력한 뒤 저장해 주세요.',
-        variant: 'success',
-      })
-    } catch (error) {
-      showToast({
-        title: '회의록을 생성하지 못했습니다.',
-        description:
-          error instanceof Error
-            ? error.message
-            : '잠시 후 다시 시도해 주세요.',
-        variant: 'danger',
-      })
-    }
-  }
-
-  const handleRequestReview = async () => {
-    if (!selectedMinutesMeeting) return
-    try {
-      await execRequestReview(selectedMinutesMeeting.mtngId)
-      // 검토 요청 후 회의록 다시 조회
-      const res = await fetchMom(selectedMinutesMeeting.mtngId)
-      if (res.data) setMomData(res.data)
-    } catch {
-      // 에러 처리는 추후 토스트로 교체
-    }
-  }
 
   const handleDownloadRecording = useCallback(
     async (meeting: MeetingListItem | MeetingDetail) => {
@@ -501,7 +543,14 @@ const MeetingPage = () => {
           ? meeting
           : (await fetchMeetingDetail(meeting.mtngId)).data
 
-      if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) return
+      if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) {
+        showToast({
+          title: '다운로드할 녹취록이 없습니다.',
+          description: '녹취록 생성이 완료된 후 다시 시도해 주세요.',
+          variant: 'info',
+        })
+        return
+      }
 
       window.location.assign(
         meetingApi.getRcrdgDownloadUrl(
@@ -510,7 +559,49 @@ const MeetingPage = () => {
         ),
       )
     },
-    [fetchMeetingDetail],
+    [fetchMeetingDetail, showToast],
+  )
+
+  const handleStreamRecording = useCallback(
+    async (meeting: MeetingListItem | MeetingDetail) => {
+      const streamWindow = window.open('', '_blank')
+      if (streamWindow) streamWindow.opener = null
+
+      try {
+        const detail =
+          'rcrdgAtchFileId' in meeting
+            ? meeting
+            : (await fetchMeetingDetail(meeting.mtngId)).data
+
+        if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) {
+          streamWindow?.close()
+          showToast({
+            title: '재생할 녹취록이 없습니다.',
+            description: '녹취록 생성이 완료된 후 다시 시도해 주세요.',
+            variant: 'info',
+          })
+          return
+        }
+
+        const streamUrl = meetingApi.getRcrdgStreamUrl(
+          detail.vconfId,
+          detail.rcrdgAtchFileId,
+        )
+        if (streamWindow) {
+          streamWindow.location.href = streamUrl
+        } else {
+          window.location.assign(streamUrl)
+        }
+      } catch {
+        streamWindow?.close()
+        showToast({
+          title: '녹취록을 재생하지 못했습니다.',
+          description: '잠시 후 다시 시도해 주세요.',
+          variant: 'danger',
+        })
+      }
+    },
+    [fetchMeetingDetail, showToast],
   )
 
   const handleScheduleFormChange = (
@@ -591,6 +682,26 @@ const MeetingPage = () => {
 
     if (scheduleForm.useMeetingRoom && scheduleForm.confRmId === null) {
       setScheduleValidationMessage('사용할 회의실을 선택해주세요.')
+      return
+    }
+
+    const selectedRoomUnavailable =
+      scheduleForm.useMeetingRoom &&
+      (roomReservations ?? []).some(
+        (reservation) =>
+          reservation.roomId === scheduleForm.confRmId &&
+          reservation.mtngId !== editingMeetingId &&
+          isReservationOverlapping(
+            scheduleForm.beginDt,
+            scheduleForm.endDt,
+            reservation,
+          ),
+      )
+
+    if (selectedRoomUnavailable) {
+      setScheduleValidationMessage(
+        '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택해주세요.',
+      )
       return
     }
 
@@ -678,275 +789,27 @@ const MeetingPage = () => {
     openMinutesWorkspace,
   ])
 
-  // ─────────────────────────────────────────────────────────────
-  // 회의록 워크스페이스
-  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!schedulePanelOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSchedulePanelOpen(false)
+        setEditingMeetingId(null)
+        setScheduleForm(createDefaultScheduleForm())
+        setSelectedEmployeeIds([])
+        setScheduleValidationMessage('')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [schedulePanelOpen])
 
   if (selectedMinutesMeeting) {
-    const isOfflineMeeting = selectedMinutesMeeting.vconfId === null
-    const approvalStarted = isApprovalStarted(
-      momData?.momSttusCd ?? selectedMinutesMeeting.momSttusCd,
-    )
-
-    const revisions: MinutesRevision[] = (momData?.histList ?? []).map((history, index) => ({
-      revisionId: history.histId,
-      version: (momData?.histList.length ?? 0) - index,
-      content: history.momCn,
-      modifiedByName: history.edtrNm,
-      modifiedAt: history.editDt,
-    }))
-
     return (
-      <PageComponent
-        title={selectedMinutesMeeting.mtngNm ?? '회의록'}
-        description="AI 초안을 검토하고 수정한 뒤 참석자 결재를 요청합니다."
-        actions={
-          <Button
-            variant="outline"
-            leftIcon={<ArrowLeft size={16} />}
-            onClick={closeMinutesWorkspace}
-          >
-            목록으로
-          </Button>
-        }
-      >
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex flex-col gap-5">
-            {momData ? (
-              <section className="rounded-xl border border-blue-100 bg-blue-50/80 px-5 py-4">
-                <p className="flex items-center gap-2 text-sm font-bold text-blue-800">
-                  <CheckCircle2 size={18} />
-                  회의록이 생성되었습니다. 내용을 확인한 뒤 전자결재를 요청할 수 있습니다.
-                </p>
-              </section>
-            ) : (
-              <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
-                <p className="text-sm font-bold text-slate-600">
-                  아직 생성된 회의록이 없습니다.
-                </p>
-              </section>
-            )}
-
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                  <FileText size={17} />
-                </span>
-                <h2 className="text-base font-bold text-slate-950">회의 정보</h2>
-                <Badge variant="primary">
-                  {getMomStatusLabel(momData?.momSttusCd ?? selectedMinutesMeeting.momSttusCd)}
-                </Badge>
-              </div>
-              <dl className="mt-5 grid gap-2 text-sm font-semibold text-slate-600 md:grid-cols-4">
-                <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                  <dt>일시</dt>
-                  <dd className="mt-1 text-slate-950">
-                    {formatDateTime(selectedMinutesMeeting.beginDt)}
-                  </dd>
-                </div>
-                <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                  <dt>참여자</dt>
-                  <dd className="mt-1 text-slate-950">
-                    {(selectedMinutesMeeting.ptcptList?.length ?? 0)}명
-                  </dd>
-                </div>
-                <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                  <dt>담당자</dt>
-                  <dd className="mt-1 text-slate-950">
-                    {selectedMinutesMeeting.crtrNm}
-                  </dd>
-                </div>
-                <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-                  <dt>녹취록</dt>
-                  <dd className="mt-1 text-emerald-700">
-                    {getRecordingLabel(selectedMinutesMeeting)}
-                  </dd>
-                </div>
-              </dl>
-            </section>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-base font-bold text-slate-950">
-                  <FileText size={18} />
-                  회의 내용
-                </h3>
-                <Button
-                  variant={!momData && isOfflineMeeting ? 'primary' : 'outline'}
-                  size="sm"
-                  disabled={!momData && !isOfflineMeeting}
-                  loading={createEmptyMomLoading}
-                  leftIcon={
-                    minutesEditing ? <Save size={15} /> : <Pencil size={15} />
-                  }
-                  onClick={() => {
-                    if (minutesEditing) {
-                      void handleSaveMom()
-                    } else if (!momData && isOfflineMeeting) {
-                      void handleStartOfflineMinutes()
-                    } else {
-                      setMinutesEditing(true)
-                    }
-                  }}
-                >
-                  {minutesEditing
-                    ? '저장'
-                    : !momData && isOfflineMeeting
-                      ? '회의록 작성'
-                      : '수정'}
-                </Button>
-              </div>
-              {minutesEditing ? (
-                <Textarea
-                  value={minutesContent}
-                  onChange={(e) => setMinutesContent(e.target.value)}
-                  className="min-h-72"
-                />
-              ) : (
-                <div className="whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm font-semibold leading-7 text-slate-700">
-                  {minutesContent || '회의록 내용이 없습니다.'}
-                </div>
-              )}
-            </section>
-          </div>
-
-          <div className="flex h-fit flex-col gap-4 xl:sticky xl:top-6">
-            <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-base font-bold text-slate-950">전자결재</h3>
-                <Badge variant={approvalStarted ? 'success' : 'warning'}>
-                  {approvalStarted ? '요청 완료' : '요청 전'}
-                </Badge>
-              </div>
-              <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3">
-                <p className="text-sm font-bold text-blue-800">
-                  {approvalStarted
-                    ? `전자결재 문서가 생성되었습니다${momData?.drftDocSn ? ` (#${momData.drftDocSn})` : ''}.`
-                    : '회의록 검토가 끝나면 전자결재 시스템으로 결재를 요청할 수 있습니다.'}
-                </p>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-5">
-                <Button
-                  variant="outline"
-                  disabled={(!momData && !isOfflineMeeting) || approvalStarted}
-                  loading={createEmptyMomLoading}
-                  leftIcon={<Pencil size={16} />}
-                  onClick={() => {
-                    if (!momData && isOfflineMeeting) {
-                      void handleStartOfflineMinutes()
-                    } else {
-                      setMinutesEditing(true)
-                    }
-                  }}
-                >
-                  {!momData && isOfflineMeeting ? '회의록 작성' : '회의록 수정'}
-                </Button>
-                <Button
-                  disabled={!momData || approvalStarted}
-                  leftIcon={<Send size={16} />}
-                  onClick={() => void handleRequestReview()}
-                >
-                  결재 요청 발송
-                </Button>
-                {selectedMinutesMeeting.vconfId !== null &&
-                  selectedMinutesMeeting.rcrdgAtchFileId && (
-                    <Button
-                      variant="outline"
-                      leftIcon={<Download size={16} />}
-                      onClick={() =>
-                        void handleDownloadRecording(selectedMinutesMeeting)
-                      }
-                    >
-                      녹취록 다운로드
-                    </Button>
-                  )}
-              </div>
-            </aside>
-
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-950">
-                  <History size={16} />
-                  수정 이력
-                </h3>
-                <Badge variant="outline">{revisions.length}개 버전</Badge>
-              </div>
-              <div className="mt-3 flex flex-col gap-2">
-                {revisions.length === 0 && (
-                  <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
-                    수정 이력이 없습니다.
-                  </p>
-                )}
-                {revisions.map((revision: MinutesRevision) => (
-                  <div
-                    key={revision.revisionId}
-                    className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge variant={revision.version === revisions.length ? 'primary' : 'outline'}>
-                            v{revision.version}
-                          </Badge>
-                          <span className="truncate text-sm font-bold text-slate-900">
-                            {revision.modifiedByName}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs font-semibold text-slate-500">
-                          {formatDateTime(revision.modifiedAt)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label={`v${revision.version} 내용 보기`}
-                        onClick={() => setSelectedMinutesRevision(revision)}
-                        className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:border-blue-200 hover:text-blue-700"
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </div>
-
-        {selectedMinutesRevision && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
-            <section className="relative w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-              <button
-                type="button"
-                aria-label="수정 이력 닫기"
-                onClick={() => setSelectedMinutesRevision(null)}
-                className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition-colors hover:bg-slate-50 hover:text-slate-900"
-              >
-                <X size={20} />
-              </button>
-              <div className="border-b border-slate-100 px-6 py-5">
-                <div className="flex flex-wrap items-center gap-2 pr-10">
-                  <Badge variant="primary">v{selectedMinutesRevision.version}</Badge>
-                  <h3 className="text-lg font-bold text-slate-950">회의록 수정 이력</h3>
-                </div>
-                <p className="mt-2 text-sm font-semibold text-slate-500">
-                  {selectedMinutesRevision.modifiedByName} · {formatDateTime(selectedMinutesRevision.modifiedAt)}
-                </p>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-                <div className="whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm font-semibold leading-7 text-slate-700">
-                  {selectedMinutesRevision.content}
-                </div>
-              </div>
-              <div className="flex justify-end border-t border-slate-100 bg-slate-50/80 px-6 py-4">
-                <Button variant="outline" onClick={() => setSelectedMinutesRevision(null)}>
-                  닫기
-                </Button>
-              </div>
-            </section>
-          </div>
-        )}
-      </PageComponent>
+      <MeetingMinutesPage
+        meeting={selectedMinutesMeeting}
+        onBack={() => setSelectedMinutesMeeting(null)}
+      />
     )
   }
 
@@ -955,192 +818,295 @@ const MeetingPage = () => {
   // ─────────────────────────────────────────────────────────────
 
   return (
-    <PageComponent
-      title="회의"
-      description="온라인, 오프라인, 혼합 회의를 한 곳에서 확인하고 관리합니다."
-    >
+    <PageComponent>
       <div className="flex w-full flex-col gap-6">
-        <section>
-          <article className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-6">
-            <div className="flex h-full flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div className="flex min-w-0 items-center gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100">
-                  <CalendarPlus size={22} />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-xl font-bold text-slate-950">회의 예약</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-500">
-                    시간과 참여자를 정해 미리 회의를 준비하세요.
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                leftIcon={<CalendarClock size={16} />}
-                onClick={() => setSchedulePanelOpen(true)}
-                className="w-full md:w-auto"
-              >
-                예약하기
-              </Button>
-            </div>
-          </article>
-        </section>
-
         <section className="flex flex-col gap-4">
           <div className="flex flex-col gap-4 border-b border-slate-200 pb-4">
-            <Tabs
-              items={tabsWithCount}
-              value={selectedFilter}
-              onChange={(value) => navigate(filterPathMap[value as MeetingStatus])}
-            />
-            <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 lg:grid-cols-[minmax(260px,1fr)_170px_170px_auto] lg:items-end">
-              <SearchInput
-                placeholder="회의명, 작성자, 화상 회의실 검색"
-                value={meetingSearchKeyword}
-                onChange={(e) => setMeetingSearchKeyword(e.target.value)}
-                wrapperClassName="w-full"
-              />
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-500">시작일</span>
-                <input
-                  type="date"
-                  value={meetingDateFrom}
-                  onChange={(e) => setMeetingDateFrom(e.target.value)}
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-blue-400"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold text-slate-500">종료일</span>
-                <input
-                  type="date"
-                  value={meetingDateTo}
-                  onChange={(e) => setMeetingDateTo(e.target.value)}
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-blue-400"
-                />
-              </label>
-              <Button
-                variant="outline"
-                leftIcon={<X size={15} />}
-                disabled={!hasMeetingFilter}
-                onClick={resetMeetingFilters}
-                className="w-full lg:w-auto"
+            <div className="flex items-center gap-3 overflow-x-auto">
+              {meetingViewMode === 'list' && (
+                <div className="min-w-0 overflow-x-auto">
+                  <Tabs
+                    items={tabsWithCount}
+                    value={selectedFilter}
+                    onChange={(value) => navigate(filterPathMap[value as MeetingStatus])}
+                  />
+                </div>
+              )}
+              {meetingViewMode === 'calendar' && (
+                <>
+                  <div className="flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                    <button
+                      type="button"
+                      aria-label="이전"
+                      onClick={() => moveCalendar('prev')}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-slate-900"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveCalendar('today')}
+                      className="h-8 rounded-lg px-3 text-sm font-bold text-slate-700 hover:bg-white"
+                    >
+                      오늘
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="다음"
+                      onClick={() => moveCalendar('next')}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-slate-900"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <h2 className="shrink-0 text-base font-bold text-slate-800">
+                    {calendarTitle}
+                  </h2>
+                </>
+              )}
+              {meetingViewMode === 'calendar' && (
+                <div className="ml-auto flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  {(['dayGridMonth', 'timeGridWeek'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => handleCalendarViewChange(v)}
+                      className={`h-8 rounded-lg px-3 text-sm font-bold transition-colors ${
+                        calendarView === v
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {v === 'dayGridMonth' ? '월' : '주'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div
+                className={`flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 ${
+                  meetingViewMode === 'list' ? 'ml-auto' : ''
+                }`}
               >
-                초기화
-              </Button>
+                <button
+                  type="button"
+                  aria-label="목록 보기"
+                  onClick={() => setMeetingViewMode('list')}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                    meetingViewMode === 'list'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <LayoutList size={16} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="캘린더 보기"
+                  onClick={() => setMeetingViewMode('calendar')}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+                    meetingViewMode === 'calendar'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <CalendarDays size={16} />
+                </button>
+              </div>
             </div>
+
+            {meetingViewMode === 'list' && (
+              <div className="grid gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 lg:grid-cols-[minmax(260px,1fr)_170px_170px_auto] lg:items-end">
+                <SearchInput
+                  placeholder="회의명, 작성자, 화상 회의실 검색"
+                  value={meetingSearchKeyword}
+                  onChange={(e) => setMeetingSearchKeyword(e.target.value)}
+                  wrapperClassName="w-full"
+                />
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-slate-500">시작일</span>
+                  <input
+                    type="date"
+                    value={meetingDateFrom}
+                    onChange={(e) => setMeetingDateFrom(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-blue-400"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold text-slate-500">종료일</span>
+                  <input
+                    type="date"
+                    value={meetingDateTo}
+                    onChange={(e) => setMeetingDateTo(e.target.value)}
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-blue-400"
+                  />
+                </label>
+                <Button
+                  variant="outline"
+                  leftIcon={<X size={15} />}
+                  disabled={!hasMeetingFilter}
+                  onClick={resetMeetingFilters}
+                  className="w-full lg:w-auto"
+                >
+                  초기화
+                </Button>
+              </div>
+            )}
           </div>
 
-          {dateKeys.length === 0 ? (
-            <EmptyState
-              title="조회된 회의가 없습니다."
-              description="백엔드에서 회의 데이터가 내려오면 이 영역에 날짜별 목록으로 표시됩니다."
-            />
-          ) : (
-            dateKeys.map((dateKey) => (
-              <section key={dateKey} className="flex flex-col gap-3">
-                <h2 className="text-sm font-bold text-slate-600">{formatDateTitle(dateKey)}</h2>
-                {groupedMeetings[dateKey].map((meeting) => {
-                  const isLive = meeting.mtngSttus === 'live'
-                  const status = meeting.mtngSttus
-                  return (
-                    <article
-                      key={meeting.mtngId}
-                      className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 transition-colors hover:border-blue-200 hover:bg-white"
-                    >
-                      <div className="flex flex-col gap-3">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-lg font-bold text-slate-950">
-                                {meeting.mtngNm}
-                              </h3>
-                              <Badge variant={statusBadgeVariantMap[status]}>
-                                {statusLabelMap[status]}
-                              </Badge>
-                              <Badge variant="outline">
-                                {getMeetingTypeLabel(meeting.mtngTypeCd)}
-                              </Badge>
+          {meetingViewMode === 'list' ? (
+            dateKeys.length === 0 ? (
+              <EmptyState
+                title="조회된 회의가 없습니다."
+                description="백엔드에서 회의 데이터가 내려오면 이 영역에 날짜별 목록으로 표시됩니다."
+              />
+            ) : (
+              dateKeys.map((dateKey) => (
+                <section key={dateKey} className="flex flex-col gap-3">
+                  <h2 className="text-sm font-bold text-slate-600">{formatDateTitle(dateKey)}</h2>
+                  {groupedMeetings[dateKey].map((meeting) => {
+                    const isLive = meeting.mtngSttus === 'live'
+                    const status = meeting.mtngSttus
+                    return (
+                      <article
+                        key={meeting.mtngId}
+                        className="rounded-xl border border-slate-200 bg-slate-50/80 p-5 transition-colors hover:border-blue-200 hover:bg-white"
+                      >
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="truncate text-lg font-bold text-slate-950">
+                                  {meeting.mtngNm}
+                                </h3>
+                                <Badge variant={statusBadgeVariantMap[status]}>
+                                  {statusLabelMap[status]}
+                                </Badge>
+                                <Badge variant={getMeetingTypeBadgeVariant(meeting.mtngTypeCd)}>
+                                  {getMeetingTypeLabel(meeting.mtngTypeCd)}
+                                </Badge>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-slate-600">
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Clock size={16} />
+                                  {formatTime(meeting.beginDt)}
+                                  {meeting.endDt ? ` - ${formatTime(meeting.endDt)}` : ''}
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Users size={16} />
+                                  참여자 {meeting.ptcptCnt ?? 0}명
+                                </span>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <CalendarClock size={16} />
+                                  생성자 {meeting.crtrNm}
+                                </span>
+                              </div>
                             </div>
-                            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-slate-600">
-                              <span className="inline-flex items-center gap-1.5">
-                                <Clock size={16} />
-                                {formatTime(meeting.beginDt)}
-                                {meeting.endDt ? ` - ${formatTime(meeting.endDt)}` : ''}
-                              </span>
-                              <span className="inline-flex items-center gap-1.5">
-                                <Users size={16} />
-                                참여자 {meeting.ptcptCnt ?? 0}명
-                              </span>
-                              <span className="inline-flex items-center gap-1.5">
-                                <CalendarClock size={16} />
-                                생성자 {meeting.crtrNm}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                            <Button
-                              variant={isLive && meeting.vconfId !== null ? 'primary' : 'outline'}
-                              leftIcon={isLive && meeting.vconfId !== null ? <Video size={16} /> : <FileText size={16} />}
-                              className="w-full lg:w-32"
-                              onClick={() => handlePrimaryMeetingAction(meeting)}
-                            >
-                              {isLive && meeting.vconfId !== null ? '회의 입장' : '상세 보기'}
-                            </Button>
-                            {isLive && meeting.vconfId !== null && meeting.canEnd && (
+                            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
                               <Button
-                                variant="danger"
-                                leftIcon={<PhoneOff size={16} />}
+                                variant={isLive && meeting.vconfId !== null ? 'primary' : 'outline'}
+                                leftIcon={isLive && meeting.vconfId !== null ? <Video size={16} /> : <FileText size={16} />}
                                 className="w-full lg:w-32"
-                                loading={endMeetingLoading}
-                                onClick={() => void handleEndMeeting(meeting)}
+                                onClick={() => handlePrimaryMeetingAction(meeting)}
                               >
-                                회의 종료
+                                {isLive && meeting.vconfId !== null ? '회의 입장' : '상세 보기'}
                               </Button>
-                            )}
+                              {isLive && meeting.vconfId !== null && meeting.canEnd && (
+                                <Button
+                                  variant="danger"
+                                  leftIcon={<PhoneOff size={16} />}
+                                  className="w-full lg:w-32"
+                                  loading={endMeetingLoading}
+                                  onClick={() => void handleEndMeeting(meeting)}
+                                >
+                                  회의 종료
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-3">
-                          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                              <UserPlus size={14} />
-                              참여 정보
-                            </p>
-                            <p className="mt-1 text-sm font-bold text-slate-900">
-                              {meeting.ptcptCnt ?? 0}명 참여 예정
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => void openMinutesWorkspace(meeting)}
-                            className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-100"
-                          >
-                            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                              <FileText size={14} />
-                              회의록
-                            </p>
-                            <p className="mt-1 text-sm font-bold text-blue-700">
-                              {getMomStatusLabel(meeting.momSttusCd)}
-                            </p>
-                          </button>
-                          <div className="relative rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
-                            <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
-                              <FileVolume size={14} />
-                              녹취록
-                            </p>
-                            <div className="mt-1 flex items-start justify-between gap-3 pr-9">
-                              <p className="text-sm font-bold text-emerald-700">
-                                {getRecordingLabel(meeting)}
+                          <div className="grid gap-3 border-t border-slate-100 pt-3 md:grid-cols-3">
+                            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                              <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                                <UserPlus size={14} />
+                                참여 정보
+                              </p>
+                              <p className="mt-1 text-sm font-bold text-slate-900">
+                                {meeting.ptcptCnt ?? 0}명 참여 예정
                               </p>
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => void openMinutesWorkspace(meeting)}
+                              className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-100"
+                            >
+                              <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                                <FileText size={14} />
+                                회의록
+                              </p>
+                              <p className="mt-1 text-sm font-bold text-blue-700">
+                                {getMomStatusLabel(meeting.momSttusCd)}
+                              </p>
+                            </button>
+                            <div className="relative rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3">
+                              <p className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                                <FileVolume size={14} />
+                                녹취록
+                              </p>
+                              <div className="mt-1 flex items-start justify-between gap-3 pr-20">
+                                <p className="text-sm font-bold text-emerald-700">
+                                  {getRecordingLabel(meeting)}
+                                </p>
+                              </div>
+                              {meeting.vconfId !== null &&
+                                meeting.mtngSttus === 'ended' && (
+                                  <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      aria-label="녹취록 스트리밍"
+                                      title="스트리밍"
+                                      onClick={() => void handleStreamRecording(meeting)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                      <Play size={13} fill="currentColor" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label="녹취록 다운로드"
+                                      title="다운로드"
+                                      onClick={() => void handleDownloadRecording(meeting)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                      <Download size={13} />
+                                    </button>
+                                  </div>
+                                )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  )
-                })}
-              </section>
-            ))
+                      </article>
+                    )
+                  })}
+                </section>
+              ))
+            )
+          ) : (
+            <div className="calendar-main overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <FullCalendar
+                ref={meetingCalendarRef}
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                initialView={calendarView}
+                height={680}
+                locale="ko"
+                headerToolbar={false}
+                dayMaxEvents={3}
+                moreLinkContent={(args) => `+${args.num} 더보기`}
+                eventDisplay="block"
+                eventContent={renderMeetingCalendarEvent}
+                events={calendarEvents}
+                eventClick={handleCalendarEventClick}
+                datesSet={(info) => setCalendarTitle(formatMonthTitle(info.view.currentStart))}
+              />
+            </div>
           )}
 
         </section>
@@ -1160,12 +1126,14 @@ const MeetingPage = () => {
             </button>
 
             <div className="px-8 pb-6 pt-8">
-              <Badge variant={statusBadgeVariantMap[selectedMeeting.mtngSttus]}>
-                {statusLabelMap[selectedMeeting.mtngSttus]}
-              </Badge>
-              <Badge variant="outline">
-                {getMeetingTypeLabel(selectedMeeting.mtngTypeCd)}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusBadgeVariantMap[selectedMeeting.mtngSttus]}>
+                  {statusLabelMap[selectedMeeting.mtngSttus]}
+                </Badge>
+                <Badge variant={getMeetingTypeBadgeVariant(selectedMeeting.mtngTypeCd)}>
+                  {getMeetingTypeLabel(selectedMeeting.mtngTypeCd)}
+                </Badge>
+              </div>
               <h2 className="mt-4 text-2xl font-bold leading-tight text-slate-950">
                 {selectedMeeting.mtngNm}
               </h2>
@@ -1225,21 +1193,35 @@ const MeetingPage = () => {
                     <FileVolume size={14} />
                     녹취록
                   </p>
-                  <p className="mt-1 pr-9 text-sm font-bold text-emerald-700">
+                  <p className="mt-1 pr-20 text-sm font-bold text-emerald-700">
                     {getRecordingLabel(selectedMeeting)}
                   </p>
                   {selectedMeeting.vconfId !== null &&
                     selectedMeeting.rcrdgAtchFileId && (
-                      <button
-                        type="button"
-                        aria-label="녹취록 다운로드"
-                        onClick={() =>
-                          void handleDownloadRecording(selectedMeeting)
-                        }
-                        className="absolute right-4 top-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
-                      >
-                        <Download size={14} />
-                      </button>
+                      <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          aria-label="녹취록 스트리밍"
+                          title="스트리밍"
+                          onClick={() =>
+                            void handleStreamRecording(selectedMeeting)
+                          }
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <Play size={13} fill="currentColor" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="녹취록 다운로드"
+                          title="다운로드"
+                          onClick={() =>
+                            void handleDownloadRecording(selectedMeeting)
+                          }
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <Download size={13} />
+                        </button>
+                      </div>
                     )}
                 </div>
               </div>
@@ -1299,14 +1281,8 @@ const MeetingPage = () => {
 
       {/* 회의 등록과 수정은 같은 폼을 사용해 입력 규칙을 한 곳에서 관리합니다. */}
       {schedulePanelOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35">
-          <button
-            type="button"
-            aria-label="예약 패널 닫기"
-            className="hidden flex-1 cursor-default md:block"
-            onClick={closeSchedulePanel}
-          />
-          <aside className="flex h-full w-full max-w-[520px] flex-col bg-white shadow-2xl">
+        <div className="pointer-events-none fixed inset-0 z-50 flex justify-end bg-slate-950/35">
+          <aside className="pointer-events-auto flex h-full w-full max-w-[520px] flex-col bg-white shadow-2xl">
             <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
               <div>
                 <p className="text-xs font-bold text-blue-700">통합 회의</p>
@@ -1360,6 +1336,24 @@ const MeetingPage = () => {
                   </div>
                 </section>
 
+                <MeetingRoomAvailabilityTimeline
+                  rooms={(meetingRooms ?? []).filter((room) => room.useYn === 'Y')}
+                  reservations={roomReservations ?? []}
+                  beginDt={scheduleForm.beginDt}
+                  endDt={scheduleForm.endDt}
+                  selectedRoomId={
+                    scheduleForm.useMeetingRoom ? scheduleForm.confRmId : null
+                  }
+                  editingMeetingId={editingMeetingId}
+                  loading={roomReservationsLoading}
+                  errorMessage={roomReservationsError?.message ?? null}
+                  onSelectRoom={(roomId) => {
+                    handleScheduleFormChange('useMeetingRoom', true)
+                    handleScheduleFormChange('confRmId', roomId)
+                    setScheduleValidationMessage('')
+                  }}
+                />
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h3 className="mb-4 text-sm font-bold text-slate-900">회의 진행 방식</h3>
                   <div className="flex flex-col gap-3">
@@ -1400,11 +1394,31 @@ const MeetingPage = () => {
                           className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400"
                         >
                           <option value="">회의실을 선택하세요</option>
-                          {(meetingRooms ?? []).map((room) => (
-                            <option key={room.roomId} value={room.roomId}>
-                              {room.roomName}
-                            </option>
-                          ))}
+                          {(meetingRooms ?? [])
+                            .filter((room) => room.useYn === 'Y')
+                            .map((room) => {
+                              const unavailable = (roomReservations ?? []).some(
+                                (reservation) =>
+                                  reservation.roomId === room.roomId &&
+                                  reservation.mtngId !== editingMeetingId &&
+                                  isReservationOverlapping(
+                                    scheduleForm.beginDt,
+                                    scheduleForm.endDt,
+                                    reservation,
+                                  ),
+                              )
+
+                              return (
+                                <option
+                                  key={room.roomId}
+                                  value={room.roomId}
+                                  disabled={unavailable}
+                                >
+                                  {room.roomName}
+                                  {unavailable ? ' (예약 불가)' : ''}
+                                </option>
+                              )
+                            })}
                         </select>
                       </label>
                     )}
