@@ -1,99 +1,122 @@
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
+import type { VideoTokenResponse } from '../types'
 import type {
-  VideoConfCreateRequest,
-  VideoConfResponse,
-  VideoTokenResponse,
-  VideoMomUpdateRequest,
-  VideoMomResponse,
-  VideoMomAprvlRequest,
-} from '../types'
+  MeetingDetail,
+  MeetingCreateRequest,
+  MeetingListItem,
+  MeetingMinutesResponse,
+  MeetingMinutesUpdateRequest,
+  MeetingUpdateRequest,
+} from '../types/meeting.dto'
 
-const MEETING_API_PREFIX = '/api/video-conferences'
+const MEETING_API_PREFIX = '/api/meetings'
+const VIDEO_CONFERENCE_API_PREFIX = '/api/video-conferences'
 
-// 내가 참여 중인 화상회의 목록 조회
-const getConfList = () => {
-  return axiosInstance.get<ApiResponse<VideoConfResponse[]>>(`${MEETING_API_PREFIX}`)
-}
+const getMeetingList = () =>
+  axiosInstance.get<ApiResponse<MeetingListItem[]>>(MEETING_API_PREFIX)
 
-// 화상회의 단건 조회
-const getConf = (vconfId: number) => {
-  return axiosInstance.get<ApiResponse<VideoConfResponse>>(`${MEETING_API_PREFIX}/${vconfId}`)
-}
+const getMeeting = (mtngId: number) =>
+  axiosInstance.get<ApiResponse<MeetingDetail>>(
+    `${MEETING_API_PREFIX}/${mtngId}`,
+  )
 
-// 화상회의 생성
-const createConf = (payload: VideoConfCreateRequest) => {
-  return axiosInstance.post<ApiResponse<VideoConfResponse>>(`${MEETING_API_PREFIX}`, payload)
-}
+const createMeeting = (payload: MeetingCreateRequest) =>
+  axiosInstance.post<ApiResponse<MeetingDetail>>(MEETING_API_PREFIX, payload)
 
-// LiveKit 입장 토큰 발급
-const issueToken = (vconfId: number) => {
-  return axiosInstance.post<ApiResponse<VideoTokenResponse>>(`${MEETING_API_PREFIX}/${vconfId}/token`)
-}
+const updateMeeting = (mtngId: number, payload: MeetingUpdateRequest) =>
+  axiosInstance.put<ApiResponse<void>>(
+    `${MEETING_API_PREFIX}/${mtngId}`,
+    payload,
+  )
 
-// 화상회의 종료
-const endConf = (vconfId: number) => {
-  return axiosInstance.patch<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/end`)
-}
+const deleteMeeting = (mtngId: number) =>
+  axiosInstance.delete<ApiResponse<void>>(`${MEETING_API_PREFIX}/${mtngId}`)
 
-// 회의록 조회
-const getMom = (vconfId: number) => {
-  return axiosInstance.get<ApiResponse<VideoMomResponse>>(`${MEETING_API_PREFIX}/${vconfId}/minutes`)
-}
+const getMom = (mtngId: number) =>
+  axiosInstance.get<ApiResponse<MeetingMinutesResponse>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+  )
 
-// 회의록 수정
-const updateMom = (vconfId: number, payload: VideoMomUpdateRequest) => {
-  return axiosInstance.put<ApiResponse<VideoMomResponse>>(`${MEETING_API_PREFIX}/${vconfId}/minutes`, payload)
-}
+const createEmptyMom = (mtngId: number) =>
+  axiosInstance.post<ApiResponse<number>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+  )
 
-// 회의록 검토 요청
-const requestMomReview = (vconfId: number) => {
-  return axiosInstance.post<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/minutes/review`)
-}
+const updateMom = (mtngId: number, payload: MeetingMinutesUpdateRequest) =>
+  axiosInstance.put<ApiResponse<MeetingMinutesResponse>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+    payload,
+  )
 
-// 회의록 결재
-const approveMom = (vconfId: number, payload: VideoMomAprvlRequest) => {
-  return axiosInstance.post<ApiResponse<void>>(`${MEETING_API_PREFIX}/${vconfId}/minutes/approve`, payload)
-}
+const requestMomApproval = (mtngId: number) =>
+  axiosInstance.post<ApiResponse<void>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes/approval`,
+  )
 
-// 녹취록 업로드
+const issueToken = (vconfId: number) =>
+  axiosInstance.post<ApiResponse<VideoTokenResponse>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/token`,
+  )
+
+const leaveConf = (vconfId: number) =>
+  axiosInstance.patch<ApiResponse<void>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/leave`,
+  )
+
+const endConf = (vconfId: number) =>
+  axiosInstance.patch<ApiResponse<void>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/end`,
+    undefined,
+    { timeout: 120_000 },
+  )
+
 const uploadRcrdg = (vconfId: number, file: File) => {
   const formData = new FormData()
   formData.append('file', file)
+
   return axiosInstance.post<ApiResponse<void>>(
-    `${MEETING_API_PREFIX}/${vconfId}/recordings/upload`,
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/upload`,
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120_000,
+    },
   )
 }
 
-// 녹취록 다운로드 URL 반환
-const getRcrdgDownloadUrl = (atchFileId: number) => {
-  return `${MEETING_API_PREFIX}/recordings/${atchFileId}/download`
-}
+const getRcrdgStreamUrl = (vconfId: number, atchFileId: number) =>
+  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/stream`
 
-// STT 변환 (5초 오디오 청크 전송)
+const getRcrdgDownloadUrl = (vconfId: number, atchFileId: number) =>
+  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/download`
+
 const transcribe = (vconfId: number, audioChunk: Blob) => {
   const formData = new FormData()
   formData.append('audio', audioChunk, 'chunk.webm')
+
   return axiosInstance.post<ApiResponse<string>>(
-    `${MEETING_API_PREFIX}/${vconfId}/stt`,
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/stt`,
     formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+    { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 }
 
 export const meetingApi = {
-  getConfList,
-  getConf,
-  createConf,
-  issueToken,
-  endConf,
+  getMeetingList,
+  getMeeting,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
   getMom,
+  createEmptyMom,
   updateMom,
-  requestMomReview,
-  approveMom,
+  requestMomApproval,
+  issueToken,
+  leaveConf,
+  endConf,
   uploadRcrdg,
+  getRcrdgStreamUrl,
   getRcrdgDownloadUrl,
   transcribe,
 }

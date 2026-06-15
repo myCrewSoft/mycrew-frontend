@@ -76,6 +76,7 @@ type MessengerSocketMessageMap = Record<number, ChatMessageResponse[]>
 type MessengerSocketUnreadCountMap = Record<number, number>
 type MessengerSocketMessageUnreadCountMap = Record<number, number>
 type MessengerSocketLastReadMessageMap = Record<number, number>
+type MessengerParticipantStatusMap = Record<number, string>
 type MessengerSocketLastMessageMap = Record<
   number,
   {
@@ -146,6 +147,17 @@ const isChatMessageResponse = (
   return typeof value.senderId === 'number' && typeof value.content === 'string'
 }
 
+const isParticipantStatusChangedPayload = (
+  value: unknown,
+): value is ParticipantStatusChangedEventPayload => {
+  if (!isObjectRecord(value)) return false
+
+  return (
+    typeof value.empId === 'number' &&
+    typeof value.ptcptSttusCd === 'string'
+  )
+}
+
 const parseSocketEvent = (body: string): MessengerSocketEvent | null => {
   const parsedBody = JSON.parse(body) as unknown
 
@@ -155,10 +167,32 @@ const parseSocketEvent = (body: string): MessengerSocketEvent | null => {
   const eventType = parsedBody.type ?? parsedBody.eventType
 
   if (isMessengerSocketEventType(eventType) && 'data' in parsedBody) {
+    if (
+      eventType === 'PARTICIPANT_STATUS_CHANGED' &&
+      !isParticipantStatusChangedPayload(parsedBody.data)
+    ) {
+      return null
+    }
+
     return {
       type: eventType,
       data: parsedBody.data,
     } as MessengerSocketEvent
+  }
+
+  // 상태 전용 topic에서는 이벤트 wrapper 없이 상태 DTO만 직접 broadcast할 수 있습니다.
+  if (isParticipantStatusChangedPayload(parsedBody)) {
+    return {
+      type: 'PARTICIPANT_STATUS_CHANGED',
+      data: parsedBody,
+    }
+  }
+
+  if (isParticipantStatusChangedPayload(parsedBody.data)) {
+    return {
+      type: 'PARTICIPANT_STATUS_CHANGED',
+      data: parsedBody.data,
+    }
   }
 
   // MESSAGE_CREATED만 ChatMessageResponse를 그대로 broadcast할 수 있어 raw DTO도 이벤트처럼 감쌉니다.
@@ -220,6 +254,8 @@ export const useMessengerSocket = (
     useState<MessengerSocketMessageUnreadCountMap>({})
   const [lastReadMessageIdByRoomId, setLastReadMessageIdByRoomId] =
     useState<MessengerSocketLastReadMessageMap>({})
+  const [participantStatusByEmpId, setParticipantStatusByEmpId] =
+    useState<MessengerParticipantStatusMap>({})
   const [lastMessageByRoomId, setLastMessageByRoomId] =
     useState<MessengerSocketLastMessageMap>({})
   const [error, setError] = useState<string | null>(null)
@@ -380,7 +416,13 @@ export const useMessengerSocket = (
               return
             case 'PARTICIPANT_ADDED':
             case 'PARTICIPANT_REMOVED':
+              requestRoomsRefresh(onRoomsShouldRefreshRef.current)
+              return
             case 'PARTICIPANT_STATUS_CHANGED':
+              setParticipantStatusByEmpId((current) => ({
+                ...current,
+                [event.data.empId]: event.data.ptcptSttusCd,
+              }))
               requestRoomsRefresh(onRoomsShouldRefreshRef.current)
               return
             default:
@@ -520,6 +562,7 @@ export const useMessengerSocket = (
     unreadCountsByRoomId,
     messageUnreadCountsById,
     lastReadMessageIdByRoomId,
+    participantStatusByEmpId,
     lastMessageByRoomId,
     error,
     sendMessage,
