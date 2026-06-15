@@ -79,3 +79,8 @@ export type VideoTokenResponse = components['schemas']['VideoTokenResponse'];
 export type NotificationResponse = components['schemas']['NotificationResponse'];
 export type NotificationUnreadCountResponse =
   components['schemas']['NotificationUnreadCountResponse'];
+
+// 검색
+export type SearchResponse = components['schemas']['SearchResponse'];
+export type SearchType = NonNullable<SearchResponse['type']>;
+export type SearchHistVO = components['schemas']['SearchHistVO'];
