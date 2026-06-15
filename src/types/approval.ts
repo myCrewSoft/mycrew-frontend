@@ -186,6 +186,15 @@ export interface ApprovalStepStatusResponse {
   /** 결재자명 */
   aprvrEmpNm: string;
 
+  /** 결재자 부서명 */
+  aprvrDeptNm?: Nullable<string>;
+
+  /** 결재자 직위명 */
+  aprvrJobPstnNm?: Nullable<string>;
+
+  /** 결재자 프로필 이미지 파일 ID */
+  aprvrPrflImgFileId?: Nullable<number>;
+
   /** 결재 처리 상태 코드 */
   aprvlPrgrsCd: string;
 
@@ -197,6 +206,30 @@ export interface ApprovalStepStatusResponse {
 
   /** 반려 사유 */
   rtrnRsn: Nullable<string>;
+}
+
+/** 전자결재 함별 기안서 건수 응답 */
+export interface ApprovalDraftCountResponse {
+  /** 상신함 - 진행 중 기안서 수 */
+  sentProgress: number;
+
+  /** 상신함 - 완료된 기안서 수 */
+  sentCompleted: number;
+
+  /** 상신함 - 반려된 기안서 수 */
+  sentRejected: number;
+
+  /** 상신함 - 임시저장 기안서 수 */
+  sentTemporary: number;
+
+  /** 수신함 - 결재 요청(내 처리 대기) 문서 수 */
+  receivedRequests: number;
+
+  /** 수신함 - 결재 내역(내가 처리한) 문서 수 */
+  receivedHistory: number;
+
+  /** 수신함 - 결재 완료(내가 승인한 최종 완료) 문서 수 */
+  receivedCompleted: number;
 }
 
 /** 결재 템플릿 응답 */

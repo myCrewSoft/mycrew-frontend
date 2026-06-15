@@ -97,12 +97,13 @@ export interface AtndPolicySaveRequest {
   annualLeaveDef: number
 }
 
-/** 관리자 전체 근태 현황 행 */
+/** 관리자 전체 근태 현황 행 (특정 일자 / 사원 상세) */
 export interface AdminAtndRow {
   empId: number
   empNm: string
   deptNm?: string | null
   jbpsNm?: string | null
+  prflImgFileId?: number | null
   atndDt: string
   wrkStartDtm?: string | null
   wrkEndDtm?: string | null
@@ -111,6 +112,21 @@ export interface AdminAtndRow {
   otMin?: number | null
   atndStatCd: string
   atndStatNm: string
+}
+
+/** 관리자 기간별 사원 근태 집계 행 */
+export interface AdminAtndStat {
+  empId: number
+  empNm: string
+  deptNm?: string | null
+  jbpsNm?: string | null
+  prflImgFileId?: number | null
+  presentDays: number
+  workMin: number
+  otMin: number
+  lateCnt: number
+  earlyLeaveCnt: number
+  leaveDays: number
 }
 
 export type AtndPeriod = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
@@ -165,9 +181,29 @@ const savePolicy = (payload: AtndPolicySaveRequest) => {
   return axiosInstance.post<ApiResponse<AtndPolicy>>('/api/admin/attendance/policy', payload)
 }
 
-// 전체 사원 근태 현황을 조회합니다.
+// 전체 사원 근태 현황을 조회합니다.(특정 일자)
 const getAllAttendance = (params: { date?: string; deptCd?: string; keyword?: string }) => {
   return axiosInstance.get<ApiResponse<AdminAtndRow[]>>('/api/admin/attendance', { params })
+}
+
+// 기간별 사원 근태 집계를 조회합니다.
+const getAttendanceStats = (params: {
+  from?: string
+  to?: string
+  deptCd?: string
+  keyword?: string
+}) => {
+  return axiosInstance.get<ApiResponse<AdminAtndStat[]>>('/api/admin/attendance/stats', {
+    params,
+  })
+}
+
+// 특정 사원의 기간 일자별 근태를 조회합니다.
+const getEmployeeAttendance = (empId: number, params: { from?: string; to?: string }) => {
+  return axiosInstance.get<ApiResponse<AdminAtndRow[]>>(
+    `/api/admin/attendance/employee/${empId}`,
+    { params },
+  )
 }
 
 // ── 휴가 신청 API ─────────────────────────────────────────────────
@@ -236,6 +272,7 @@ export interface LeaveBalance {
   empId: number
   empNm: string
   deptNm?: string | null
+  prflImgFileId?: number | null
   baseDay: number
   grantedDay: number
   usedDay: number
@@ -307,6 +344,8 @@ export const attendanceApi = {
   getPolicy,
   savePolicy,
   getAllAttendance,
+  getAttendanceStats,
+  getEmployeeAttendance,
   getLeaveTypes,
   getMyLeaves,
   applyLeave,

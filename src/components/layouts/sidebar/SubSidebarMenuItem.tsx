@@ -10,6 +10,8 @@ interface SubSidebarMenuItemProps {
   path: string
   active?: boolean
   children?: any[]
+  /** 우측에 표시할 항목 개수 배지 (예: 결재함별 기안서 수). undefined 면 표시하지 않음 */
+  count?: number
 }
 
 const isPathActive = (pathname: string, itemPath: string) =>
@@ -26,6 +28,7 @@ const SubSidebarMenuItem = ({
   path,
   active = false,
   children,
+  count,
 }: SubSidebarMenuItemProps) => {
   const location = useLocation()
   const hasChildren = Boolean(children?.length)
@@ -66,7 +69,16 @@ const SubSidebarMenuItem = ({
           }`}
         >
           {Icon && <Icon size={18} />}
-          <span className="truncate">{label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {typeof count === 'number' && count > 0 && (
+            <span
+              className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                active ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              {count > 999 ? '999+' : count}
+            </span>
+          )}
         </Link>
       )}
 

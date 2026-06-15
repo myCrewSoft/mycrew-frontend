@@ -1,10 +1,12 @@
 import {
   CheckCircle2,
   PenLine,
+  Pencil,
   RefreshCcw,
   RotateCcw,
   Search,
   Send,
+  Trash2,
   XCircle,
 } from 'lucide-react'
 import {
@@ -136,6 +138,8 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     setDraftApprovers,
     draftError,
     draftSaving,
+    isEditingDraft,
+    openDraftForEdit,
     handleSaveDraft,
     closeDraft,
   } = useDraftModal(loadList)
@@ -196,6 +200,8 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
       showToast({ title: successTitle, variant: 'success' })
       await loadList()
       await loadDetail()
+      // 사이드바 함별 건수 갱신
+      window.dispatchEvent(new Event('approval:refresh-counts'))
     } catch (error) {
       showToast({
         title: '결재 처리 실패',
@@ -242,6 +248,26 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
       () => approvalApi.withdrawApproval(selectedDocumentId),
       '결재 문서를 회수했습니다.',
     )
+  }
+
+  // 임시저장 기안서 수정: 상세를 모달에 불러와 같은 문서를 갱신한다.
+  const handleEditDraft = () => {
+    if (!detail) return
+    openDraftForEdit(detail)
+  }
+
+  // 임시저장 기안서 삭제 (하드 삭제)
+  const handleDeleteDraft = () => {
+    if (!selectedDocumentId) return
+    if (!window.confirm('이 임시저장 기안서를 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.')) {
+      return
+    }
+    void mutateAndReload(async () => {
+      await approvalApi.deleteTemporaryDraft(selectedDocumentId)
+      setSelectedDocumentId(null)
+      setDetail(null)
+      window.dispatchEvent(new Event('approval:refresh-counts'))
+    }, '기안서를 삭제했습니다.')
   }
 
   return (
@@ -364,9 +390,28 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
                 </div>
                 <div className="approval-page__detail-actions">
                   {currentBox === 'sent-temporary' ? (
-                    <Button size="sm" leftIcon={<Send size={15} />} onClick={handleSubmitDraft}>
-                      결재 요청
-                    </Button>
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        leftIcon={<Pencil size={15} />}
+                        onClick={handleEditDraft}
+                      >
+                        수정
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        leftIcon={<Trash2 size={15} />}
+                        loading={actionLoading}
+                        onClick={handleDeleteDraft}
+                      >
+                        삭제
+                      </Button>
+                      <Button size="sm" leftIcon={<Send size={15} />} onClick={handleSubmitDraft}>
+                        결재 요청
+                      </Button>
+                    </>
                   ) : null}
                   {currentBox === 'sent-progress' ? (
                     <Button
@@ -472,6 +517,8 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
         onApproversChange={setDraftApprovers}
         onClose={closeDraft}
         onSubmit={handleSaveDraft}
+        title={isEditingDraft ? '기안서 수정' : undefined}
+        submitLabel={isEditingDraft ? '수정 저장' : undefined}
       />
 
       <ApprovalActionModal
