@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Textarea from '../../components/common/form/textarea/Textarea'
@@ -27,6 +28,7 @@ import {
 } from '../../api/boardDetailApi'
 import { profileApi } from '../../api/profileApi'
 import { useApi } from '../../hooks/useApi'
+import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind } from '../../types/board'
 import type { BoardCommentUpdateRequest, BoardResponse } from '../../types'
 
@@ -131,16 +133,12 @@ const isSameEmployeeId = (
 const formatCommentAuthor = (
   writerEmployeeId: number | undefined,
   boardType: BoardKind,
-  currentEmployeeId: number | null,
-  currentEmployeeName: string,
+  writerName: string,
 ) => {
   if (boardType === 'anonymous') return '익명'
 
-  if (
-    writerEmployeeId === currentEmployeeId &&
-    currentEmployeeName
-  ) {
-    return `${currentEmployeeName}(${writerEmployeeId})`
+  if (writerName) {
+    return `${writerName}(${writerEmployeeId ?? '-'})`
   }
 
   return `사원(${writerEmployeeId ?? '-'})`
@@ -263,6 +261,9 @@ const BoardDetailPage = () => {
   const isEditMode = editModeKey === detailStateKey
   const currentEmployeeId = getCurrentEmployeeId()
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  const { getEmployeeProfile } = useEmployeeProfileDirectory(
+    boardType !== 'anonymous',
+  )
   // 부서/익명 게시판은 상세 응답에서 작성자 식별값이 누락될 수 있으므로
   // 삭제 버튼을 표시하고 실제 권한은 인증 정보를 가진 백엔드에서 검증합니다.
   const canDeletePost = detail
@@ -924,29 +925,44 @@ const BoardDetailPage = () => {
 
                   <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
                     {comments.length > 0 ? (
-                      comments.map((comment, index) => (
+                      comments.map((comment, index) => {
+                        const employeeProfile = getEmployeeProfile(
+                          comment.wrterEmpId,
+                        )
+                        const commentAuthorName =
+                          boardType === 'anonymous'
+                            ? '익명'
+                            : employeeProfile?.name ??
+                              (comment.wrterEmpId === currentEmployeeId
+                                ? currentEmployeeName
+                                : '')
+
+                        return (
                         <div
                           key={comment.commentId ?? index}
                           className={`flex gap-3 px-4 py-4 ${
                             comment.commentDepth ? 'bg-slate-50 pl-10' : ''
                           }`}
                         >
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-xs font-bold text-white">
-                            {boardType === 'anonymous'
-                              ? '익'
-                              : comment.wrterEmpId === currentEmployeeId &&
-                                  currentEmployeeName
-                                ? currentEmployeeName.slice(0, 1)
-                                : String(comment.wrterEmpId ?? '?').slice(0, 1)}
-                          </div>
+                          <ProfileAvatar
+                            fileId={
+                              boardType === 'anonymous'
+                                ? null
+                                : employeeProfile?.profileFileId ??
+                                  (comment.wrterEmpId === currentEmployeeId
+                                    ? currentProfile?.prflImgFileId
+                                    : null)
+                            }
+                            name={commentAuthorName}
+                            size={32}
+                          />
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-wrap items-center gap-2 text-sm">
                               <span className="font-bold text-slate-800">
                                 {formatCommentAuthor(
                                   comment.wrterEmpId,
                                   boardType,
-                                  currentEmployeeId,
-                                  currentEmployeeName,
+                                  commentAuthorName,
                                 )}
                               </span>
                               {Boolean(comment.commentDepth) && (
@@ -1098,7 +1114,8 @@ const BoardDetailPage = () => {
                               )}
                           </div>
                         </div>
-                      ))
+                        )
+                      })
                     ) : (
                       <div className="px-4 py-8 text-center text-sm font-medium text-slate-400">
                         등록된 댓글이 없습니다.
