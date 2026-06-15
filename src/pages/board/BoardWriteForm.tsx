@@ -233,7 +233,14 @@ const BoardWriteForm = ({
       const selectionElement = selectionNode instanceof Element
         ? selectionNode
         : selectionNode?.parentElement
+      const selectedHeading = selectionElement?.closest('h1, h2')
       const selectedTable = selectionElement?.closest('table')
+
+      if (selectedHeading && !selectedHeading.textContent?.trim()) {
+        event.preventDefault()
+        editor.exec('heading', { level: 0 })
+        return
+      }
 
       // Toast UI는 새 표를 만들 때 내용이 없는 머리글 행도 함께 생성합니다.
       // 빈 표 안에서 Delete/Backspace를 누르면 셀이 아니라 표 전체를 삭제합니다.
@@ -243,10 +250,30 @@ const BoardWriteForm = ({
       editor.exec('removeTable')
     }
 
+    const handleActiveListToggle = (event: MouseEvent) => {
+      const target = event.target
+      const button = target instanceof Element
+        ? target.closest<HTMLButtonElement>(
+            '.toastui-editor-toolbar-icons.bullet-list.active, ' +
+            '.toastui-editor-toolbar-icons.ordered-list.active, ' +
+            '.toastui-editor-toolbar-icons.task-list.active',
+          )
+        : null
+
+      if (!button) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      editor.exec('outdent')
+    }
+
     editorHost.addEventListener('keydown', handleEmptyTableDelete)
+    editorHost.addEventListener('click', handleActiveListToggle, true)
 
     return () => {
       editorHost.removeEventListener('keydown', handleEmptyTableDelete)
+      editorHost.removeEventListener('click', handleActiveListToggle, true)
       editor.destroy()
       editorRef.current = null
     }

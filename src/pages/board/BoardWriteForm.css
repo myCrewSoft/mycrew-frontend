@@ -4,6 +4,23 @@
   display: none !important;
 }
 
+.board-toast-editor .toastui-editor-ww-container .ProseMirror {
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.board-toast-editor .toastui-editor-contents p,
+.board-toast-editor .toastui-editor-contents li {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.board-toast-editor .toastui-editor-contents h1,
+.board-toast-editor .toastui-editor-contents h2 {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .toastui-editor-contents table th {
   background-color: #ffffff !important; /* 배경색: 흰색 고정 */
   color: #0f172a !important;   
