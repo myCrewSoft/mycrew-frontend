@@ -3,7 +3,6 @@
 declare module '@toast-ui/editor' {
   export type EditorMode = 'markdown' | 'wysiwyg'
   export type PreviewStyle = 'tab' | 'vertical'
-
   export interface EditorOptions {
     el: HTMLElement
     height?: string
