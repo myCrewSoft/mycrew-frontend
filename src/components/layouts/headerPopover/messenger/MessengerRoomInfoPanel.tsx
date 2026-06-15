@@ -2,6 +2,7 @@ import { ArrowLeft, Edit3, LogOut, Save, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import EmployeeSearchPicker from '../../../common/employeeSearch/EmployeeSearchPicker'
 import type { EmployeeSearchItem } from '../../../common/employeeSearch/EmployeeSearchPicker'
+import ChatRoomImagePicker from './ChatRoomImagePicker'
 import type { ChatParticipant, ChatRoom } from './messenger.types'
 import {
   getDirectRoomMeta,
@@ -16,6 +17,8 @@ interface MessengerRoomInfoPanelProps {
   onUpdateRoom: (payload: {
     chatName: string
     chatDescription: string
+    imageFile: File | null
+    removeImage: boolean
   }) => void
   onAddParticipants: (participantIds: number[]) => void
   onRemoveParticipants: (participantIds: number[]) => void
@@ -76,12 +79,16 @@ const MessengerRoomInfoPanel = ({
   const [editMode, setEditMode] = useState(false)
   const [roomName, setRoomName] = useState(room.name)
   const [roomDescription, setRoomDescription] = useState(room.description)
+  const [roomImageFile, setRoomImageFile] = useState<File | null>(null)
+  const [removeRoomImage, setRemoveRoomImage] = useState(false)
   const [selectedParticipantIds, setSelectedParticipantIds] = useState(originalParticipantIds)
 
   const handleCancelEdit = () => {
     setEditMode(false)
     setRoomName(room.name)
     setRoomDescription(room.description)
+    setRoomImageFile(null)
+    setRemoveRoomImage(false)
     setSelectedParticipantIds(originalParticipantIds)
   }
 
@@ -95,10 +102,12 @@ const MessengerRoomInfoPanel = ({
       (participantId) => !nextParticipantIdSet.has(participantId),
     )
 
-    if (editableRoomInfo) {
+    if (editableRoomInfo || roomImageFile || removeRoomImage) {
       onUpdateRoom({
         chatName: roomName.trim(),
         chatDescription: roomDescription.trim(),
+        imageFile: roomImageFile,
+        removeImage: removeRoomImage,
       })
     }
 
@@ -149,8 +158,7 @@ const MessengerRoomInfoPanel = ({
           <button
             type="button"
             onClick={() => setEditMode(true)}
-            disabled={!editableRoomInfo && !canManageParticipants}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
           >
             <Edit3 size={14} />
             수정
@@ -185,23 +193,35 @@ const MessengerRoomInfoPanel = ({
                   className="h-20 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm leading-5 outline-none placeholder:text-slate-400 focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </label>
-            </section>
 
-            <section className="border-t border-slate-100 pt-4">
-              <p className="mb-3 text-xs font-bold text-slate-700">
-                참여자 관리
-              </p>
-              <EmployeeSearchPicker
-                variant="compact"
-                remoteSearch
-                showAllOnEmpty
-                selectedEmployeeIds={selectedParticipantIds}
-                selectedEmployeeItems={participantItems}
-                onChange={(nextEmployeeIds) =>
-                  setSelectedParticipantIds(toNumberIds(nextEmployeeIds))
-                }
+              <ChatRoomImagePicker
+                currentFileId={room.chatRoomImageAtchFileId}
+                removed={removeRoomImage}
+                onChange={(file) => {
+                  setRoomImageFile(file)
+                  if (file) setRemoveRoomImage(false)
+                }}
+                onRemove={() => setRemoveRoomImage(true)}
               />
             </section>
+
+            {canManageParticipants && (
+              <section className="border-t border-slate-100 pt-4">
+                <p className="mb-3 text-xs font-bold text-slate-700">
+                  참여자 관리
+                </p>
+                <EmployeeSearchPicker
+                  variant="compact"
+                  remoteSearch
+                  showAllOnEmpty
+                  selectedEmployeeIds={selectedParticipantIds}
+                  selectedEmployeeItems={participantItems}
+                  onChange={(nextEmployeeIds) =>
+                    setSelectedParticipantIds(toNumberIds(nextEmployeeIds))
+                  }
+                />
+              </section>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-5">

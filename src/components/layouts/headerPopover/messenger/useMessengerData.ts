@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import messengerApi from '../../../../api/messengerApi'
 import { useApi } from '../../../../hooks/useApi'
 import type {
@@ -20,10 +21,11 @@ export const useMessengerData = () => {
   const removeParticipantsApi = useApi(messengerApi.removeParticipants, {
     immediate: false,
   })
-  const updateParticipantStatusApi = useApi(
-    messengerApi.updateParticipantStatus,
-    { immediate: false },
-  )
+  const {
+    execute: executeUpdateParticipantStatus,
+    loading: updatingParticipantStatus,
+    error: updateParticipantStatusError,
+  } = useApi(messengerApi.updateParticipantStatus, { immediate: false })
   const markAsReadApi = useApi(messengerApi.markAsRead, { immediate: false })
 
   const createChat = (payload: CreateChatRoomRequest) =>
@@ -44,8 +46,10 @@ export const useMessengerData = () => {
     payload: RemoveParticipantsRequest,
   ) => removeParticipantsApi.execute(chatId, payload)
 
-  const updateParticipantStatus = (ptcptSttusCd: string) =>
-    updateParticipantStatusApi.execute(ptcptSttusCd)
+  const updateParticipantStatus = useCallback(
+    (ptcptSttusCd: string) => executeUpdateParticipantStatus(ptcptSttusCd),
+    [executeUpdateParticipantStatus],
+  )
 
   return {
     rooms: roomsApi.data ?? null,
@@ -70,7 +74,7 @@ export const useMessengerData = () => {
       deleteChatApi.loading ||
       addParticipantsApi.loading ||
       removeParticipantsApi.loading ||
-      updateParticipantStatusApi.loading ||
+      updatingParticipantStatus ||
       markAsReadApi.loading,
     error:
       roomsApi.error ??
@@ -81,7 +85,7 @@ export const useMessengerData = () => {
       deleteChatApi.error ??
       addParticipantsApi.error ??
       removeParticipantsApi.error ??
-      updateParticipantStatusApi.error ??
+      updateParticipantStatusError ??
       markAsReadApi.error,
   }
 }

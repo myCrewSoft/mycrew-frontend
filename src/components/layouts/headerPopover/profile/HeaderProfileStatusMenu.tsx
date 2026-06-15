@@ -41,6 +41,10 @@ const HeaderProfileStatusMenu = () => {
     statusOptions.find((option) => option.value === status) ?? statusOptions[0];
   const profileMeta = getProfileMeta(profile);
 
+  useEffect(() => {
+    void updateParticipantStatus('STS1');
+  }, [updateParticipantStatus]);
+
   const handleLogout = async () => {
     try {
       await authApi.logout();

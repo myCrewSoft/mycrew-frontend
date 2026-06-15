@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import EmployeeSearchPicker from '../../../common/employeeSearch/EmployeeSearchPicker'
 import { useAuth } from '../../../../store/AuthContext'
+import ChatRoomImagePicker from './ChatRoomImagePicker'
 
 interface MessengerCreateFormProps {
   roomName: string
@@ -8,6 +9,7 @@ interface MessengerCreateFormProps {
   selectedMemberIds: number[]
   onChangeRoomName: (value: string) => void
   onChangeRoomDescription: (value: string) => void
+  onChangeRoomImageFile: (file: File | null) => void
   onChangeSelectedMembers: (memberIds: number[]) => void
   onCreate: () => void
   onCancel: () => void
@@ -19,6 +21,7 @@ const MessengerCreateForm = ({
   selectedMemberIds,
   onChangeRoomName,
   onChangeRoomDescription,
+  onChangeRoomImageFile,
   onChangeSelectedMembers,
   onCreate,
   onCancel,
@@ -68,6 +71,10 @@ const MessengerCreateForm = ({
               className="h-20 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm leading-5 outline-none placeholder:text-slate-400 focus:border-blue-400"
             />
           </label>
+
+          <ChatRoomImagePicker
+            onChange={onChangeRoomImageFile}
+          />
 
           <EmployeeSearchPicker
             variant="compact"
