@@ -1,9 +1,13 @@
 import {
   ArchiveRestore,
   AtSign,
+  Download,
   FileText,
   MailPlus,
   Paperclip,
+  Reply,
+  ReplyAll,
+  Forward,
   RefreshCcw,
   Search,
   Send,
@@ -34,6 +38,7 @@ import Modal from '../../components/common/overlay/modal/Modal';
 import { useToast } from '../../components/common/toast/useToast';
 import type {
   MailDetailResponse,
+  MailDraftRequest,
   MailListResult,
   MailRouteBox,
   MailSendRequest,
@@ -72,6 +77,21 @@ const mailboxMeta: Record<
     title: '나에게 온 메일',
     description: '내 주소가 수신 대상인 메일을 확인합니다.',
     apiType: 'tome',
+  },
+  important: {
+    title: '중요 메일함',
+    description: '중요로 표시한 메일을 모아봅니다.',
+    apiType: 'important',
+  },
+  unread: {
+    title: '안읽은 메일',
+    description: '아직 읽지 않은 메일만 모아봅니다.',
+    apiType: 'unread',
+  },
+  draft: {
+    title: '임시보관함',
+    description: '작성 중인 임시보관 메일을 확인하고 이어서 작성합니다.',
+    apiType: 'draft',
   },
   trash: {
     title: '휴지통',
@@ -118,6 +138,47 @@ const formatFileSize = (size: number) => {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 };
 
+const isFullHtmlDocument = (content: string) =>
+  /^\s*(?:<!doctype\s+html\b|<html[\s>])/i.test(content);
+
+const buildSandboxedMailDocument = (content: string) => {
+  if (isFullHtmlDocument(content)) {
+    return content;
+  }
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base target="_blank" />
+    <style>
+      html, body { margin: 0; padding: 0; background: #ffffff; color: #0f172a; }
+      body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; }
+      img, table { max-width: 100%; }
+    </style>
+  </head>
+  <body>${content}</body>
+</html>`;
+};
+
+interface MailContentViewerProps {
+  content: string;
+  renderMode?: string | null;
+}
+
+function MailContentViewer({ content, renderMode }: MailContentViewerProps) {
+  return (
+    <iframe
+      title="메일 본문"
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      srcDoc={buildSandboxedMailDocument(content)}
+      data-render-mode={renderMode ?? 'SANDBOX_IFRAME'}
+      className="h-[70vh] min-h-[420px] max-h-[720px] w-full rounded-xl border border-slate-200 bg-white"
+    />
+  );
+}
+
 const getMailErrorMessage = (error: unknown) => {
   if (error instanceof ApiError) {
     if (error.errorCode === 'MAIL_003') {
@@ -130,21 +191,63 @@ const getMailErrorMessage = (error: unknown) => {
   return '메일 요청 처리 중 오류가 발생했습니다.';
 };
 
+interface ComposePrefill {
+  to?: string;
+  cc?: string;
+  bcc?: string;
+  subject?: string;
+  content?: string;
+  inReplyToMailId?: number;
+  draftMailId?: number;
+}
+
 interface ComposeModalProps {
   open: boolean;
   sending: boolean;
+  prefill?: ComposePrefill | null;
   onClose: () => void;
   onSubmit: (request: MailSendRequest, attachments: File[]) => Promise<void>;
+  onSaveDraft: (request: MailDraftRequest) => Promise<void>;
+  onDeleteDraft: (mailId: number) => void;
 }
 
-function ComposeModal({ open, sending, onClose, onSubmit }: ComposeModalProps) {
+function ComposeModal({
+  open,
+  sending,
+  prefill,
+  onClose,
+  onSubmit,
+  onSaveDraft,
+  onDeleteDraft,
+}: ComposeModalProps) {
   const [to, setTo] = useState('');
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [inReplyToMailId, setInReplyToMailId] = useState<number | null>(null);
+  const [draftMailId, setDraftMailId] = useState<number | null>(null);
   const [error, setError] = useState('');
+
+  // 모달이 열릴 때 prefill(답장/전달 등) 값으로 폼을 채운다.
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    // 모달 열림 시 폼을 prefill 값으로 동기화 (의도된 1회성 동기화)
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTo(prefill?.to ?? '');
+    setCc(prefill?.cc ?? '');
+    setBcc(prefill?.bcc ?? '');
+    setSubject(prefill?.subject ?? '');
+    setContent(prefill?.content ?? '');
+    setAttachments([]);
+    setInReplyToMailId(prefill?.inReplyToMailId ?? null);
+    setDraftMailId(prefill?.draftMailId ?? null);
+    setError('');
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, prefill]);
 
   const reset = () => {
     setTo('');
@@ -153,6 +256,8 @@ function ComposeModal({ open, sending, onClose, onSubmit }: ComposeModalProps) {
     setSubject('');
     setContent('');
     setAttachments([]);
+    setInReplyToMailId(null);
+    setDraftMailId(null);
     setError('');
   };
 
@@ -191,10 +296,23 @@ function ComposeModal({ open, sending, onClose, onSubmit }: ComposeModalProps) {
         bcc: splitAddresses(bcc),
         subject: subject.trim(),
         content,
+        inReplyToMailId: inReplyToMailId ?? undefined,
       },
       attachments,
     );
     reset();
+  };
+
+  const handleSaveDraft = async () => {
+    setError('');
+    await onSaveDraft({
+      mailId: draftMailId ?? undefined,
+      to: splitAddresses(to),
+      cc: splitAddresses(cc),
+      bcc: splitAddresses(bcc),
+      subject: subject.trim(),
+      content,
+    });
   };
 
   return (
@@ -206,8 +324,19 @@ function ComposeModal({ open, sending, onClose, onSubmit }: ComposeModalProps) {
       size="lg"
       footer={
         <>
+          {draftMailId != null ? (
+            <Button
+              variant="danger"
+              onClick={() => onDeleteDraft(draftMailId)}
+            >
+              삭제
+            </Button>
+          ) : null}
           <Button variant="outline" onClick={handleClose}>
             취소
+          </Button>
+          <Button variant="outline" onClick={() => void handleSaveDraft()}>
+            임시저장
           </Button>
           <Button
             variant="primary"
@@ -289,7 +418,9 @@ interface MailListProps {
   mails: MailSummaryResponse[];
   loading: boolean;
   selectedMailId: number | null;
+  selectedIds: number[];
   onSelect: (mailId: number) => void;
+  onToggleSelect: (mailId: number) => void;
   onToggleImportant: (mail: MailSummaryResponse) => void;
 }
 
@@ -297,7 +428,9 @@ function MailList({
   mails,
   loading,
   selectedMailId,
+  selectedIds,
   onSelect,
+  onToggleSelect,
   onToggleImportant,
 }: MailListProps) {
   if (loading) {
@@ -321,16 +454,28 @@ function MailList({
     <div className="divide-y divide-slate-100">
       {mails.map((mail) => {
         const selected = selectedMailId === mail.mailId;
+        const checked = selectedIds.includes(mail.mailId);
 
         return (
-          <button
-            key={mail.mailId}
-            type="button"
-            onClick={() => onSelect(mail.mailId)}
-            className={`flex w-full items-start gap-3 px-5 py-4 text-left transition ${
-              selected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'
-            }`}
-          >
+          <div key={mail.mailId} className="flex items-stretch">
+            <label
+              className="flex cursor-pointer items-start px-3 pt-5"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggleSelect(mail.mailId)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => onSelect(mail.mailId)}
+              className={`flex w-full items-start gap-3 py-4 pr-5 text-left transition ${
+                selected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'
+              }`}
+            >
             <span
               className={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${
                 mail.unread ? 'bg-blue-600' : 'bg-slate-200'
@@ -381,7 +526,8 @@ function MailList({
                 </button>
               </div>
             </div>
-          </button>
+            </button>
+          </div>
         );
       })}
     </div>
@@ -393,9 +539,14 @@ interface MailDetailPanelProps {
   loading: boolean;
   trashView: boolean;
   onMarkRead: () => void;
+  onReply: () => void;
+  onReplyAll: () => void;
+  onForward: () => void;
+  onMarkUnread: () => void;
   onToggleImportant: () => void;
   onMoveTrash: () => void;
   onRestore: () => void;
+  onDownloadAttachment: (attachmentId: number, fileName: string) => void;
 }
 
 function MailDetailPanel({
@@ -403,9 +554,14 @@ function MailDetailPanel({
   loading,
   trashView,
   onMarkRead,
+  onReply,
+  onReplyAll,
+  onForward,
+  onMarkUnread,
   onToggleImportant,
   onMoveTrash,
   onRestore,
+  onDownloadAttachment,
 }: MailDetailPanelProps) {
   const participantGroups = useMemo(() => {
     const groups = new Map<string, string[]>();
@@ -450,11 +606,43 @@ function MailDetailPanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {!trashView ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Reply size={15} />}
+                  onClick={onReply}
+                >
+                  답장
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<ReplyAll size={15} />}
+                  onClick={onReplyAll}
+                >
+                  전체답장
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Forward size={15} />}
+                  onClick={onForward}
+                >
+                  전달
+                </Button>
+              </>
+            ) : null}
             {detail.unread ? (
               <Button variant="outline" size="sm" onClick={onMarkRead}>
                 읽음 처리
               </Button>
-            ) : null}
+            ) : (
+              <Button variant="outline" size="sm" onClick={onMarkUnread}>
+                읽지 않음으로 표시
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -513,9 +701,9 @@ function MailDetailPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         {detail.content ? (
-          <article
-            className="prose prose-slate max-w-none text-sm leading-7"
-            dangerouslySetInnerHTML={{ __html: detail.content }}
+          <MailContentViewer
+            content={detail.content}
+            renderMode={detail.contentRenderMode}
           />
         ) : (
           <p className="text-sm leading-7 text-slate-600">
@@ -531,9 +719,16 @@ function MailDetailPanel({
             </h3>
             <div className="grid gap-2">
               {detail.attachments.map((attachment) => (
-                <div
+                <button
                   key={attachment.attachmentId}
-                  className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm"
+                  type="button"
+                  onClick={() =>
+                    onDownloadAttachment(
+                      attachment.attachmentId,
+                      attachment.originalFileName,
+                    )
+                  }
+                  className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-sm transition-colors hover:bg-blue-50"
                 >
                   <span className="flex min-w-0 items-center gap-2 font-semibold text-slate-700">
                     <FileText size={16} className="text-blue-500" />
@@ -541,10 +736,11 @@ function MailDetailPanel({
                       {attachment.originalFileName}
                     </span>
                   </span>
-                  <span className="ml-3 flex-shrink-0 text-xs font-bold text-slate-400">
+                  <span className="ml-3 flex flex-shrink-0 items-center gap-2 text-xs font-bold text-slate-400">
                     {formatFileSize(attachment.fileSize)}
+                    <Download size={14} className="text-blue-500" />
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -578,6 +774,8 @@ export default function MailPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [composePrefill, setComposePrefill] = useState<ComposePrefill | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [scopeRequired, setScopeRequired] = useState(false);
@@ -597,6 +795,7 @@ export default function MailPage() {
     setListLoading(true);
     setErrorMessage('');
     setScopeRequired(false);
+    setSelectedIds([]);
     let syncError: unknown = null;
 
     try {
@@ -700,7 +899,10 @@ export default function MailPage() {
   }, [loadDetail]);
 
   useEffect(() => {
-    const openCompose = () => setComposeOpen(true);
+    const openCompose = () => {
+      setComposePrefill(null);
+      setComposeOpen(true);
+    };
     window.addEventListener('mail:open-compose', openCompose);
     return () => {
       window.removeEventListener('mail:open-compose', openCompose);
@@ -769,6 +971,213 @@ export default function MailPage() {
     );
   };
 
+  const handleDownloadAttachment = async (
+    attachmentId: number,
+    fileName: string,
+  ) => {
+    if (!detail) {
+      return;
+    }
+    try {
+      const response = await mailApi.downloadAttachment(detail.mailId, attachmentId);
+      const url = window.URL.createObjectURL(response.data as Blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName || 'attachment';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      showToast({
+        title: '첨부파일 다운로드 실패',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const openComposeWith = (prefillValue: ComposePrefill) => {
+    setComposePrefill(prefillValue);
+    setComposeOpen(true);
+  };
+
+  const draftView = currentMailbox === 'draft';
+
+  const handleSaveDraft = async (request: MailDraftRequest) => {
+    try {
+      await mailApi.saveDraft(request);
+      setComposeOpen(false);
+      setComposePrefill(null);
+      showToast({ title: '임시보관에 저장했습니다.', variant: 'success' });
+      if (draftView) {
+        await loadList();
+      } else {
+        navigate('/mail/draft');
+      }
+    } catch (error) {
+      showToast({
+        title: '임시저장 실패',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const handleDeleteDraft = async (mailId: number) => {
+    try {
+      await mailApi.deleteDraft(mailId);
+      setComposeOpen(false);
+      setComposePrefill(null);
+      showToast({ title: '임시보관 메일을 삭제했습니다.', variant: 'success' });
+      await loadList();
+    } catch (error) {
+      showToast({
+        title: '삭제 실패',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const openDraftForEdit = async (mailId: number) => {
+    try {
+      const response = await mailApi.getDraft(mailId);
+      const draft = response.data.data;
+      if (!draft) {
+        return;
+      }
+      const emailsOf = (type: string) =>
+        draft.participants
+          .filter((participant) => participant.type === type)
+          .map((participant) => participant.email)
+          .join(', ');
+      openComposeWith({
+        to: emailsOf('TO'),
+        cc: emailsOf('CC'),
+        bcc: emailsOf('BCC'),
+        subject: draft.subject ?? '',
+        content: draft.content ?? '',
+        draftMailId: draft.mailId,
+      });
+    } catch (error) {
+      showToast({
+        title: '임시보관 메일을 불러오지 못했습니다.',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
+  const buildQuotedBody = (source: MailDetailResponse) => {
+    const plain = (source.content ?? '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const original = plain || source.snippet || '';
+    return `<br/><br/>-------- 원본 메일 --------<br/>보낸 사람: ${source.fromEmail ?? ''}<br/>날짜: ${formatDateTime(source.sentAt)}<br/>제목: ${source.subject ?? ''}<br/><br/>${original}`;
+  };
+
+  const withSubjectPrefix = (subjectValue: string, prefix: string) => {
+    const base = subjectValue ?? '';
+    return base.toLowerCase().startsWith(prefix.toLowerCase())
+      ? base
+      : `${prefix} ${base}`;
+  };
+
+  const handleReply = () => {
+    if (!detail) {
+      return;
+    }
+    openComposeWith({
+      to: detail.fromEmail ?? '',
+      subject: withSubjectPrefix(detail.subject, 'Re:'),
+      content: buildQuotedBody(detail),
+      inReplyToMailId: detail.mailId,
+    });
+  };
+
+  const handleReplyAll = () => {
+    if (!detail) {
+      return;
+    }
+    const toList = detail.participants
+      .filter((participant) => participant.type === 'TO')
+      .map((participant) => participant.email);
+    const ccList = detail.participants
+      .filter((participant) => participant.type === 'CC')
+      .map((participant) => participant.email);
+    const recipients = Array.from(
+      new Set([detail.fromEmail ?? '', ...toList].filter(Boolean)),
+    );
+    openComposeWith({
+      to: recipients.join(', '),
+      cc: Array.from(new Set(ccList)).join(', '),
+      subject: withSubjectPrefix(detail.subject, 'Re:'),
+      content: buildQuotedBody(detail),
+      inReplyToMailId: detail.mailId,
+    });
+  };
+
+  const handleForward = () => {
+    if (!detail) {
+      return;
+    }
+    openComposeWith({
+      subject: withSubjectPrefix(detail.subject, 'Fwd:'),
+      content: buildQuotedBody(detail),
+    });
+  };
+
+  const toggleSelect = (mailId: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(mailId)
+        ? prev.filter((id) => id !== mailId)
+        : [...prev, mailId],
+    );
+  };
+
+  const allSelected = mails.length > 0 && selectedIds.length === mails.length;
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : mails.map((mail) => mail.mailId));
+  };
+
+  const runBulk = async (
+    action: 'read' | 'trash' | 'important',
+    important?: boolean,
+  ) => {
+    if (selectedIds.length === 0) {
+      return;
+    }
+    try {
+      const response = await mailApi.bulkAction({
+        action,
+        mailIds: selectedIds,
+        important,
+      });
+      const result = response.data.data;
+      showToast({
+        title: `${result?.processed ?? 0}건 처리했습니다.${
+          result && result.failed > 0 ? ` (${result.failed}건 실패)` : ''
+        }`,
+        variant: 'success',
+      });
+      setSelectedIds([]);
+      await loadList();
+      await loadDetail();
+    } catch (error) {
+      if (error instanceof ApiError && error.errorCode === 'MAIL_003') {
+        setScopeRequired(true);
+      }
+      showToast({
+        title: '일괄 처리 실패',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    }
+  };
+
   const handleSendMail = async (
     request: MailSendRequest,
     attachments: File[],
@@ -777,7 +1186,16 @@ export default function MailPage() {
 
     try {
       await mailApi.sendMail(request, attachments);
+      const draftId = composePrefill?.draftMailId;
+      if (draftId) {
+        try {
+          await mailApi.deleteDraft(draftId);
+        } catch {
+          // 드래프트 삭제 실패는 발송 성공에 영향을 주지 않음
+        }
+      }
       setComposeOpen(false);
+      setComposePrefill(null);
       showToast({ title: '메일을 발송했습니다.', variant: 'success' });
       navigate('/mail/sent');
       await loadList();
@@ -843,7 +1261,10 @@ export default function MailPage() {
               <Button
                 variant="primary"
                 leftIcon={<MailPlus size={16} />}
-                onClick={() => setComposeOpen(true)}
+                onClick={() => {
+                  setComposePrefill(null);
+                  setComposeOpen(true);
+                }}
               >
                 메일 쓰기
               </Button>
@@ -898,14 +1319,74 @@ export default function MailPage() {
       ) : null}
 
       <section className="grid min-h-0 flex-1 grid-cols-[minmax(320px,440px)_minmax(0,1fr)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="min-h-0 overflow-y-auto border-r border-slate-100">
-          <MailList
-            mails={mails}
-            loading={listLoading}
-            selectedMailId={selectedMailId}
-            onSelect={setSelectedMailId}
-            onToggleImportant={handleSummaryImportant}
-          />
+        <div className="flex min-h-0 flex-col border-r border-slate-100">
+          {mails.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                />
+                전체 선택
+              </label>
+              {selectedIds.length > 0 ? (
+                <>
+                  <span className="text-xs font-bold text-blue-600">
+                    {selectedIds.length}개 선택
+                  </span>
+                  <div className="ml-auto flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void runBulk('read')}
+                    >
+                      읽음
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void runBulk('important', true)}
+                    >
+                      중요표시
+                    </Button>
+                    {!trashView ? (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => void runBulk('trash')}
+                      >
+                        휴지통
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSelectedIds([])}
+                    >
+                      해제
+                    </Button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <MailList
+              mails={mails}
+              loading={listLoading}
+              selectedMailId={selectedMailId}
+              selectedIds={selectedIds}
+              onSelect={
+                draftView
+                  ? (mailId) => void openDraftForEdit(mailId)
+                  : setSelectedMailId
+              }
+              onToggleSelect={toggleSelect}
+              onToggleImportant={handleSummaryImportant}
+            />
+          </div>
         </div>
 
         <div className="min-h-0 overflow-hidden">
@@ -921,6 +1402,18 @@ export default function MailPage() {
                 );
               }
             }}
+            onReply={handleReply}
+            onReplyAll={handleReplyAll}
+            onForward={handleForward}
+            onMarkUnread={() => {
+              if (detail) {
+                void mutateAndReload(
+                  () => mailApi.markAsUnread(detail.mailId),
+                  '읽지 않음으로 표시했습니다.',
+                );
+              }
+            }}
+            onDownloadAttachment={handleDownloadAttachment}
             onToggleImportant={handleDetailImportant}
             onMoveTrash={() => {
               if (detail) {
@@ -953,8 +1446,11 @@ export default function MailPage() {
       <ComposeModal
         open={composeOpen}
         sending={sending}
+        prefill={composePrefill}
         onClose={() => setComposeOpen(false)}
         onSubmit={handleSendMail}
+        onSaveDraft={handleSaveDraft}
+        onDeleteDraft={handleDeleteDraft}
       />
     </div>
   );

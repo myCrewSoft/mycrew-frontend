@@ -1,7 +1,10 @@
 import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
 import type {
+  MailBulkRequest,
+  MailBulkResponse,
   MailDetailResponse,
+  MailDraftRequest,
   MailImportantUpdateRequest,
   MailListQuery,
   MailMutationResponse,
@@ -66,6 +69,17 @@ export const mailApi = {
       `/api/mails/${mailId}/read`,
     ),
 
+  markAsUnread: (mailId: number) =>
+    axiosInstance.patch<ApiResponse<MailMutationResponse>>(
+      `/api/mails/${mailId}/unread`,
+    ),
+
+  downloadAttachment: (mailId: number, attachmentId: number) =>
+    axiosInstance.get<Blob>(
+      `/api/mails/${mailId}/attachments/${attachmentId}`,
+      { responseType: 'blob' },
+    ),
+
   updateImportant: (
     mailId: number,
     request: MailImportantUpdateRequest,
@@ -84,4 +98,18 @@ export const mailApi = {
     axiosInstance.post<ApiResponse<MailMutationResponse>>(
       `/api/mails/trash/${mailId}/restore`,
     ),
+
+  bulkAction: (request: MailBulkRequest) =>
+    axiosInstance.post<ApiResponse<MailBulkResponse>>('/api/mails/bulk', request),
+
+  saveDraft: (request: MailDraftRequest) =>
+    axiosInstance.post<ApiResponse<number>>('/api/mails/drafts', request),
+
+  getDraft: (mailId: number) =>
+    axiosInstance.get<ApiResponse<MailDetailResponse>>(
+      `/api/mails/drafts/${mailId}`,
+    ),
+
+  deleteDraft: (mailId: number) =>
+    axiosInstance.delete<ApiResponse<void>>(`/api/mails/drafts/${mailId}`),
 };
