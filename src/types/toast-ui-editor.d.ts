@@ -3,6 +3,17 @@
 declare module '@toast-ui/editor' {
   export type EditorMode = 'markdown' | 'wysiwyg'
   export type PreviewStyle = 'tab' | 'vertical'
+  export interface ToolbarItemOptions {
+    name: string
+    tooltip?: string
+    el?: HTMLElement
+  }
+  export type EditorCommand = (
+    payload: Record<string, unknown>,
+    state: any,
+    dispatch: (transaction: any) => void,
+    view: any,
+  ) => boolean
   export interface EditorOptions {
     el: HTMLElement
     height?: string
@@ -13,13 +24,14 @@ declare module '@toast-ui/editor' {
     language?: string
     useCommandShortcut?: boolean
     usageStatistics?: boolean
-    toolbarItems?: string[][]
+    toolbarItems?: (string | ToolbarItemOptions)[][]
     hideModeSwitch?: boolean
     placeholder?: string
     autofocus?: boolean
     events?: {
       change?: () => void
     }
+    customHTMLRenderer?: Record<string, Record<string, (...args: any[]) => unknown>>
   }
 
   export default class ToastEditor {
@@ -27,7 +39,9 @@ declare module '@toast-ui/editor' {
 
     changeMode(mode: EditorMode, isWithoutFocus?: boolean): void
     exec(command: string, payload?: Record<string, unknown>): void
+    addCommand(type: EditorMode, name: string, command: EditorCommand): void
     getMarkdown(): string
+    getHTML(): string
     destroy(): void
   }
 }
@@ -38,6 +52,7 @@ declare module '@toast-ui/editor/dist/toastui-editor-viewer' {
     initialValue?: string
     usageStatistics?: boolean
     theme?: string
+    customHTMLRenderer?: Record<string, Record<string, (...args: any[]) => unknown>>
   }
 
   export default class ToastViewer {

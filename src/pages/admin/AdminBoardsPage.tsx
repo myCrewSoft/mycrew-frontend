@@ -17,7 +17,6 @@ import {
   ThumbsUp,
   Trash2,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../../api/adminApi'
 import { boardApi } from '../../api/boardApi'
 import {
@@ -32,6 +31,7 @@ import {
   type ProjectBoardListParams,
 } from '../../api/projectBoardApi'
 import Button from '../../components/common/button/Button'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import DataTable from '../../components/common/dataDisplay/dataTable/DataTable'
@@ -42,6 +42,7 @@ import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
+import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind, BoardListParams } from '../../types/board'
 import type {
   BoardCommentUpdateRequest,
@@ -183,13 +184,12 @@ const formatAuthor = (board: BoardResponse, type: AdminBoardKind) => {
 const formatCommentAuthor = (
   employeeId: number | undefined,
   type: AdminBoardKind,
-  currentEmployeeId: number | null,
-  currentEmployeeName: string,
+  employeeName: string,
 ) => {
   if (type === 'anonymous') return '익명'
 
-  if (employeeId === currentEmployeeId && currentEmployeeName) {
-    return `${currentEmployeeName}(${employeeId})`
+  if (employeeName) {
+    return `${employeeName}(${employeeId ?? '-'})`
   }
 
   return `사원(${employeeId ?? '-'})`
@@ -221,7 +221,6 @@ const parseBoardLikeState = (
 }
 
 const AdminBoardsPage = () => {
-  const navigate = useNavigate()
   const { showToast } = useToast()
   const [boardType, setBoardType] = useState<AdminBoardKind>('notice')
   const [departmentCode, setDepartmentCode] = useState('')
@@ -230,6 +229,8 @@ const AdminBoardsPage = () => {
   const [searchText, setSearchText] = useState('')
   const [keyword, setKeyword] = useState('')
   const [detailTarget, setDetailTarget] = useState<BoardResponse | null>(null)
+  const [creatingBoard, setCreatingBoard] = useState(false)
+  const [creatingBoardTitle, setCreatingBoardTitle] = useState('공지사항')
   const [editTarget, setEditTarget] = useState<BoardResponse | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BoardResponse | null>(null)
   const [commentContent, setCommentContent] = useState('')
@@ -322,6 +323,9 @@ const AdminBoardsPage = () => {
 
   const currentEmployeeId = getCurrentEmployeeId()
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  const { getEmployeeProfile } = useEmployeeProfileDirectory(
+    boardType !== 'anonymous',
+  )
   // 다른 게시글의 좋아요 상태가 잠깐 표시되지 않도록 boardId가 같은지 확인합니다.
   const currentLikeState = detailTarget && likeState.boardId === detailTarget.boardId
     ? likeState
@@ -790,6 +794,55 @@ const AdminBoardsPage = () => {
     }
   }
 
+  if (creatingBoard) {
+    return (
+      <section className="flex min-h-[calc(100vh-7rem)] w-full flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Badge variant="outline">ADMIN BOARD CREATE</Badge>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">
+              관리자 {creatingBoardTitle} 작성
+            </h2>
+          </div>
+          <Button variant="outline" onClick={() => setCreatingBoard(false)}>
+            목록으로
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex-1">
+          <BoardWriteForm
+            mode="create"
+            initialBoardType={boardType === 'project' ? 'notice' : boardType}
+            initialBoardTypeCd={boardType === 'project' ? 'PROJ' : ''}
+            departmentCode={selectedDepartmentCode}
+            projectId={boardType === 'project' ? selectedProjectId : undefined}
+            onBoardSelectionChange={(selectedType, departmentName) => {
+              if (boardType === 'project') {
+                setCreatingBoardTitle(boardLabelByType.project)
+                return
+              }
+
+              const selectedLabel = boardLabelByType[selectedType]
+              setCreatingBoardTitle(
+                departmentName
+                  ? `${selectedLabel} ${departmentName}`
+                  : selectedLabel,
+              )
+            }}
+            onClose={() => setCreatingBoard(false)}
+            onCreated={() => {
+              showToast({
+                title: `${creatingBoardTitle} 게시글이 등록되었습니다.`,
+                variant: 'success',
+              })
+              refreshBoards()
+            }}
+          />
+        </div>
+      </section>
+    )
+  }
+
   if (editTarget) {
     return (
       <section className="flex min-h-[calc(100vh-7rem)] w-full flex-col gap-4">
@@ -854,9 +907,19 @@ const AdminBoardsPage = () => {
           </Button>
           <Button
             leftIcon={<Plus size={16} />}
-            onClick={() => navigate('/boards/notices?mode=create')}
+            onClick={() => {
+              setPage(1)
+              setSearchText('')
+              setKeyword('')
+              setCreatingBoardTitle(boardLabelByType[boardType])
+              setCreatingBoard(true)
+            }}
+            disabled={
+              (boardType === 'department' && !selectedDepartmentCode) ||
+              (boardType === 'project' && !selectedProjectId)
+            }
           >
-            공지 작성
+            {boardLabelByType[boardType]} 작성
           </Button>
         </div>
       </div>
@@ -1304,29 +1367,53 @@ const AdminBoardsPage = () => {
 
               {(detailTarget.commentList?.length ?? 0) > 0 ? (
                 <div className="divide-y divide-slate-200 rounded-md border border-slate-200">
-                  {detailTarget.commentList?.map((comment, index) => (
+                  {detailTarget.commentList?.map((comment, index) => {
+                    const employeeProfile = getEmployeeProfile(
+                      comment.wrterEmpId,
+                    )
+                    const commentAuthorName =
+                      boardType === 'anonymous'
+                        ? '익명'
+                        : employeeProfile?.name ??
+                          (comment.wrterEmpId === currentEmployeeId
+                            ? currentEmployeeName
+                            : '')
+
+                    return (
                     <div
                       key={comment.commentId ?? index}
-                      className={`px-4 py-3 ${
+                      className={`flex gap-3 px-4 py-3 ${
                         comment.commentDepth ? 'bg-slate-50 pl-10' : 'bg-white'
                       }`}
                     >
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-bold text-slate-800">
-                          {formatCommentAuthor(
-                            comment.wrterEmpId,
-                            boardType,
-                            currentEmployeeId,
-                            currentEmployeeName,
+                      <ProfileAvatar
+                        fileId={
+                          boardType === 'anonymous'
+                            ? null
+                            : employeeProfile?.profileFileId ??
+                              (comment.wrterEmpId === currentEmployeeId
+                                ? currentProfile?.prflImgFileId
+                                : null)
+                        }
+                        name={commentAuthorName}
+                        size={32}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="font-bold text-slate-800">
+                            {formatCommentAuthor(
+                              comment.wrterEmpId,
+                              boardType,
+                              commentAuthorName,
+                            )}
+                          </span>
+                          {Boolean(comment.commentDepth) && (
+                            <Badge variant="neutral">답글</Badge>
                           )}
-                        </span>
-                        {Boolean(comment.commentDepth) && (
-                          <Badge variant="neutral">답글</Badge>
-                        )}
-                        <span className="text-slate-400">
-                          {formatDate(comment.wrteDt)}
-                        </span>
-                      </div>
+                          <span className="text-slate-400">
+                            {formatDate(comment.wrteDt)}
+                          </span>
+                        </div>
                       {editingCommentId === comment.commentId &&
                       comment.commentId ? (
                         <form
@@ -1410,8 +1497,10 @@ const AdminBoardsPage = () => {
                           )}
                         </>
                       )}
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed border-slate-200 px-4 py-8 text-center text-sm font-medium text-slate-400">
