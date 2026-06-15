@@ -12,6 +12,9 @@ import {
   Coffee,
   Plane,
   CalendarCheck,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
 } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
@@ -81,8 +84,47 @@ const PERIOD_TABS: { value: AtndPeriod; label: string }[] = [
   { value: 'YEAR', label: '년' },
 ]
 
+// 기준 날짜를 yyyy-MM-dd(로컬)로 변환
+const toYmd = (d: Date) => {
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${m}-${day}`
+}
+
+// 선택한 기간 단위로 기준 날짜를 이동
+const stepBase = (base: Date, period: AtndPeriod, dir: -1 | 1): Date => {
+  const d = new Date(base)
+  if (period === 'DAY') d.setDate(d.getDate() + dir)
+  else if (period === 'WEEK') d.setDate(d.getDate() + dir * 7)
+  else if (period === 'MONTH') d.setMonth(d.getMonth() + dir)
+  else d.setFullYear(d.getFullYear() + dir)
+  return d
+}
+
+// 월요일 기준 주 시작(00:00) timestamp
+const weekStart = (x: Date) => {
+  const c = new Date(x)
+  const day = (c.getDay() + 6) % 7
+  c.setDate(c.getDate() - day)
+  c.setHours(0, 0, 0, 0)
+  return c.getTime()
+}
+
+// 선택한 기준 날짜가 오늘이 속한 '현재' 기간인지 (다음 이동 비활성화 판단)
+const isCurrentPeriod = (base: Date, period: AtndPeriod): boolean => {
+  const now = new Date()
+  if (period === 'YEAR') return base.getFullYear() === now.getFullYear()
+  if (period === 'MONTH')
+    return (
+      base.getFullYear() === now.getFullYear() && base.getMonth() === now.getMonth()
+    )
+  if (period === 'WEEK') return weekStart(base) === weekStart(now)
+  return toYmd(base) === toYmd(now)
+}
+
 const AttendancePage = () => {
   const [period, setPeriod] = useState<AtndPeriod>('WEEK')
+  const [baseDate, setBaseDate] = useState(() => new Date())
   const [acting, setActing] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
@@ -103,8 +145,8 @@ const AttendancePage = () => {
   const { data: ots, execute: refetchOts } = useApi(attendanceApi.getMyOts)
 
   useEffect(() => {
-    void fetchStats(period)
-  }, [period, fetchStats])
+    void fetchStats(period, toYmd(baseDate))
+  }, [period, baseDate, fetchStats])
 
   const handleCheck = async (kind: 'in' | 'out') => {
     setActing(true)
@@ -114,7 +156,9 @@ const AttendancePage = () => {
           ? await attendanceApi.checkIn()
           : await attendanceApi.checkOut()
       alert(res.data.message ?? '처리되었습니다.')
-      await Promise.all([refetchToday(), fetchStats(period), refetchHistory(30)])
+      await Promise.all([refetchToday(), fetchStats(period, toYmd(baseDate)), refetchHistory(30)])
+      // 서브 사이드바 '오늘 근태'가 즉시 갱신되도록 알림
+      window.dispatchEvent(new Event('attendance:refresh'))
     } catch (err) {
       if (err instanceof ApiError) alert(err.message)
       else alert('처리 중 오류가 발생했습니다.')
@@ -139,6 +183,9 @@ const AttendancePage = () => {
   const completedWk = stdWk - (stats?.remainingWorkMin ?? 0)
   const workedWk = completedWk + Math.min(todayElapsedMin, stdDay)
   const progress = stdWk > 0 ? Math.min(100, Math.round((workedWk / stdWk) * 100)) : 0
+  // 남은 근무시간: 진행 중인 오늘 근무까지 반영 (raw remainingWorkMin 은 퇴근 전까지 갱신되지 않음)
+  const liveRemainingWorkMin = Math.max(0, stdWk - workedWk)
+  const atCurrentPeriod = isCurrentPeriod(baseDate, period)
 
   return (
     <div className="flex w-full flex-col gap-4 text-slate-950">
@@ -263,7 +310,7 @@ const AttendancePage = () => {
           <div className="rounded bg-blue-50 px-4 py-4">
             <p className="text-xs font-semibold text-slate-600">남은 근무시간</p>
             <p className="mt-1 text-base font-black">
-              {formatMin(stats?.remainingWorkMin)}
+              {formatMin(liveRemainingWorkMin)}
             </p>
           </div>
           <div className="rounded bg-blue-50 px-4 py-4">
@@ -283,7 +330,10 @@ const AttendancePage = () => {
             {PERIOD_TABS.map((tab) => (
               <button
                 key={tab.value}
-                onClick={() => setPeriod(tab.value)}
+                onClick={() => {
+                  setPeriod(tab.value)
+                  setBaseDate(new Date())
+                }}
                 className={`rounded-md px-4 py-1.5 text-sm font-bold transition-colors ${
                   period === tab.value
                     ? 'bg-white text-blue-600 shadow-sm'
@@ -295,9 +345,39 @@ const AttendancePage = () => {
             ))}
           </div>
         </div>
-        <p className="mt-2 text-xs font-semibold text-slate-400">
-          {stats?.periodLabel}
-        </p>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setBaseDate((b) => stepBase(b, period, -1))}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+            aria-label="이전 기간"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <div className="flex flex-1 items-center justify-center gap-2">
+            <span className="text-sm font-bold text-slate-700">
+              {stats?.periodLabel ?? '-'}
+            </span>
+            {!atCurrentPeriod && (
+              <button
+                type="button"
+                onClick={() => setBaseDate(new Date())}
+                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-slate-200"
+              >
+                <RotateCcw size={11} /> 현재로
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setBaseDate((b) => stepBase(b, period, 1))}
+            disabled={atCurrentPeriod}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="다음 기간"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard icon={Briefcase} tone="blue" label="실근무" value={formatMin(stats?.workMin)} />

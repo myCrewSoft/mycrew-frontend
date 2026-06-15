@@ -149,9 +149,9 @@ const checkOut = () => {
 }
 
 // 기간(일/주/월/년)별 근태 통계를 조회합니다.
-const getStats = (period: AtndPeriod) => {
+const getStats = (period: AtndPeriod, baseDate?: string) => {
   return axiosInstance.get<ApiResponse<AtndStats>>('/api/attendance/stats', {
-    params: { period },
+    params: { period, ...(baseDate ? { baseDate } : {}) },
   })
 }
 
