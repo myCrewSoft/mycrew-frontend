@@ -12,6 +12,7 @@ import {
   LayoutList,
   Link2,
   Pencil,
+  Play,
   PhoneOff,
   Trash2,
   Users,
@@ -87,9 +88,9 @@ const statusBadgeVariantMap: Record<
   MeetingStatus,
   'primary' | 'success' | 'neutral' | 'danger' | 'outline'
 > = {
-  scheduled: 'neutral',
+  scheduled: 'primary',
   live: 'success',
-  ended: 'outline',
+  ended: 'neutral',
 }
 
 const meetingTypeLabelMap: Record<MeetingTypeCode, string> = {
@@ -98,8 +99,20 @@ const meetingTypeLabelMap: Record<MeetingTypeCode, string> = {
   '03': '혼합',
 }
 
+const meetingTypeBadgeVariantMap: Record<
+  MeetingTypeCode,
+  'violet' | 'warning' | 'info'
+> = {
+  '01': 'violet',
+  '02': 'warning',
+  '03': 'info',
+}
+
 const getMeetingTypeLabel = (code?: string | null) =>
   meetingTypeLabelMap[code as MeetingTypeCode] ?? '오프라인'
+
+const getMeetingTypeBadgeVariant = (code?: string | null) =>
+  meetingTypeBadgeVariantMap[code as MeetingTypeCode] ?? 'warning'
 
 const getRecordingLabel = (meeting: MeetingListItem | MeetingDetail) => {
   if (meeting.vconfId === null) return '해당 없음'
@@ -530,7 +543,14 @@ const MeetingPage = () => {
           ? meeting
           : (await fetchMeetingDetail(meeting.mtngId)).data
 
-      if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) return
+      if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) {
+        showToast({
+          title: '다운로드할 녹취록이 없습니다.',
+          description: '녹취록 생성이 완료된 후 다시 시도해 주세요.',
+          variant: 'info',
+        })
+        return
+      }
 
       window.location.assign(
         meetingApi.getRcrdgDownloadUrl(
@@ -539,7 +559,49 @@ const MeetingPage = () => {
         ),
       )
     },
-    [fetchMeetingDetail],
+    [fetchMeetingDetail, showToast],
+  )
+
+  const handleStreamRecording = useCallback(
+    async (meeting: MeetingListItem | MeetingDetail) => {
+      const streamWindow = window.open('', '_blank')
+      if (streamWindow) streamWindow.opener = null
+
+      try {
+        const detail =
+          'rcrdgAtchFileId' in meeting
+            ? meeting
+            : (await fetchMeetingDetail(meeting.mtngId)).data
+
+        if (detail?.vconfId === null || !detail?.rcrdgAtchFileId) {
+          streamWindow?.close()
+          showToast({
+            title: '재생할 녹취록이 없습니다.',
+            description: '녹취록 생성이 완료된 후 다시 시도해 주세요.',
+            variant: 'info',
+          })
+          return
+        }
+
+        const streamUrl = meetingApi.getRcrdgStreamUrl(
+          detail.vconfId,
+          detail.rcrdgAtchFileId,
+        )
+        if (streamWindow) {
+          streamWindow.location.href = streamUrl
+        } else {
+          window.location.assign(streamUrl)
+        }
+      } catch {
+        streamWindow?.close()
+        showToast({
+          title: '녹취록을 재생하지 못했습니다.',
+          description: '잠시 후 다시 시도해 주세요.',
+          variant: 'danger',
+        })
+      }
+    },
+    [fetchMeetingDetail, showToast],
   )
 
   const handleScheduleFormChange = (
@@ -919,7 +981,7 @@ const MeetingPage = () => {
                                 <Badge variant={statusBadgeVariantMap[status]}>
                                   {statusLabelMap[status]}
                                 </Badge>
-                                <Badge variant="outline">
+                                <Badge variant={getMeetingTypeBadgeVariant(meeting.mtngTypeCd)}>
                                   {getMeetingTypeLabel(meeting.mtngTypeCd)}
                                 </Badge>
                               </div>
@@ -990,11 +1052,34 @@ const MeetingPage = () => {
                                 <FileVolume size={14} />
                                 녹취록
                               </p>
-                              <div className="mt-1 flex items-start justify-between gap-3 pr-9">
+                              <div className="mt-1 flex items-start justify-between gap-3 pr-20">
                                 <p className="text-sm font-bold text-emerald-700">
                                   {getRecordingLabel(meeting)}
                                 </p>
                               </div>
+                              {meeting.vconfId !== null &&
+                                meeting.mtngSttus === 'ended' && (
+                                  <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      aria-label="녹취록 스트리밍"
+                                      title="스트리밍"
+                                      onClick={() => void handleStreamRecording(meeting)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                      <Play size={13} fill="currentColor" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label="녹취록 다운로드"
+                                      title="다운로드"
+                                      onClick={() => void handleDownloadRecording(meeting)}
+                                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                                    >
+                                      <Download size={13} />
+                                    </button>
+                                  </div>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -1041,12 +1126,14 @@ const MeetingPage = () => {
             </button>
 
             <div className="px-8 pb-6 pt-8">
-              <Badge variant={statusBadgeVariantMap[selectedMeeting.mtngSttus]}>
-                {statusLabelMap[selectedMeeting.mtngSttus]}
-              </Badge>
-              <Badge variant="outline">
-                {getMeetingTypeLabel(selectedMeeting.mtngTypeCd)}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={statusBadgeVariantMap[selectedMeeting.mtngSttus]}>
+                  {statusLabelMap[selectedMeeting.mtngSttus]}
+                </Badge>
+                <Badge variant={getMeetingTypeBadgeVariant(selectedMeeting.mtngTypeCd)}>
+                  {getMeetingTypeLabel(selectedMeeting.mtngTypeCd)}
+                </Badge>
+              </div>
               <h2 className="mt-4 text-2xl font-bold leading-tight text-slate-950">
                 {selectedMeeting.mtngNm}
               </h2>
@@ -1106,21 +1193,35 @@ const MeetingPage = () => {
                     <FileVolume size={14} />
                     녹취록
                   </p>
-                  <p className="mt-1 pr-9 text-sm font-bold text-emerald-700">
+                  <p className="mt-1 pr-20 text-sm font-bold text-emerald-700">
                     {getRecordingLabel(selectedMeeting)}
                   </p>
                   {selectedMeeting.vconfId !== null &&
                     selectedMeeting.rcrdgAtchFileId && (
-                      <button
-                        type="button"
-                        aria-label="녹취록 다운로드"
-                        onClick={() =>
-                          void handleDownloadRecording(selectedMeeting)
-                        }
-                        className="absolute right-4 top-3 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
-                      >
-                        <Download size={14} />
-                      </button>
+                      <div className="absolute right-3 top-3 flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          aria-label="녹취록 스트리밍"
+                          title="스트리밍"
+                          onClick={() =>
+                            void handleStreamRecording(selectedMeeting)
+                          }
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <Play size={13} fill="currentColor" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="녹취록 다운로드"
+                          title="다운로드"
+                          onClick={() =>
+                            void handleDownloadRecording(selectedMeeting)
+                          }
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                        >
+                          <Download size={13} />
+                        </button>
+                      </div>
                     )}
                 </div>
               </div>
