@@ -1,9 +1,10 @@
-import { Check, ChevronDown, LogOut, UserRound } from 'lucide-react';
+import { Check, ChevronDown, LogOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../../common/button/Button';
+import ProfileAvatar from '../../../common/avatar/ProfileAvatar';
 import { authApi } from '../../../../api/authApi';
-import { useMyProfile, getProfileInitial, getProfileMeta } from '../../../../hooks/useMyProfile';
+import { useMyProfile, getProfileMeta } from '../../../../hooks/useMyProfile';
 import { useAuth } from '../../../../store/AuthContext';
 import { useMessengerData } from '../messenger/useMessengerData';
 
@@ -39,6 +40,10 @@ const HeaderProfileStatusMenu = () => {
   const selectedStatus =
     statusOptions.find((option) => option.value === status) ?? statusOptions[0];
   const profileMeta = getProfileMeta(profile);
+
+  useEffect(() => {
+    void updateParticipantStatus('STS1');
+  }, [updateParticipantStatus]);
 
   const handleLogout = async () => {
     try {
@@ -90,8 +95,14 @@ const HeaderProfileStatusMenu = () => {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-sm font-black text-blue-700">
-          <span>{profile ? getProfileInitial(profile) : <UserRound size={18} />}</span>
+        <div className="relative h-9 w-9">
+          <ProfileAvatar
+            fileId={profile?.prflImgFileId}
+            name={profile?.empNm}
+            size={36}
+            rounded="xl"
+            className="h-9 w-9 text-sm"
+          />
           <span
             className={`absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-[3px] border-white shadow-sm ${selectedStatus.dotClassName}`}
           />

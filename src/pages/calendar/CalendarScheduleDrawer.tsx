@@ -15,6 +15,7 @@ import type { ScheduleRequestDto } from '../../types'
 import {
   scheduleTypeColorMap,
   scheduleTypeLabelMap,
+  type CalendarSelectedRange,
   type CalendarEventItem,
   type RepeatTypeCode,
   type ScheduleFormValues,
@@ -25,6 +26,7 @@ import { useCalendar } from './CalendarContext'
 interface CalendarScheduleDrawerProps {
   open: boolean
   selectedDate: string
+  selectedRange?: CalendarSelectedRange | null
   schedule?: CalendarEventItem | null
   onClose: () => void
 }
@@ -35,14 +37,8 @@ interface OptionItem {
 }
 
 const scheduleTypeOptions: OptionItem[] = [
-  { value: 'C001', label: scheduleTypeLabelMap.C001 },
   { value: 'C002', label: scheduleTypeLabelMap.C002 },
   { value: 'C003', label: scheduleTypeLabelMap.C003 },
-  { value: 'C004', label: scheduleTypeLabelMap.C004 },
-  { value: 'C005', label: scheduleTypeLabelMap.C005 },
-  { value: 'C006', label: scheduleTypeLabelMap.C006 },
-  { value: 'C007', label: scheduleTypeLabelMap.C007 },
-  { value: 'C008', label: scheduleTypeLabelMap.C008 },
 ]
 
 const repeatTypeOptions: OptionItem[] = [
@@ -65,6 +61,7 @@ const taskOptions: OptionItem[] = []
 const createInitialFormValues = (
   selectedDate: string,
   schedule?: CalendarEventItem | null,
+  selectedRange?: CalendarSelectedRange | null,
 ): ScheduleFormValues => ({
   title: schedule?.title ?? '',
   detail: schedule?.detail ?? '',
@@ -72,9 +69,9 @@ const createInitialFormValues = (
   color: schedule
     ? scheduleTypeColorMap[schedule.scheduleTypeCode]
     : scheduleTypeColorMap.C002,
-  beginDate: schedule?.start ?? `${selectedDate}T09:00`,
-  endDate: schedule?.end ?? `${selectedDate}T10:00`,
-  allDay: schedule?.allDay ?? false,
+  beginDate: schedule?.start ?? selectedRange?.start ?? `${selectedDate}T09:00`,
+  endDate: schedule?.end ?? selectedRange?.end ?? `${selectedDate}T10:00`,
+  allDay: schedule?.allDay ?? selectedRange?.allDay ?? false,
   deptCd: schedule?.deptCd,
   projId: schedule?.projId,
   repeatYn: schedule?.repeat ?? false,
@@ -196,12 +193,13 @@ const getScheduleScopeNotice = (
 const CalendarScheduleDrawer = ({
   open,
   selectedDate,
+  selectedRange,
   schedule,
   onClose,
 }: CalendarScheduleDrawerProps) => {
   const isEditMode = !!schedule
   const [formValues, setFormValues] = useState<ScheduleFormValues>(() =>
-    createInitialFormValues(selectedDate, schedule),
+    createInitialFormValues(selectedDate, schedule, selectedRange),
   )
   const [selectedAttendeeIds, setSelectedAttendeeIds] = useState<
     Array<string | number>
@@ -214,6 +212,28 @@ const CalendarScheduleDrawer = ({
     schedule?.taskId ? String(schedule.taskId) : '',
   )
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
+
+  // 달력에서 날짜 선택이 바뀌면(비편집 모드) 시작/종료 일시를 즉시 갱신합니다.
+  // useEffect 대신 렌더 중 setState 패턴을 사용해 cascading render를 방지합니다.
+  const [prevSelectedDate, setPrevSelectedDate] = useState(selectedDate)
+  const [prevSelectedRange, setPrevSelectedRange] = useState(selectedRange)
+  if (
+    !isEditMode &&
+    (prevSelectedDate !== selectedDate ||
+      prevSelectedRange?.start !== selectedRange?.start ||
+      prevSelectedRange?.end !== selectedRange?.end ||
+      prevSelectedRange?.allDay !== selectedRange?.allDay)
+  ) {
+    setPrevSelectedDate(selectedDate)
+    setPrevSelectedRange(selectedRange)
+    const nextInitialValues = createInitialFormValues(selectedDate, null, selectedRange)
+    setFormValues((current) => ({
+      ...current,
+      beginDate: nextInitialValues.beginDate,
+      endDate: nextInitialValues.endDate,
+      allDay: nextInitialValues.allDay,
+    }))
+  }
 
   const { refreshSchedules } = useCalendar()
   const { showToast } = useToast()
@@ -349,22 +369,24 @@ const CalendarScheduleDrawer = ({
   const createSchedulePayload = (): ScheduleRequestDto => ({
     schdClsfCd: formValues.scheduleTypeCode,
     schdNm: formValues.title.trim(),
-    deptCd: formValues.deptCd,
+    deptCd: formValues.deptCd ?? '',
     projId:
       shouldShowProjectSelect && relatedProjectId
         ? Number(relatedProjectId)
-        : undefined,
+        : 0,
     taskId:
       shouldShowTaskSelect && relatedTaskId
         ? Number(relatedTaskId)
-        : undefined,
+        : 0,
+    vconfId: 0,
+    rsrvId: 0,
     schdDetailCn: formValues.detail,
     beginDt: formValues.beginDate,
     endDt: formValues.endDate,
     allDayYn: formValues.allDay ? 'Y' : 'N',
     reptYn: formValues.repeatYn ? 'Y' : 'N',
-    reptTypeCd: formValues.repeatYn ? formValues.repeatTypeCode : undefined,
-    reptEndDt: formValues.repeatYn ? formValues.repeatEndDate : undefined,
+    reptTypeCd: formValues.repeatYn ? (formValues.repeatTypeCode ?? '') : '',
+    reptEndDt: formValues.repeatYn ? (formValues.repeatEndDate ?? '') : '',
     targets: shouldShowAttendeePicker
       ? selectedAttendeeIds.map((id) => ({
           targetTypeCd: '01',

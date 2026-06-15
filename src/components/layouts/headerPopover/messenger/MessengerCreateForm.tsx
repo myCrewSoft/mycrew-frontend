@@ -1,5 +1,7 @@
 import { X } from 'lucide-react'
 import EmployeeSearchPicker from '../../../common/employeeSearch/EmployeeSearchPicker'
+import { useAuth } from '../../../../store/AuthContext'
+import ChatRoomImagePicker from './ChatRoomImagePicker'
 
 interface MessengerCreateFormProps {
   roomName: string
@@ -7,6 +9,7 @@ interface MessengerCreateFormProps {
   selectedMemberIds: number[]
   onChangeRoomName: (value: string) => void
   onChangeRoomDescription: (value: string) => void
+  onChangeRoomImageFile: (file: File | null) => void
   onChangeSelectedMembers: (memberIds: number[]) => void
   onCreate: () => void
   onCancel: () => void
@@ -18,10 +21,14 @@ const MessengerCreateForm = ({
   selectedMemberIds,
   onChangeRoomName,
   onChangeRoomDescription,
+  onChangeRoomImageFile,
   onChangeSelectedMembers,
   onCreate,
   onCancel,
 }: MessengerCreateFormProps) => {
+  const { auth } = useAuth()
+  const currentEmpId = auth.payload?.sub ? Number(auth.payload.sub) : undefined
+
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-white">
       <header className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
@@ -65,7 +72,10 @@ const MessengerCreateForm = ({
             />
           </label>
 
-          {/* 참여자 검색은 공통 사원 검색 API를 사용하므로 별도 메신저 mapper가 필요 없습니다. */}
+          <ChatRoomImagePicker
+            onChange={onChangeRoomImageFile}
+          />
+
           <EmployeeSearchPicker
             variant="compact"
             remoteSearch
@@ -74,6 +84,7 @@ const MessengerCreateForm = ({
             onChange={(nextMemberIds) =>
               onChangeSelectedMembers(nextMemberIds.map(Number))
             }
+            fixedParams={{ excludeEmpId: currentEmpId }}
           />
         </div>
       </div>

@@ -15,16 +15,23 @@ import type { components } from "./generated";
 // 게시판
 export type BoardSideBarResponse  = components['schemas']['BoardSideBarResponse'];
 export type BoardResponse = components['schemas']['BoardResponse'];
-export type PageBoardResponse = components['schemas']['PageBoardResponse'];
 export type BoardSearchRequest = components['schemas']['BoardSearchRequest'];
+export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
+export type BoardCommentCreateRequest = components['schemas']['BoardCommentCreateRequest'];
+export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
+export type BoardCommentUpdateRequest = components['schemas']['BoardCommentUpdateRequest'];
 
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
+export type PageBoardResponse = components['schemas']['PageBoardResponse'];
+export type BoardCommentVO = components['schemas']['BoardCommentVO'];
+  
 // 일정 관리
 export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = components['schemas']['ScheduleTargetResponseDto'];
+
 // 메신저
 export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
 export type AddParticipantsRequest = components['schemas']['AddParticipantsRequest'];
@@ -44,9 +51,31 @@ export type DepartmentLookupResponse = components['schemas']['DepartmentLookupRe
 // 예약
 export type ReservationCreateRequest = components['schemas']['ReservationCreateRequest'];
 export type ReservationUpdateRequest = components['schemas']['ReservationUpdateRequest'];
-export type ReservationResponse = components['schemas']['ReservationResponse'];
+export type ReservationResponse = Omit<
+  components['schemas']['ReservationResponse'],
+  'mtngId'
+> & {
+  mtngId: number | null;
+};
 
 // 회의실
 export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
 export type RoomUpdateRequest = components['schemas']['RoomUpdateRequest'];
 export type RoomResponse = components['schemas']['RoomResponse'];
+
+// 업무
+export type TaskCreateRequest = components['schemas']['TaskCreateRequest'];
+export type TaskUpdateRequest = components['schemas']['TaskUpdateRequest'];
+export type TaskDetailResponse = components['schemas']['TaskDetailResponse'];
+export type TaskListResponse = components['schemas']['TaskListResponse'];
+export type TaskDashboardResponse = components['schemas']['TaskDashboardResponse'];
+export type TaskDashboardSummaryResponse = components['schemas']['TaskDashboardSummaryResponse'];
+export type TaskUpcomingResponse = components['schemas']['TaskUpcomingResponse'];
+
+// 화상회의
+export type VideoTokenResponse = components['schemas']['VideoTokenResponse'];
+
+// 알림
+export type NotificationResponse = components['schemas']['NotificationResponse'];
+export type NotificationUnreadCountResponse =
+  components['schemas']['NotificationUnreadCountResponse'];

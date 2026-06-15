@@ -31,9 +31,12 @@ const createMailFormData = (
 };
 
 export const mailApi = {
+  // Gmail 전체 동기화는 수십 초가 걸릴 수 있어, 이 호출만 타임아웃을 넉넉히 둔다.
+  // (전역 기본 10초는 다른 호출 보호용으로 그대로 유지)
   syncMails: (maxResults = 50) =>
     axiosInstance.post<ApiResponse<unknown>>('/api/mails/sync', null, {
       params: { maxResults },
+      timeout: 60_000,
     }),
 
   getMails: (query: MailListQuery) =>

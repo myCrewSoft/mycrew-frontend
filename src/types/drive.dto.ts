@@ -9,10 +9,9 @@ export interface DriveResponseDto {
   bookmarkYn: string            // Y / N
   itemNm: string
  
-  frstRegDt?: string            // 생성일시
+  frstRegDt?: string              // 생성일시
   lastMdfcnDt?: string          // 수정일시
-  timeAgo?: string              // 몇 분 전 / 몇 시간 전
- 
+
   delYn?: string                // 삭제 여부 (Y / N)
   delDt?: string                // 삭제일시
   deltrMbrId?: number           // 삭제자 ID

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Clock, Megaphone, UserPlus, X } from 'lucide-react'
 import { notificationApi } from '../../../api/notificationApi'
-import type { NotificationResponse } from '../../../api/notificationApi'
 import { useApi, useApiList } from '../../../hooks/useApi'
+import type { NotificationResponse } from '../../../types'
 
 type NotificationType = 'approval' | 'schedule' | 'notice' | 'member'
 
@@ -22,11 +22,15 @@ const notificationIcon = {
 
 const mapNotificationType = (typeCode: string): NotificationType => {
   switch (typeCode) {
-    case 'APPROVAL':
-      return 'approval'
-    case 'SCHEDULE':
+    case '01':
       return 'schedule'
-    case 'MEMBER':
+    case '02':
+      return 'approval'
+    case '03':
+    case '04':
+      return 'notice'
+    case '05':
+    case '06':
       return 'member'
     default:
       return 'notice'
@@ -49,10 +53,27 @@ const formatTimeText = (sentAt: string) => {
   return `${Math.floor(diffMinutes / 1440)}일 전`
 }
 
-const NotificationPopoverContent = () => {
+const getNotificationReceiverId = (
+  notification: NotificationResponse,
+): number | null => {
+  return Number.isInteger(notification.alrmRcvrId)
+    ? notification.alrmRcvrId
+    : null
+}
+
+interface NotificationPopoverContentProps {
+  refreshSignal?: number
+  onNotificationsChanged?: () => void | Promise<unknown>
+}
+
+const NotificationPopoverContent = ({
+  refreshSignal,
+  onNotificationsChanged,
+}: NotificationPopoverContentProps) => {
   const [deletedNotificationIds, setDeletedNotificationIds] = useState<
     number[]
   >([])
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState('')
 
   const {
     data: notifications,
@@ -70,18 +91,68 @@ const NotificationPopoverContent = () => {
 
   useEffect(() => {
     void fetchNotifications().catch(() => undefined)
-  }, [fetchNotifications])
+  }, [fetchNotifications, refreshSignal])
 
   const visibleNotifications = useMemo(() => {
     return (notifications ?? []).filter(
-      (notification) =>
-        !deletedNotificationIds.includes(notification.notificationId),
+      (notification) => {
+        const alrmRcvrId = getNotificationReceiverId(notification)
+
+        return (
+          alrmRcvrId === null ||
+          !deletedNotificationIds.includes(alrmRcvrId)
+        )
+      },
     )
   }, [deletedNotificationIds, notifications])
 
-  const handleDeleteNotification = async (notificationId: number) => {
-    await deleteNotification(notificationId)
-    setDeletedNotificationIds((current) => [...current, notificationId])
+  const handleDeleteNotification = async (alrmRcvrId: number) => {
+    if (!Number.isInteger(alrmRcvrId)) {
+      setDeleteErrorMessage(
+        '삭제할 수 없는 알림입니다. 잠시 후 다시 시도해 주세요.',
+      )
+      return
+    }
+
+    if (deletedNotificationIds.includes(alrmRcvrId)) {
+      return
+    }
+
+    setDeleteErrorMessage('')
+    setDeletedNotificationIds((current) => [...current, alrmRcvrId])
+
+    try {
+      await deleteNotification(alrmRcvrId)
+      const response = await fetchNotifications()
+      const deletionFailed = response.data?.some(
+        (notification) => notification.alrmRcvrId === alrmRcvrId,
+      )
+
+      setDeletedNotificationIds((current) =>
+        current.filter((id) => id !== alrmRcvrId),
+      )
+
+      if (deletionFailed) {
+        setDeleteErrorMessage(
+          '알림이 삭제되지 않았습니다. 본인에게 수신된 알림인지 확인해 주세요.',
+        )
+        return
+      }
+    } catch {
+      setDeletedNotificationIds((current) =>
+        current.filter((id) => id !== alrmRcvrId),
+      )
+      setDeleteErrorMessage(
+        '알림을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      )
+      return
+    }
+
+    try {
+      await onNotificationsChanged?.()
+    } catch {
+      // The notification is already deleted, so a count refresh failure is ignored.
+    }
   }
 
   if (loading) {
@@ -109,21 +180,37 @@ const NotificationPopoverContent = () => {
   }
 
   return (
-    <ul className="max-h-[272px] divide-y divide-slate-100 overflow-y-auto">
-      {visibleNotifications.map((notification) => {
-        const notificationType = mapNotificationType(
-          notification.notificationTypeCode,
-        )
-        const Icon = notificationIcon[notificationType]
-        const unread = notification.confirmedAt === null
+    <div>
+      {deleteErrorMessage && (
+        <p
+          role="alert"
+          className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-600"
+        >
+          {deleteErrorMessage}
+        </p>
+      )}
 
-        return (
-          <li
-            key={notification.notificationId}
-            className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50 ${
-              unread ? 'bg-white' : 'bg-slate-50 opacity-60'
-            }`}
-          >
+      <ul
+        className="divide-y divide-slate-100"
+        style={{
+          maxHeight: visibleNotifications.length > 5 ? 272 : undefined,
+          overflowY:
+            visibleNotifications.length > 5 ? 'auto' : 'visible',
+        }}
+      >
+        {visibleNotifications.map((notification) => {
+          const notificationType = mapNotificationType(notification.alrmTypeCd)
+          const Icon = notificationIcon[notificationType]
+          const unread = notification.alrmCfmtnDt === null
+          const alrmRcvrId = getNotificationReceiverId(notification)
+
+          return (
+            <li
+              key={notification.alrmId}
+              className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50 ${
+                unread ? 'bg-white' : 'bg-slate-50 opacity-60'
+              }`}
+            >
             <div
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                 notificationIconStyle[notificationType]
@@ -135,7 +222,7 @@ const NotificationPopoverContent = () => {
             <div className="min-w-0 flex-1 pr-7">
               <div className="flex min-w-0 items-center gap-2 pr-14">
                 <p className="truncate text-sm font-bold text-slate-900">
-                  {notification.notificationTitle}
+                  {notification.alrmTtln}
                 </p>
 
                 {unread && (
@@ -144,30 +231,42 @@ const NotificationPopoverContent = () => {
               </div>
 
               <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">
-                {notification.notificationContent}
+                {notification.alrmCn}
               </p>
             </div>
 
             <div className="absolute right-4 top-2.5 flex flex-col items-end gap-1">
               <span className="whitespace-nowrap text-xs font-medium text-slate-500">
-                {formatTimeText(notification.sentAt)}
+                {formatTimeText(notification.alrmSndngDt)}
               </span>
 
               <button
                 type="button"
                 aria-label="알림 삭제"
-                onClick={() =>
-                  void handleDeleteNotification(notification.notificationId)
+                onClick={() => {
+                  if (alrmRcvrId === null) {
+                    setDeleteErrorMessage(
+                      '삭제할 수 없는 알림입니다. 잠시 후 다시 시도해 주세요.',
+                    )
+                    return
+                  }
+
+                  void handleDeleteNotification(alrmRcvrId)
+                }}
+                disabled={
+                  alrmRcvrId !== null &&
+                  deletedNotificationIds.includes(alrmRcvrId)
                 }
-                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 opacity-0 transition-all hover:bg-slate-200 hover:text-slate-700 group-hover:opacity-100"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-slate-400 opacity-0 transition-all hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40 group-hover:opacity-100"
               >
                 <X size={14} />
               </button>
             </div>
-          </li>
-        )
-      })}
-    </ul>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 

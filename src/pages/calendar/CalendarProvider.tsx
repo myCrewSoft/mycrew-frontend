@@ -1,4 +1,18 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+
+const STORAGE_KEY_CHECKED_TYPES = 'calendar_checked_types'
+
+const loadCheckedTypes = (fallback: ScheduleTypeCode[]): ScheduleTypeCode[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_CHECKED_TYPES)
+    if (!stored) return fallback
+    const parsed = JSON.parse(stored) as unknown
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed as ScheduleTypeCode[]
+  } catch {
+    // ignore parse errors
+  }
+  return fallback
+}
 import { scheduleApi, type ScheduleListParams } from '../../api/scheduleApi'
 import { useApi } from '../../hooks/useApi'
 import type { ScheduleResponseDto } from '../../types'
@@ -74,9 +88,14 @@ export const CalendarProvider = ({ children }: CalendarProviderProps) => {
     }
   }, [schedules])
 
-  const [checkedScheduleTypeCodes, setCheckedScheduleTypeCodes] = useState<
+  const [checkedScheduleTypeCodes, setCheckedScheduleTypeCodesRaw] = useState<
     ScheduleTypeCode[]
-  >(defaultCheckedScheduleTypeCodes)
+  >(() => loadCheckedTypes(defaultCheckedScheduleTypeCodes))
+
+  const setCheckedScheduleTypeCodes = useCallback((nextCodes: ScheduleTypeCode[]) => {
+    localStorage.setItem(STORAGE_KEY_CHECKED_TYPES, JSON.stringify(nextCodes))
+    setCheckedScheduleTypeCodesRaw(nextCodes)
+  }, [])
 
   const [selectedDate, setSelectedDate] = useState(() =>
     formatDateKey(new Date()),

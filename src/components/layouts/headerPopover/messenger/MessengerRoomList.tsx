@@ -1,16 +1,11 @@
 import { PencilLine } from 'lucide-react'
-import { useState } from 'react'
 import Badge from '../../../common/dataDisplay/badge/Badge'
 import SearchInput from '../../../common/form/searchInput/SearchInput'
+import ChatRoomAvatar from './ChatRoomAvatar'
 import type { ChatRoom, ChatTab } from './messenger.types'
 import {
-  getProfileImageUrlByFileId,
   getRoomListDepartment,
-  getStatusDotClassName,
   isDirectChatRoom,
-  isGroupChatRoom,
-  isProjectChatRoom,
-  isTaskChatRoom,
 } from './messenger.utils'
 
 // 왼쪽 목록 상단에 표시할 탭입니다.
@@ -24,77 +19,10 @@ const chatTabs: { value: ChatTab; label: string }[] = [
 const getSafeText = (value: unknown) =>
   typeof value === 'string' ? value.trim() : ''
 
-const getRoomAvatarStyle = (room: ChatRoom) => {
-  if (isGroupChatRoom(room)) {
-    return {
-      label: '단체',
-      className: 'bg-indigo-100 text-indigo-600',
-    }
-  }
-
-  if (isProjectChatRoom(room)) {
-    return {
-      label: '프로젝트',
-      className: 'bg-violet-100 text-violet-600',
-    }
-  }
-
-  if (isTaskChatRoom(room)) {
-    return {
-      label: '업무',
-      className: 'bg-emerald-100 text-emerald-600',
-    }
-  }
-
-  return {
-    label: getSafeText(room.name).charAt(0) || '?',
-    className: 'bg-blue-100 text-blue-600',
-  }
-}
-
 const getParticipantCount = (room: ChatRoom) => {
   const count = room.participantCount
 
   return typeof count === 'number' && Number.isFinite(count) ? count : null
-}
-
-const RoomAvatar = ({
-  room,
-  avatarStyle,
-}: {
-  room: ChatRoom
-  avatarStyle: ReturnType<typeof getRoomAvatarStyle>
-}) => {
-  const [imageFailed, setImageFailed] = useState(false)
-  const profileImageUrl = isDirectChatRoom(room)
-    ? getProfileImageUrlByFileId(room.prflImgFileId)
-    : null
-  const showProfileImage = Boolean(profileImageUrl) && !imageFailed
-
-  return (
-    <div
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold ${avatarStyle.className}`}
-    >
-      {/* 1:1 채팅방은 ChatRoomResponse.prflImgFileId를 파일 이미지 URL로 변환해서 표시합니다. */}
-      {showProfileImage ? (
-        <img
-          src={profileImageUrl ?? ''}
-          alt={`${room.name} 프로필`}
-          className="h-full w-full object-cover"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <span className="max-w-[32px] truncate px-1">{avatarStyle.label}</span>
-      )}
-
-      {/* status 값이 있을 때 프로필 오른쪽 아래에 작은 상태 점을 보여줍니다. */}
-      {room.status && (
-        <span
-          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${getStatusDotClassName(room.status)}`}
-        />
-      )}
-    </div>
-  )
 }
 
 interface MessengerRoomListProps {
@@ -154,7 +82,6 @@ const MessengerRoomList = ({
         {rooms.map((room) => {
           // 새 대화 폼을 보는 중에는 기존 채팅방이 선택된 것처럼 보이지 않게 합니다.
           const selected = !createMode && room.id === selectedRoomId
-          const avatarStyle = getRoomAvatarStyle(room)
           const latestMessage = getSafeText(room.lastMessage)
           const participantCount = getParticipantCount(room)
 
@@ -167,7 +94,7 @@ const MessengerRoomList = ({
                 selected ? 'bg-slate-100' : 'hover:bg-slate-50'
               }`}
             >
-              <RoomAvatar room={room} avatarStyle={avatarStyle} />
+              <ChatRoomAvatar room={room} />
 
               <div className="flex min-w-0 flex-1 flex-col justify-center">
                 <div className="flex items-center justify-between gap-2">

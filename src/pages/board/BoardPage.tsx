@@ -1,7 +1,7 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Building2,
+  Eye,
   FileText,
   Megaphone,
   MessageSquare,
@@ -11,6 +11,7 @@ import {
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import BoardWriteForm from './BoardWriteForm'
+import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import { boardApi } from '../../api/boardApi'
@@ -69,18 +70,115 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
   return 'notice'
 }
 
+const getBoardDetailPath = (boardType: BoardKind, boardId: number, deptCd?: string) => {
+  if (boardType === 'department' && deptCd) {
+    return `/boards/dept/${encodeURIComponent(deptCd)}/${boardId}`
+  }
+
+  if (boardType === 'department') {
+    return `/boards/departments/${boardId}`
+  }
+
+  if (boardType === 'free') {
+    return `/boards/free/${boardId}`
+  }
+
+  if (boardType === 'anonymous') {
+    return `/boards/anonymous/${boardId}`
+  }
+
+  return `/boards/notices/${boardId}`
+}
+
+const getPageFromSearchParams = (searchParams: URLSearchParams) => {
+  const page = Number(searchParams.get('page'))
+
+  return Number.isInteger(page) && page > 0 ? page : 1
+}
+
+const formatBoardAuthor = (board: BoardResponse, boardType: BoardKind) => {
+  if (boardType === 'anonymous') return '익명'
+
+  const employeeName = board.empNm?.trim()
+
+  if (employeeName) {
+    return `${employeeName}(${board.frstRgtrId})`
+  }
+
+  return `사원(${board.frstRgtrId})`
+}
+
+const isImportantBoard = (board: BoardResponse) =>
+  board.imprtntYn?.trim().toUpperCase() === 'Y'
+
+interface BoardPageMetadata {
+  totalPages?: number
+  totalElements?: number
+  size?: number
+}
+
+const getFinitePositiveNumber = (...values: Array<number | undefined>) =>
+  values.find((value): value is number => (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0
+  ))
+
+const getBoardTotalPages = (
+  pageData?: BoardPageMetadata | null,
+  pagination?: BoardPageMetadata | null,
+) => {
+  const totalElements = getFinitePositiveNumber(
+    pageData?.totalElements,
+    pagination?.totalElements,
+  )
+  const pageSize = getFinitePositiveNumber(
+    pageData?.size,
+    pagination?.size,
+    10,
+  )
+
+  if (totalElements && pageSize) {
+    return Math.max(1, Math.ceil(totalElements / pageSize))
+  }
+
+  return getFinitePositiveNumber(
+    pageData?.totalPages,
+    pagination?.totalPages,
+    1,
+  ) ?? 1
+}
+
+const getVerifiedNoticeTotalPages = async (
+  candidateTotalPages: number,
+  keyword: string,
+) => {
+  if (candidateTotalPages <= 1) return candidateTotalPages
+
+  const response = await boardApi.getBoards({
+    type: 'notice',
+    page: candidateTotalPages,
+    keyword,
+  })
+  const content = response.data.data?.content ?? []
+
+  return content.length > 0 ? candidateTotalPages : candidateTotalPages - 1
+}
+
 const BoardPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { deptCd } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [page, setPage] = useState(1)
+  const [page, setPage] = useState(() => getPageFromSearchParams(searchParams))
   const [totalPages, setTotalPages] = useState(1)
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useState(() => searchParams.get('keyword') ?? '')
   const [boardList, setBoardList] = useState<BoardVo[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [lastPageOverride, setLastPageOverride] = useState<number | null>(null)
 
   const boardType = getBoardTypeFromPath(location.pathname)
   const isCreateMode = searchParams.get('mode') === 'create'
@@ -89,6 +187,53 @@ const BoardPage = () => {
   const departmentName = deptCd
     ? departmentNameMap[deptCd.toLowerCase()] ?? deptCd
     : ''
+  const boardContextKey = `${boardType}:${deptCd ?? ''}`
+  const previousBoardContextKey = useRef(boardContextKey)
+  const boardCreatedRef = useRef(false)
+
+  const updateListSearchParams = useCallback((
+    nextPage: number,
+    nextKeyword: string,
+    createMode = false,
+  ) => {
+    const nextSearchParams = new URLSearchParams()
+
+    if (nextPage > 1) {
+      nextSearchParams.set('page', String(nextPage))
+    }
+
+    if (nextKeyword.trim()) {
+      nextSearchParams.set('keyword', nextKeyword.trim())
+    }
+
+    if (createMode) {
+      nextSearchParams.set('mode', 'create')
+    }
+
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [setSearchParams])
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage)
+    updateListSearchParams(nextPage, keyword)
+  }
+
+  const openBoardDetail = (boardId: number) => {
+    const detailPath = getBoardDetailPath(boardType, boardId, deptCd)
+    const listSearch = new URLSearchParams()
+
+    if (page > 1) {
+      listSearch.set('page', String(page))
+    }
+
+    if (keyword.trim()) {
+      listSearch.set('keyword', keyword.trim())
+    }
+
+    const queryString = listSearch.toString()
+
+    navigate(queryString ? `${detailPath}?${queryString}` : detailPath)
+  }
 
   useEffect(() => {
     const fetchBoardData = async () => {
@@ -113,9 +258,42 @@ const BoardPage = () => {
 
         if (response.data?.success) {
           const pageData = response.data.data
+          const content = pageData?.content ?? []
+          const calculatedTotalPages = getBoardTotalPages(pageData, response.data.pagination)
+          const verifiedNoticeTotalPages = boardType === 'notice' && !lastPageOverride
+            ? await getVerifiedNoticeTotalPages(calculatedTotalPages, keyword)
+            : calculatedTotalPages
+          const nextTotalPages = lastPageOverride
+            ? Math.min(calculatedTotalPages, lastPageOverride)
+            : verifiedNoticeTotalPages
 
-          setBoardList(pageData?.content ?? [])
-          setTotalPages(pageData?.totalPages ?? response.data.pagination?.totalPages ?? 1)
+          if (verifiedNoticeTotalPages < calculatedTotalPages) {
+            setLastPageOverride(verifiedNoticeTotalPages)
+          }
+
+          setTotalPages(nextTotalPages)
+
+          if (page > nextTotalPages) {
+            setPage(nextTotalPages)
+            updateListSearchParams(nextTotalPages, keyword)
+            return
+          }
+
+          if (content.length === 0 && page > 1) {
+            const correctedPage = page - 1
+
+            setLastPageOverride((currentOverride) => (
+              currentOverride
+                ? Math.min(currentOverride, correctedPage)
+                : correctedPage
+            ))
+            setTotalPages(correctedPage)
+            setPage(correctedPage)
+            updateListSearchParams(correctedPage, keyword)
+            return
+          }
+
+          setBoardList(content)
         }
       } catch (err) {
         if (err instanceof ApiError) {
@@ -129,17 +307,46 @@ const BoardPage = () => {
     }
 
     void fetchBoardData()
-  }, [boardType, keyword, deptCd, page])
+  }, [
+    boardType,
+    keyword,
+    deptCd,
+    page,
+    reloadKey,
+    lastPageOverride,
+    updateListSearchParams,
+  ])
 
   useEffect(() => {
+    if (previousBoardContextKey.current === boardContextKey) return
+
+    previousBoardContextKey.current = boardContextKey
     setPage(1)
-  }, [boardType, deptCd])
+    setKeyword('')
+    setLastPageOverride(null)
+    updateListSearchParams(1, '')
+  }, [boardContextKey, updateListSearchParams])
 
   if (isCreateMode) {
     return (
       <BoardWriteForm
         initialBoardType={boardType}
-        onClose={() => setSearchParams({})}
+        departmentCode={deptCd}
+        onClose={() => {
+          if (boardCreatedRef.current) {
+            boardCreatedRef.current = false
+            return
+          }
+
+          updateListSearchParams(page, keyword)
+        }}
+        onCreated={() => {
+          boardCreatedRef.current = true
+          setPage(1)
+          setKeyword('')
+          updateListSearchParams(1, '')
+          setReloadKey((current) => current + 1)
+        }}
       />
     )
   }
@@ -168,8 +375,11 @@ const BoardPage = () => {
             placeholder="제목 검색"
             value={keyword}
             onChange={(event) => {
-              setKeyword(event.target.value)
+              const nextKeyword = event.target.value
+
+              setKeyword(nextKeyword)
               setPage(1)
+              updateListSearchParams(1, nextKeyword)
             }}
           />
         </div>
@@ -177,11 +387,19 @@ const BoardPage = () => {
 
       <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white">
         {!loading && !errorMsg && boardList.length > 0 && (
-          <div className="flex h-14 items-center border-b border-slate-100 bg-slate-50 px-6 text-sm font-semibold text-slate-500">
-            <div className="w-24">번호</div>
-            <div className="flex-1">제목</div>
-            <div className="w-40">작성자</div>
-            <div className="w-40">작성일</div>
+          <div className="grid h-14 grid-cols-[80px_minmax(280px,1fr)_220px_150px_110px_110px] items-center gap-x-6 border-b border-slate-100 bg-slate-50 px-6 text-[15px] font-bold text-slate-600">
+            <div className="text-center">번호</div>
+            <div className="text-center">제목</div>
+            <div className="text-center">작성자</div>
+            <div className="text-center">작성일</div>
+            <div className="flex items-center justify-center gap-1.5">
+              <MessageSquare size={14} />
+              댓글 수
+            </div>
+            <div className="flex items-center justify-center gap-1.5">
+              <Eye size={14} />
+              조회 수
+            </div>
           </div>
         )}
 
@@ -221,32 +439,52 @@ const BoardPage = () => {
         )}
 
         {!loading && !errorMsg && boardList.length > 0 && (
-          <div className="flex-1 overflow-y-auto">
+          <div
+            className="grid min-h-0 flex-1 content-start overflow-y-auto"
+            style={{
+              gridTemplateRows: boardList.length >= 10
+                ? `repeat(${boardList.length}, minmax(64px, 1fr))`
+                : `repeat(${boardList.length}, 64px)`,
+            }}
+          >
             {boardList.map((board) => (
               <div
                 key={board.boardId}
                 role="button"
                 tabIndex={0}
-                onClick={() => navigate(`${location.pathname}/${board.boardId}`)}
+                onClick={() => openBoardDetail(board.boardId)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
-                    navigate(`${location.pathname}/${board.boardId}`)
+                    openBoardDetail(board.boardId)
                   }
                 }}
-                className="flex h-14 cursor-pointer items-center border-b border-slate-100 px-6 text-sm hover:bg-slate-50"
+                className="grid min-h-16 cursor-pointer grid-cols-[80px_minmax(280px,1fr)_220px_150px_110px_110px] items-center gap-x-6 border-b border-slate-100 px-6 text-[15px] transition-colors hover:bg-slate-50"
               >
-                <div className="w-24 text-slate-600">{board.boardId}</div>
-                <div className="flex flex-1 items-center gap-1 font-medium text-slate-800">
-                  <span>{board.boardSj}</span>
+                <div className="text-center font-medium text-slate-600">
+                  {board.boardId}
+                </div>
+                <div className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-slate-800">
+                  {isImportantBoard(board) && (
+                    <Badge variant="warning" size="sm" className="shrink-0 rounded-md">
+                      중요
+                    </Badge>
+                  )}
+                  <span className="truncate">{board.boardSj}</span>
                   {board.boardAtchFileId !== null && (
-                    <Paperclip size={14} className="text-slate-400" />
+                    <Paperclip size={14} className="shrink-0 text-slate-400" />
                   )}
                 </div>
-                <div className="w-40 text-slate-700">
-                  {boardType === 'anonymous' ? '익명' : `사원(${board.frstRgtrId})`}
+                <div className="text-center text-slate-700">
+                  {formatBoardAuthor(board, boardType)}
                 </div>
-                <div className="w-40 text-slate-500">
+                <div className="text-center text-slate-500">
                   {board.frstRegDt?.split('T')[0].replace(/-/g, '.')}
+                </div>
+                <div className="text-center font-medium text-slate-500">
+                  {board.commentList?.length ?? 0}
+                </div>
+                <div className="text-center font-medium text-slate-500">
+                  {board.viewCnt?.toLocaleString() ?? 0}
                 </div>
               </div>
             ))}
@@ -256,7 +494,7 @@ const BoardPage = () => {
 
       {!loading && !errorMsg && boardList.length > 0 && (
         <div className="mt-6 flex justify-center">
-          <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          <Pagination page={page} totalPages={totalPages} onChange={handlePageChange} />
         </div>
       )}
     </section>

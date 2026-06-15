@@ -1,12 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { MoreHorizontal, Search } from 'lucide-react'
 import IconButton from '../../../common/button/IconButton'
+import ChatRoomAvatar from './ChatRoomAvatar'
 import type { ChatMessage, ChatRoom } from './messenger.types'
 import {
   formatMessengerTime,
   getDirectRoomMeta,
-  getProfileImageUrlByFileId,
-  getStatusDotClassName,
   isDirectChatRoom,
 } from './messenger.utils'
 import MessengerMessageInput from './MessengerMessageInput'
@@ -22,37 +21,6 @@ interface MessengerChatPanelProps {
 
 const getMessageSenderInitial = (senderName: string) =>
   senderName.trim().charAt(0) || '?'
-
-const RoomHeaderAvatar = ({ room }: { room: ChatRoom }) => {
-  const [imageFailed, setImageFailed] = useState(false)
-  const profileImageUrl = isDirectChatRoom(room)
-    ? getProfileImageUrlByFileId(room.prflImgFileId)
-    : null
-  const showProfileImage = Boolean(profileImageUrl) && !imageFailed
-
-  return (
-    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold text-blue-600">
-      {/* 1:1 채팅방 헤더는 avatar 대신 ChatRoomResponse.prflImgFileId로 프로필 이미지를 표시합니다. */}
-      {showProfileImage ? (
-        <img
-          src={profileImageUrl ?? ''}
-          alt={`${room.name} 프로필`}
-          className="h-full w-full object-cover"
-          onError={() => setImageFailed(true)}
-        />
-      ) : (
-        <span>{room.name.trim().charAt(0) || '?'}</span>
-      )}
-
-      {/* 선택된 채팅방의 상태도 텍스트 대신 프로필 아이콘의 작은 점으로 표시합니다. */}
-      {room.status && (
-        <span
-          className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${getStatusDotClassName(room.status)}`}
-        />
-      )}
-    </div>
-  )
-}
 
 const MessengerChatPanel = ({
   room,
@@ -114,7 +82,7 @@ const MessengerChatPanel = ({
     <section className="flex min-w-0 flex-1 flex-col">
       <header className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <RoomHeaderAvatar room={room} />
+          <ChatRoomAvatar room={room} />
 
           <div className="min-w-0">
             <div className="flex min-w-0 items-baseline gap-2">

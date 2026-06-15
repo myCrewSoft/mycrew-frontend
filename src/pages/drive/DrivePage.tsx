@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Folder, FileImage, LayoutList, LayoutGrid, ArrowUpDown, Plus, FolderPlus, ChevronRight, Star } from 'lucide-react'
+import { Folder, FileImage, LayoutList, LayoutGrid, Plus, FolderPlus, ChevronRight, Star } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
@@ -268,7 +268,6 @@ export default function DriveMyPage() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" leftIcon={<ArrowUpDown size={14} />} size="sm">수정한 날짜순</Button>
             <IconButton size="sm" aria-label="목록 보기" active={viewMode === 'list'} onClick={() => setViewMode('list')}><LayoutList size={16} /></IconButton>
             <IconButton size="sm" aria-label="격자 보기" active={viewMode === 'grid'} onClick={() => setViewMode('grid')}><LayoutGrid size={16} /></IconButton>
           </div>

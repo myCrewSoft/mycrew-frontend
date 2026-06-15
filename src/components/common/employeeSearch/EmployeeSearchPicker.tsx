@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { departmentApi } from '../../../api/departmentApi'
 import { employeeApi } from '../../../api/employeeApi'
@@ -38,6 +39,9 @@ interface EmployeeSearchPickerProps {
   showAllOnEmpty?: boolean
   remoteSearch?: boolean
   emptyText?: string
+  fixedParams?: Partial<EmployeeLookupParams>
+  onSelectedItemsChange?: (items: EmployeeSearchItem[]) => void 
+  renderSelectedEmployeeAction?: (employee: EmployeeSearchItem) => ReactNode
 }
 
 const containsKorean = (keyword: string) =>
@@ -65,7 +69,7 @@ const EmployeeAvatar = ({
   const [imageFailed, setImageFailed] = useState(false)
   const sizeClassName = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10'
   const src =
-    hasUsableProfileImageUrl(employee.profileImageUrl) && !imageFailed
+    hasUsableProfileImageUrl(employee.profileImageUrl) && !imageFailed && employee.profileImageUrl
       ? employee.profileImageUrl
       : '/avatar-default.svg'
 
@@ -129,6 +133,9 @@ const EmployeeSearchPicker = ({
   showAllOnEmpty = false,
   remoteSearch = false,
   emptyText = '검색 결과가 없습니다.',
+  fixedParams,
+  onSelectedItemsChange,
+  renderSelectedEmployeeAction,
 }: EmployeeSearchPickerProps) => {
   const [internalKeyword, setInternalKeyword] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
@@ -177,12 +184,14 @@ const EmployeeSearchPicker = ({
       void lookupEmployees({
         keyword: canSearchCurrentKeyword ? trimmedKeyword : undefined,
         deptCd: remoteDeptCd,
+        ...fixedParams,
       })
     }, 250)
 
     return () => window.clearTimeout(timer)
   }, [
     canSearchCurrentKeyword,
+    fixedParams,
     lookupEmployees,
     remoteDeptCd,
     remoteSearch,
@@ -329,10 +338,25 @@ const EmployeeSearchPicker = ({
     }
 
     onChange(nextEmployeeIds)
+
+    if (onSelectedItemsChange) {
+      const nextItems = nextEmployeeIds
+        .map((id) => {
+          const key = getEmployeeIdKey(id)
+          return (
+            employeeOptions.find((e) => getEmployeeIdKey(e.id) === key) ??
+            selectedEmployeeCache.find((e) => getEmployeeIdKey(e.id) === key) ??
+            selectedEmployeeItems.find((e) => getEmployeeIdKey(e.id) === key)
+          )
+        })
+        .filter((e): e is EmployeeSearchItem => Boolean(e))
+      onSelectedItemsChange(nextItems)
+    }
   }
 
   const handleClearSelectedEmployees = () => {
     onChange([])
+    onSelectedItemsChange?.([])
   }
 
   const renderStatus = () => {
@@ -507,6 +531,7 @@ const EmployeeSearchPicker = ({
                     {employee.department} / {employee.position}
                   </span>
                 </span>
+                {renderSelectedEmployeeAction?.(employee)}
                 <button
                   type="button"
                   onClick={() => handleToggleEmployee(employee.id)}

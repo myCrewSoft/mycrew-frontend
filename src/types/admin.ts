@@ -36,6 +36,7 @@ export interface RoleListResponse {
 export interface RoleEmployeeResponse {
   roleAssignmentId: number;
   empId: number;
+  prflImgFileId: number | null;
   employeeName: string;
   deptCd: string | null;
   deptName: string | null;
@@ -140,6 +141,7 @@ export interface DepartmentDeleteRequestDTO {
 export interface AdminDepartmentMemberResponseDTO {
   empId: number;
   empNm: string;
+  prflImgFileId: number | null;
   deptCd: string;
   deptNm: string;
   jobGrdCd: string | null;
@@ -163,4 +165,20 @@ export interface DepartmentMemberMutationResponseDTO {
   sourceDeptCd: string | null;
   targetDeptCd: string;
   affectedEmployeeCount: number;
+}
+
+/** 관리자 대시보드 - 사원 상태별 인원 수 항목 */
+export interface AdminDashboardStatusCount {
+  empStatCd: string;
+  empStatNm: string | null;
+  count: number;
+}
+
+/** 관리자 대시보드 집계 응답 */
+export interface AdminDashboardResponse {
+  totalEmployees: number;
+  roleCount: number;
+  permissionCount: number;
+  departmentCount: number;
+  employeeStatusCounts: AdminDashboardStatusCount[];
 }

@@ -24,9 +24,9 @@ export const driveApi = {
   },
 
   // 드라이브 목록 조회
-  getMyDriveList: (prntDriveItemId?: number, page = 0, size = 20) =>
+  getMyDriveList: (prntDriveItemId?: number, page = 0) =>
     axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive', {
-      params: { prntDriveItemId, page, size }
+      params: { prntDriveItemId, page }
     }),
   
   // 폴더명 수정
@@ -47,11 +47,11 @@ export const driveApi = {
 
   // 휴지통 단건 복구
   restoreItem: (driveItemId: number) =>
-    axiosInstance.patch<ApiResponse<void>>(`/api/drive/items/${driveItemId}/restore`),
+    axiosInstance.patch<ApiResponse<void>>(`/api/drive/trash/${driveItemId}/restore`),
 
   // 영구삭제
   hardDeleteItem: (driveItemId: number) =>
-    axiosInstance.delete<ApiResponse<void>>(`/api/drive/items/${driveItemId}/hard`),
+    axiosInstance.delete<ApiResponse<void>>(`/api/drive/trash/${driveItemId}`),
 
   //파일 다운로드
   downloadFile: (driveItemId: number) =>

@@ -3,6 +3,7 @@ import axiosInstance from './axiosInstance';
 import type { ApiResponse } from './axiosInstance';
 import type {
   AdminAccessResponse,
+  AdminDashboardResponse,
   AdminDepartmentMemberResponseDTO,
   AdminDepartmentResponseDTO,
   DepartmentCreateRequestDTO,
@@ -39,6 +40,11 @@ import type {
 export const adminApi = {
   getAccess: (): Promise<AxiosResponse<ApiResponse<AdminAccessResponse>>> => {
     return axiosInstance.get('/api/admin/access');
+  },
+  getDashboard: (): Promise<
+    AxiosResponse<ApiResponse<AdminDashboardResponse>>
+  > => {
+    return axiosInstance.get('/api/admin/dashboard');
   },
   getEmployees: (
     params: AdminEmployeeSearchParams = {},

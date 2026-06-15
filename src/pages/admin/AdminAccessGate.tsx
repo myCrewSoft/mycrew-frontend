@@ -6,12 +6,17 @@ import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyStat
 import AdminLayout from '../../components/layouts/admin/AdminLayout';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
+import DashboardPage from '../dashboard/DashboardPage';
+import { ADMIN_DASHBOARD_LAYOUT } from '../dashboard/dashboard.config';
+import ApprovalTemplatePage from '../approval/ApprovalTemplatePage';
 import AdminEmployeesPage from './AdminEmployeesPage';
 import AdminDepartmentsPage from './AdminDepartmentsPage';
 import AdminOrgChartPage from './AdminOrgChartPage';
+import AdminAttendancePage from './AdminAttendancePage';
 import AdminPage from './AdminPage';
 import AdminRanksPage from './AdminRanksPage';
 import AdminRolesPage from './AdminRolesPage';
+import AdminBoardsPage from './AdminBoardsPage';
 import { AdminDepartmentsProvider } from './adminDepartmentsContext';
 import { AdminRanksProvider } from './adminRanksContext';
 import { AdminRolesProvider } from './adminRolesContext';
@@ -120,6 +125,32 @@ export default function AdminAccessGate() {
     return null;
   }
 
+  // 관리자 메인 화면 = 대시보드 (서브 사이드바 없음)
+  const isAdminRoot =
+    location.pathname === '/admin' || location.pathname === '/admin/';
+
+  if (isAdminRoot || location.pathname.startsWith('/admin/dashboard')) {
+    return (
+      <AdminLayout access={access}>
+        <DashboardPage
+          title="관리자 대시보드"
+          description="조직 전체 현황을 한 화면에서 확인합니다."
+          storageKey="mycrew.admin.dashboard.layout"
+          defaultLayout={ADMIN_DASHBOARD_LAYOUT}
+        />
+      </AdminLayout>
+    );
+  }
+
+  // 결재 양식 관리 (전체 양식 조회 + 생성/수정/삭제, 기안 기능은 숨김)
+  if (location.pathname.startsWith('/admin/templates')) {
+    return (
+      <AdminLayout access={access}>
+        <ApprovalTemplatePage manageOnly />
+      </AdminLayout>
+    );
+  }
+
   if (location.pathname.startsWith('/admin/roles')) {
     return (
       <AdminRolesProvider>
@@ -154,6 +185,22 @@ export default function AdminAccessGate() {
     return (
       <AdminLayout access={access}>
         <AdminOrgChartPage />
+      </AdminLayout>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/attendance')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminAttendancePage />
+      </AdminLayout>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/boards')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminBoardsPage />
       </AdminLayout>
     );
   }

@@ -1,0 +1,824 @@
+.approval-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.approval-page__header,
+.approval-page__workspace,
+.approval-page__error {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+}
+
+.approval-page__header {
+  padding: 1rem 1.25rem;
+}
+
+.approval-page__header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.approval-page__title-group {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.approval-page__icon-box {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.approval-page__title-text {
+  min-width: 0;
+}
+
+.approval-page__title {
+  margin: 0;
+  color: #020617;
+  font-size: 1.5rem;
+  font-weight: 900;
+  line-height: 2rem;
+}
+
+.approval-page__description {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+}
+
+.approval-page__header-actions,
+.approval-page__search,
+.approval-page__detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-page__search {
+  max-width: 42rem;
+  margin-top: 1rem;
+  flex-wrap: nowrap;
+}
+
+.approval-page__search > :first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.approval-page__error {
+  padding: 0.875rem 1rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.approval-page__workspace {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.approval-page__list-panel,
+.approval-page__detail-panel {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.approval-page__list-panel {
+  border-right: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.approval-page__detail-panel {
+  background-color: #ffffff;
+  padding: 1.25rem;
+}
+
+.approval-page__loading {
+  display: flex;
+  min-height: 12rem;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.approval-page__document-list {
+  display: grid;
+  gap: 0;
+}
+
+.approval-page__document-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 0;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  padding: 1rem;
+  text-align: left;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.approval-page__document-row:hover {
+  background-color: #f8fafc;
+}
+
+.approval-page__document-row--selected {
+  background-color: #eff6ff;
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.approval-page__document-info {
+  min-width: 0;
+}
+
+.approval-page__document-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-page__document-title {
+  overflow: hidden;
+  margin: 0;
+  color: #020617;
+  font-size: 0.875rem;
+  font-weight: 900;
+  line-height: 1.25rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-page__document-summary,
+.approval-page__document-meta {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1rem;
+}
+
+.approval-page__document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: #94a3b8;
+}
+
+.approval-page__detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1rem;
+}
+
+.approval-page__detail-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.approval-page__detail-title {
+  margin: 0;
+  color: #020617;
+  font-size: 1.35rem;
+  font-weight: 900;
+  line-height: 1.8rem;
+}
+
+.approval-page__detail-subtitle {
+  margin: 0.35rem 0 0;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.approval-page__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.approval-page__summary-grid > div {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #f8fafc;
+  padding: 0.75rem;
+}
+
+.approval-page__summary-grid span,
+.approval-page__summary-grid strong {
+  display: block;
+}
+
+.approval-page__summary-grid span {
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.approval-page__summary-grid strong {
+  margin-top: 0.25rem;
+  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 900;
+  line-height: 1.2rem;
+}
+
+.approval-page__status-messages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.approval-page__status-messages span {
+  border-radius: 999px;
+  background-color: #eef2ff;
+  padding: 0.35rem 0.65rem;
+  color: #4338ca;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.approval-page__detail-section {
+  margin-top: 1.25rem;
+}
+
+.approval-page__detail-section h3 {
+  margin: 0 0 0.75rem;
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.approval-page__step-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.approval-page__step-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.approval-page__step-order {
+  display: flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: #2563eb;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.approval-page__step-row strong {
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.approval-page__step-row p {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.1rem;
+}
+
+.approval-page__content-box {
+  min-height: 14rem;
+  white-space: pre-wrap;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #f8fafc;
+  padding: 1rem;
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.65;
+}
+
+.approval-draft-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.approval-draft-form__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.approval-draft-form__textarea {
+  min-height: 15rem;
+}
+
+.approval-draft-form__label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.approval-draft-form__select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  font-size: 0.875rem;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.approval-draft-form__select:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.approval-draft-form__select:disabled {
+  background-color: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.approval-draft-form__content-editor {
+  display: block;
+  width: 100%;
+  height: calc(50vh);
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+}
+
+/* 문서 뷰어 iframe 래퍼 */
+.approval-page__document-viewer {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+}
+
+.approval-page__document-viewer iframe {
+  display: block;
+  width: 100%;
+  min-height: 12rem;
+  border: none;
+}
+
+.approval-draft-form__error {
+  margin: 0;
+  border-radius: 0.5rem;
+  background-color: #fef2f2;
+  padding: 0.75rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .approval-page__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-page__list-panel {
+    max-height: 18rem;
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .approval-page__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .approval-page__header-actions,
+  .approval-page__search,
+  .approval-page__detail-header,
+  .approval-page__detail-actions {
+    width: 100%;
+  }
+
+  .approval-page__header-actions > *,
+  .approval-page__detail-actions > * {
+    flex: 1;
+  }
+
+  .approval-page__search {
+    flex-wrap: wrap;
+  }
+
+  .approval-page__summary-grid,
+  .approval-draft-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.approval-template-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.approval-template-form__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.approval-template-form__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.approval-template-form__editor {
+  min-height: 28rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.approval-template-form__preview-wrap {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.approval-template-form__preview-label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 900;
+}
+
+.approval-page__html-document {
+  /* layout containment — prevents margin collapse leaking to parent (상단 들뜸 방지) */
+  display: flow-root;
+  min-height: 18rem;
+  /* horizontal overflow clipped; vertical scroll handled by parent panel */
+  overflow-x: hidden;
+  overflow-y: visible;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #ffffff;
+  padding: 1.5rem;
+  color: #0f172a;
+  line-height: 1.7;
+  /* prevent any child from expanding the container width */
+  box-sizing: border-box;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+/* Constrain all descendant elements so wide HTML content doesn't cause overflow */
+.approval-page__html-document * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset any browser margin on first/last children inside the document */
+.approval-page__html-document > *:first-child {
+  margin-top: 0;
+}
+
+.approval-page__html-document > *:last
+.approval-page__html-document > *:last-child {
+  margin-bottom: 0;
+}
+
+.approval-page__html-document table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.approval-page__html-document th,
+.approval-page__html-document td {
+  border: 1px solid #cbd5e1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.875rem;
+}
+
+/* ── 기안서 작성 모달 2-컬럼 레이아웃 ── */
+.approval-draft-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  /* align-items: start 로 각 컬럼이 콘텐츠 높이만큼만 차지하게 하여 sticky 동작 보장 */
+  align-items: start;
+}
+
+.approval-draft-layout__main {
+  min-width: 0;
+}
+
+.approval-draft-layout__approver-panel {
+  /* 모달 스크롤 컨테이너 기준으로 상단에 고정 */
+  position: sticky;
+  top: 0;
+  /* grid 내 stretch 방지: 콘텐츠 높이만큼만 차지해야 sticky 유효 */
+  align-self: start;
+  /* 드롭다운이 패널 외부로 나올 수 있도록 overflow 허용 */
+  overflow: visible;
+}
+
+/* ── 결재선 패널 ── */
+.approval-approver-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background-color: #f8fafc;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.approval-approver-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.approval-approver-panel__desc {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* 검색 영역 */
+.approval-approver-panel__search {
+  position: relative;
+}
+
+.approval-approver-panel__search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.approval-approver-panel__search-icon {
+  position: absolute;
+  left: 0.6rem;
+  color: #94a3b8;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.approval-approver-panel__search-input {
+  width: 100%;
+  padding: 0.45rem 0.75rem 0.45rem 2rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.approval-approver-panel__search-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.approval-approver-panel__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.approval-approver-panel__dropdown-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+
+.approval-approver-panel__dropdown-item:hover:not(:disabled) {
+  background-color: #f1f5f9;
+}
+
+.approval-approver-panel__dropdown-item--loading,
+.approval-approver-panel__dropdown-item--added {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.approval-approver-panel__emp-name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.approval-approver-panel__emp-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.approval-approver-panel__badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6366f1;
+  background-color: #eef2ff;
+  border-radius: 99px;
+  padding: 0.1rem 0.4rem;
+  margin-top: 0.15rem;
+}
+
+/* 빈 결재선 안내 */
+.approval-approver-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0;
+  color: #94a3b8;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.approval-approver-panel__empty p {
+  margin: 0;
+}
+
+/* 결재선 순서 목록 */
+.approval-approver-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.approval-approver-panel__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem 0.5rem 0;
+}
+
+/* 순서 배지 */
+.approval-approver-panel__order {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background-color: #6366f1;
+  color: #ffffff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+/* 결재선 연결 세로선 */
+.approval-approver-panel__connector {
+  position: absolute;  left: 0.6875rem;
+  top: calc(50% + 0.75rem);
+  width: 2px;
+  height: calc(100% - 0.5rem);
+  background-color: #c7d2fe;
+  z-index: 0;
+}
+
+/* 결재자 정보 */
+.approval-approver-panel__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-approver-panel__name {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.approval-approver-panel__sub {
+  font-size: 0.75rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 제거 버튼 */
+.approval-approver-panel__remove {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.approval-approver-panel__remove:hover {
+  background-color: #fee2e2;
+  color: #ef4444;
+  border-color: #fca5a5;
+}
+
+/* 모바일: 세로 스택 */
+@media (max-width: 768px) {
+  .approval-draft-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-draft-layout__approver-panel {
+    position: static;
+  }
+}
+
+.approval-page__favorite-btn {
+  color: #94a3b8;
+}
+
+.approval-page__favorite-btn svg {
+  fill: none;
+  stroke: currentColor;
+}
+
+.approval-page__favorite-btn--active {
+  color: #f59e0b;
+}
+
+.approval-page__favorite-btn--active svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
