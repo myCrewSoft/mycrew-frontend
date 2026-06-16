@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type FullCalendarComponent from '@fullcalendar/react'
 import type {
   DateSelectArg,
@@ -102,6 +102,27 @@ const formatApiLocalDateTime = (date: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
 }
 
+const getFullCalendarEvents = (events: CalendarEventItem[]) =>
+  events.map((event) => {
+    if (!event.allDay || !event.end) {
+      return event
+    }
+
+    const exclusiveEnd = new Date(event.end)
+
+    if (Number.isNaN(exclusiveEnd.getTime())) {
+      return event
+    }
+
+    exclusiveEnd.setDate(exclusiveEnd.getDate() + 1)
+    exclusiveEnd.setHours(0, 0, 0, 0)
+
+    return {
+      ...event,
+      end: formatApiLocalDateTime(exclusiveEnd),
+    }
+  })
+
 const createSelectedRange = (selectInfo: DateSelectArg): CalendarSelectedRange => {
   const endDate = new Date(selectInfo.end)
 
@@ -178,6 +199,10 @@ const CalendarPage = () => {
   const restoringSelectionRef = useRef(false)
   const [morePopover, setMorePopover] =
     useState<CalendarMorePopoverState | null>(null);
+  const fullCalendarEvents = useMemo(
+    () => getFullCalendarEvents(visibleCalendarEvents),
+    [visibleCalendarEvents],
+  )
 
   const restoreSelectedRange = () => {
     const range = selectedRangeRef.current
@@ -489,7 +514,7 @@ const CalendarPage = () => {
               expandRows
               selectable
               unselectAuto={false}
-              events={visibleCalendarEvents}
+              events={fullCalendarEvents}
               select={handleDateSelect}
               eventClick={handleScheduleClick}
               dateClick={(info) => {

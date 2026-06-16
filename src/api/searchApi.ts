@@ -1,33 +1,15 @@
 import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
-import type { SearchResponseDto, SearchType } from '../types/search.dto'
+import type { SearchResponse, SearchType } from '../types'
 
-/**
- * Integrated search API collection.
- *
- * AGENTS.local.md:
- * GET /search
- * query parameters:
- * - keyword: search keyword
- * - type: board | document | schedule
- */
 export const searchApi = {
-  /**
-   * Search boards, documents, and schedules.
-   *
-   * Pass only keyword for all results.
-   * Pass type when the UI needs one specific category.
-   */
   search: (
     keyword: string,
     type?: SearchType,
-  ): Promise<AxiosResponse<ApiResponse<SearchResponseDto[]>>> => {
-    return axiosInstance.get('/search', {
-      params: {
-        keyword,
-        type,
-      },
+  ): Promise<AxiosResponse<ApiResponse<SearchResponse[]>>> => {
+    return axiosInstance.get('/api/search', {
+      params: { keyword, type },
     })
   },
 }

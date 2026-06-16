@@ -51,7 +51,12 @@ export type DepartmentLookupResponse = components['schemas']['DepartmentLookupRe
 // 예약
 export type ReservationCreateRequest = components['schemas']['ReservationCreateRequest'];
 export type ReservationUpdateRequest = components['schemas']['ReservationUpdateRequest'];
-export type ReservationResponse = components['schemas']['ReservationResponse'];
+export type ReservationResponse = Omit<
+  components['schemas']['ReservationResponse'],
+  'mtngId'
+> & {
+  mtngId: number | null;
+};
 
 // 회의실
 export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
@@ -68,16 +73,14 @@ export type TaskDashboardSummaryResponse = components['schemas']['TaskDashboardS
 export type TaskUpcomingResponse = components['schemas']['TaskUpcomingResponse'];
 
 // 화상회의
-export type VideoConfCreateRequest = components['schemas']['VideoConfCreateRequest'];
-export type VideoMomAprvlRequest = components['schemas']['VideoMomAprvlRequest'];
-export type VideoMomUpdateRequest = components['schemas']['VideoMomUpdateRequest'];
-export type VideoConfResponse = components['schemas']['VideoConfResponse'];
-export type VideoMomAprvlResponse = components['schemas']['VideoMomAprvlResponse'];
-export type VideoMomResponse = components['schemas']['VideoMomResponse'];
-export type VideoPtcptResponse = components['schemas']['VideoPtcptResponse'];
 export type VideoTokenResponse = components['schemas']['VideoTokenResponse'];
 
 // 알림
 export type NotificationResponse = components['schemas']['NotificationResponse'];
 export type NotificationUnreadCountResponse =
   components['schemas']['NotificationUnreadCountResponse'];
+
+// 검색
+export type SearchResponse = components['schemas']['SearchResponse'];
+export type SearchType = NonNullable<SearchResponse['type']>;
+export type SearchHistVO = components['schemas']['SearchHistVO'];

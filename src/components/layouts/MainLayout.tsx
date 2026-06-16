@@ -24,7 +24,7 @@ export default function MainLayout() {
               onToggle={() => setIsSubOpen((current) => !current)}
             />
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6">
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6 [scrollbar-gutter:stable]">
               <Outlet />
             </main>
           </div>

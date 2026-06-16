@@ -39,6 +39,12 @@ const toUnreadCount = (value: unknown) =>
 
 const hasAccessToken = () => Boolean(localStorage.getItem('accessToken'))
 
+const getCurrentEmpId = () => {
+  const empId = Number(localStorage.getItem('empId'))
+
+  return Number.isFinite(empId) ? empId : null
+}
+
 // 로그인 후 메인 레이아웃에서 메신저 WebSocket 연결을 전역으로 유지하는 Provider입니다.
 // 헤더 메신저 팝오버가 닫혀 있어도 새 메시지를 받을 수 있게 만드는 역할입니다.
 export const MessengerSocketProvider = ({
@@ -71,6 +77,7 @@ export const MessengerSocketProvider = ({
     unreadCountsByRoomId,
     messageUnreadCountsById,
     lastReadMessageIdByRoomId,
+    participantStatusByEmpId,
     lastMessageByRoomId,
     error,
     sendMessage,
@@ -83,6 +90,16 @@ export const MessengerSocketProvider = ({
   const roomsWithUnreadCount = useMemo(
     () => {
       const nextRooms = (rooms ?? []).map((room) => {
+        const currentEmpId = getCurrentEmpId()
+        const directChatParticipant =
+          room.type === 'M1' || room.type === 'direct'
+            ? room.participants?.find(
+                (participant) => participant.empId !== currentEmpId,
+              )
+            : undefined
+        const realtimeStatus = directChatParticipant
+          ? participantStatusByEmpId[directChatParticipant.empId]
+          : undefined
         const restUnreadCount = readRoomIds.has(room.id)
           ? 0
           : Math.max(
@@ -95,6 +112,10 @@ export const MessengerSocketProvider = ({
           ...room,
           lastMessage: lastMessageByRoomId[room.id]?.content ?? room.lastMessage,
           lastTime: lastMessageByRoomId[room.id]?.time ?? room.lastTime,
+          status:
+            realtimeStatus ??
+            directChatParticipant?.ptcptSttusCd ??
+            room.status,
           // REST 재조회값과 WebSocket 실시간 보정값은 같은 메시지를 가리킬 수 있으므로 더하지 않습니다.
           // 둘 중 큰 값을 사용해야 메시지 1개가 알림 2개로 보이는 중복 카운팅을 막을 수 있습니다.
           unreadCount: Math.max(restUnreadCount, realtimeUnreadCount),
@@ -114,6 +135,7 @@ export const MessengerSocketProvider = ({
     [
       initialUnreadCountsByRoomId,
       lastMessageByRoomId,
+      participantStatusByEmpId,
       readRoomIds,
       rooms,
       unreadCountsByRoomId,

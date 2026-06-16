@@ -29,6 +29,15 @@ const Header = () => {
     execute: fetchNotificationUnreadCount,
   } = useApi<NotificationUnreadCountResponse>(notificationApi.getUnreadCount)
 
+  const handleCloseNotifications = () => {
+    void readAllNotifications()
+      .then(() => {
+        setNotificationRefreshKey((current) => current + 1)
+        return fetchNotificationUnreadCount()
+      })
+      .catch(() => undefined)
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
@@ -142,11 +151,9 @@ const Header = () => {
 
           <HeaderPopover
             title="알림"
-            onClose={() => {
-              void readAllNotifications()
-                .then(() => fetchNotificationUnreadCount())
-                .catch(() => undefined)
-            }}
+            className="!w-[420px]"
+            bodyClassName="overflow-visible"
+            onClose={handleCloseNotifications}
             trigger={({ open, toggle }) => (
               <NotificationIconButton
                 active={open}

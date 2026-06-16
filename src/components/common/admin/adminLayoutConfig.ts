@@ -1,8 +1,10 @@
 import type { ComponentType } from 'react';
 import {
   Building2,
+  CalendarClock,
   CalendarDays,
   ClipboardList,
+  FileText,
   FolderKanban,
   IdCard,
   Network,
@@ -29,7 +31,9 @@ export const adminNavItems: AdminNavItem[] = [
   { label: '부서', path: '/admin/departments', icon: Building2 },
   { label: '게시판', path: '/admin/boards', icon: ClipboardList },
   { label: '프로젝트', path: '/admin/projects', icon: FolderKanban },
+  { label: '양식', path: '/admin/templates', icon: FileText },
   { label: '조직도', path: '/admin/org', icon: Network },
+  { label: '근태', path: '/admin/attendance', icon: CalendarClock },
   { label: '일정', path: '/admin/schedules', icon: CalendarDays },
 ];
 

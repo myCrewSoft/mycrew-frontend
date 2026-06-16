@@ -14,15 +14,15 @@ interface ProjectInfoCardProps {
 const STATUS_LABEL: Record<string, string> = {
   '01': '예정',
   '02': '진행 중',
-  '03': '중단',
-  '04': '완료',
+  '03': '완료',
+  '04': '중단',
 }
 
 const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'danger' | 'success'> = {
   '01': 'neutral',
   '02': 'primary',
-  '03': 'danger',
-  '04': 'success',
+  '03': 'success',
+  '04': 'danger',
 }
 
 const ProjectInfoCard = ({

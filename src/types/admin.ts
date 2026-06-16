@@ -166,3 +166,19 @@ export interface DepartmentMemberMutationResponseDTO {
   targetDeptCd: string;
   affectedEmployeeCount: number;
 }
+
+/** 관리자 대시보드 - 사원 상태별 인원 수 항목 */
+export interface AdminDashboardStatusCount {
+  empStatCd: string;
+  empStatNm: string | null;
+  count: number;
+}
+
+/** 관리자 대시보드 집계 응답 */
+export interface AdminDashboardResponse {
+  totalEmployees: number;
+  roleCount: number;
+  permissionCount: number;
+  departmentCount: number;
+  employeeStatusCounts: AdminDashboardStatusCount[];
+}

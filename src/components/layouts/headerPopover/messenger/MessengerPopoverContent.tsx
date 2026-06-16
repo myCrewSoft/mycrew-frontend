@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { fileApi } from '../../../../api/fileApi'
 import type { ChatRoom, ChatTab, MessengerViewMode } from './messenger.types'
 import MessengerChatPanel from './MessengerChatPanel'
 import MessengerCreateForm from './MessengerCreateForm'
@@ -84,6 +85,7 @@ const MessengerPopoverContent = () => {
   const [messageText, setMessageText] = useState('')
   const [newRoomName, setNewRoomName] = useState('')
   const [newRoomDescription, setNewRoomDescription] = useState('')
+  const [newRoomImageFile, setNewRoomImageFile] = useState<File | null>(null)
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([])
   const [roomDetail, setRoomDetail] = useState<ChatRoom | null>(null)
   const lastMarkedReadMessageIdByRoomRef = useRef<Record<number, number>>({})
@@ -128,10 +130,24 @@ const MessengerPopoverContent = () => {
     ],
   )
 
-  const handleCreateChat = () => {
+  const uploadRoomImage = async (file: File | null) => {
+    if (!file) return null
+
+    const response = await fileApi.uploadBoardFile({
+      file,
+      fileCn: '채팅방 이미지',
+    })
+
+    return response.data.data ?? null
+  }
+
+  const handleCreateChat = async () => {
+    const chatRoomImageAtchFileId = await uploadRoomImage(newRoomImageFile)
+
     void createChat({
       chatName: newRoomName.trim(),
       chatDescription: newRoomDescription.trim(),
+      chatRoomImageAtchFileId,
       participantIds: selectedMemberIds,
     }).then((response) => {
       const createdRoomId = response.data
@@ -142,6 +158,7 @@ const MessengerPopoverContent = () => {
         setViewMode('chat')
         setNewRoomName('')
         setNewRoomDescription('')
+        setNewRoomImageFile(null)
         setSelectedMemberIds([])
 
         // 목록 갱신 전에도 오른쪽 채팅방 헤더가 바로 보이도록 단건 상세를 먼저 가져옵니다.
@@ -175,18 +192,32 @@ const MessengerPopoverContent = () => {
   const handleUpdateRoom = (payload: {
     chatName: string
     chatDescription: string
+    imageFile: File | null
+    removeImage: boolean
   }) => {
     if (!selectedRoomId) return
 
-    void updateChat(selectedRoomId, payload).then(() => {
-      // 이름/설명 수정 후 왼쪽 방 목록과 오른쪽 헤더 정보를 최신값으로 다시 불러옵니다.
-      reloadRooms()
-      void loadRoomDetail(selectedRoomId).then((response) => {
-        if (response.data) {
-          setRoomDetail(response.data)
-        }
+    void uploadRoomImage(payload.imageFile)
+      .then((uploadedImageId) =>
+        updateChat(selectedRoomId, {
+          chatName: payload.chatName,
+          chatDescription: payload.chatDescription,
+          chatRoomImageAtchFileId: payload.removeImage
+            ? null
+            : (uploadedImageId ??
+              selectedRoomForInfo?.chatRoomImageAtchFileId ??
+              null),
+        }),
+      )
+      .then(() => {
+        // 이름/설명 수정 후 왼쪽 방 목록과 오른쪽 헤더 정보를 최신값으로 다시 불러옵니다.
+        reloadRooms()
+        void loadRoomDetail(selectedRoomId).then((response) => {
+          if (response.data) {
+            setRoomDetail(response.data)
+          }
+        })
       })
-    })
   }
 
   const handleAddParticipants = (participantIds: number[]) => {
@@ -313,12 +344,14 @@ const MessengerPopoverContent = () => {
           selectedMemberIds={selectedMemberIds}
           onChangeRoomName={setNewRoomName}
           onChangeRoomDescription={setNewRoomDescription}
+          onChangeRoomImageFile={setNewRoomImageFile}
           onChangeSelectedMembers={setSelectedMemberIds}
           onCreate={handleCreateChat}
           onCancel={() => setViewMode('chat')}
         />
       ) : viewMode === 'info' && selectedRoomForInfo ? (
         <MessengerRoomInfoPanel
+          key={selectedRoomForInfo.id}
           room={selectedRoomForInfo}
           onBack={() => setViewMode('chat')}
           onUpdateRoom={handleUpdateRoom}

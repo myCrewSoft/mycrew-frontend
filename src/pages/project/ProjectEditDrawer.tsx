@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import Button from '../../components/common/button/Button'
+import Modal from '../../components/common/overlay/modal/Modal'
 import DatePickerField from '../../components/common/form/datePicker/DatePickerField'
 import FormField from '../../components/common/form/formField/FormField'
 import Textarea from '../../components/common/form/textarea/Textarea'
@@ -14,10 +15,9 @@ type ProjectEditDrawerProps = {
   onSuccess?: () => void
 }
 
-// ✅ "20240115" 또는 "2024-01-15" → Date 객체로 변환
+// "20240115" 또는 "2024-01-15" → Date 객체로 변환
 const parseDate = (ymd: string): Date | null => {
   if (!ymd) return null
-  // YYYYMMDD 형식 처리
   const normalized = ymd.length === 8
     ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`
     : ymd
@@ -25,7 +25,7 @@ const parseDate = (ymd: string): Date | null => {
   return isNaN(d.getTime()) ? null : d
 }
 
-// ✅ Date → "2024-01-15" string으로 변환
+// Date → "2024-01-15" string으로 변환
 const formatDate = (date: Date | null): string | undefined => {
   if (!date) return undefined
   return date.toISOString().slice(0, 10)
@@ -44,6 +44,7 @@ export default function ProjectEditDrawer({
   const [endDate, setEndDate] = useState<Date | null>(parseDate(project.projEndYmd))
   const [projStatCd, setProjStatCd] = useState(project.projStatCd)
   const [updating, setUpdating] = useState(false)
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false) //경고 모달 표시 여부
 
   const currentStat = project.projStatCd
   const isStartDateDisabled = ['02', '03', '04'].includes(currentStat)
@@ -56,59 +57,79 @@ export default function ProjectEditDrawer({
         return [
           { value: '01', label: '예정' },
           { value: '02', label: '진행 중' },
-          { value: '03', label: '중단' },
-          { value: '04', label: '완료' },
+          { value: '04', label: '중단' },
         ]
       case '02':
         return [
           { value: '02', label: '진행 중' },
-          { value: '03', label: '중단' },
-          { value: '04', label: '완료' },
+          { value: '03', label: '완료' },
+          { value: '04', label: '중단' },
         ]
       case '03':
-        return [{ value: '03', label: '중단' }]
+        return [{ value: '03', label: '완료' }]
       case '04':
-        return [{ value: '04', label: '완료' }]
+        return [{ value: '04', label: '중단' }]
       default:
         return []
     }
   }
 
-  const handleSubmit = async () => {
+  // ✅ 변경: 기존 handleSubmit의 검증 + body 생성 부분을 분리
+  const validateAndPrepareBody = (): ProjectUpdateRequestDto | null => {
     if (!projNm.trim()) {
-      alert('프로젝트명을 입력해주세요')
-      return
+      alert('프로젝트명을 입력하세요.')
+      return null
     }
     if (!isStartDateDisabled && !isEndDateDisabled) {
       if (!startDate || !endDate) {
-        alert('시작일과 마감일을 입력해주세요')
-        return
+        alert('시작일과 마감일을 입력하세요.')
+        return null
       }
       if (startDate.getTime() >= endDate.getTime()) {
-        alert('마감일은 시작일 이후여야 해요')
-        return
+        alert('마감일은 시작일 이후여야 합니다.')
+        return null
       }
     }
 
+    return {
+      projNm,
+      projCn,
+      projBgngYmd: isStartDateDisabled ? undefined : formatDate(startDate),
+      projEndYmd: isEndDateDisabled ? undefined : formatDate(endDate),
+      projStatCd: isStatDisabled ? undefined : projStatCd,
+    }
+  }
+
+  //수정 API 호출
+  const submitUpdate = async () => {
+    const body = validateAndPrepareBody()
+    if (!body) return
+
     try {
       setUpdating(true)
-
-      const body: ProjectUpdateRequestDto = {
-        projNm,
-        projCn,
-        projBgngYmd: isStartDateDisabled ? undefined : formatDate(startDate),
-        projEndYmd: isEndDateDisabled ? undefined : formatDate(endDate),
-        projStatCd: isStatDisabled ? undefined : projStatCd,
-      }
-
       await projectApi.updateProject(project.projId, body)
       onSuccess?.()
       onClose()
     } catch {
-      alert('수정 중 오류가 발생했어요')
+      alert('수정 중 오류가 발생했습니다.')
     } finally {
       setUpdating(false)
+      setShowStatusConfirm(false)
     }
+  }
+
+  const handleSubmit = () => {
+    const isTerminalChange =
+      !isStatDisabled &&
+      projStatCd !== currentStat &&
+      (projStatCd === '03' || projStatCd === '04')
+
+    if (isTerminalChange) {
+      setShowStatusConfirm(true)
+      return
+    }
+
+    void submitUpdate()
   }
 
   return (
@@ -174,7 +195,7 @@ export default function ProjectEditDrawer({
 
             {currentStat === '02' && (
               <p className="text-xs text-slate-400">
-                진행 중인 프로젝트는 시작일을 변경할 수 없어요
+                진행 중인 프로젝트는 시작일을 변경할 수 없습니다.
               </p>
             )}
 
@@ -196,7 +217,7 @@ export default function ProjectEditDrawer({
               </select>
               {isStatDisabled && (
                 <p className="mt-1 text-xs text-slate-400">
-                  {currentStat === '04' ? '완료된' : '중단된'} 프로젝트는 상태를 변경할 수 없어요
+                  {currentStat === '03' ? '완료된' : '중단된'} 프로젝트는 상태를 변경할 수 없습니다.
                 </p>
               )}
             </div>
@@ -213,6 +234,22 @@ export default function ProjectEditDrawer({
           </Button>
         </div>
       </aside>
+
+      {/* 완료/중단 변경 경고 모달 */}
+      <Modal
+        open={showStatusConfirm}
+        variant="danger"
+        title="프로젝트 상태를 변경하시겠어요?"
+        description={
+          projStatCd === '03'
+            ? '완료로 변경하면 이후에는 프로젝트를 수정할 수 없습니다. 계속하시겠습니까?'
+            : '중단으로 변경하면 이후에는 프로젝트를 수정할 수 없습니다. 계속하시겠습니까?'
+        }
+        confirmText="변경"
+        cancelText="취소"
+        onClose={() => setShowStatusConfirm(false)}
+        onConfirm={() => void submitUpdate()}
+      />
     </>
   )
 }

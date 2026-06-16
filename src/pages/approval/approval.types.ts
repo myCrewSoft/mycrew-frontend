@@ -33,6 +33,36 @@ export type SelectedApprover = {
   prflImgFileId?: number | null
 }
 
+// 휴가 신청 모드에서 기안 모달이 추가로 받는 휴가 정보
+export type LeaveDraftInfo = {
+  leaveTypeCd: string
+  leaveBgnYmd: string
+  leaveEndYmd: string
+  reqRsn: string
+}
+
+export const defaultLeaveDraftInfo: LeaveDraftInfo = {
+  leaveTypeCd: '',
+  leaveBgnYmd: '',
+  leaveEndYmd: '',
+  reqRsn: '',
+}
+
+// 초과근무 신청 모드에서 기안 모달이 추가로 받는 초과근무 정보
+export type OtDraftInfo = {
+  otYmd: string
+  otBgnTm: string
+  otEndTm: string
+  reqRsn: string
+}
+
+export const defaultOtDraftInfo: OtDraftInfo = {
+  otYmd: '',
+  otBgnTm: '',
+  otEndTm: '',
+  reqRsn: '',
+}
+
 export type TemplateFormState = {
   tmplatCd: string
   tmplatNm: string

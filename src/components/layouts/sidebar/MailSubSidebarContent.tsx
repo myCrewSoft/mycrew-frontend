@@ -1,4 +1,4 @@
-import { Archive, Inbox, MailPlus, Send, Star, Trash2, UserCheck, Users } from 'lucide-react';
+import { Archive, FileEdit, Inbox, Mail, MailPlus, Send, Star, Trash2, UserCheck, Users } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SubSidebarActionButton from './SubSidebarActionButton';
 import SubSidebarMenuItem from './SubSidebarMenuItem';
@@ -7,6 +7,9 @@ import SubSidebarSection from './SubSidebarSection';
 const mailboxes = [
   { icon: Inbox, label: '받은 메일함', path: '/mail/inbox' },
   { icon: Send, label: '보낸 메일함', path: '/mail/sent' },
+  { icon: Star, label: '중요 메일함', path: '/mail/important' },
+  { icon: Mail, label: '안읽은 메일', path: '/mail/unread' },
+  { icon: FileEdit, label: '임시보관함', path: '/mail/draft' },
   { icon: Archive, label: '전체 메일', path: '/mail/all' },
   { icon: UserCheck, label: '내게 쓴 메일', path: '/mail/self' },
   { icon: Users, label: '나에게 온 메일', path: '/mail/tome' },

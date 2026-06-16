@@ -3,15 +3,16 @@ import type { FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Building2,
-  Camera,
   Eye,
   IdCard,
+  MapPin,
   RefreshCw,
   ShieldCheck,
   ShieldMinus,
   UserPlus,
   Users,
 } from 'lucide-react';
+import { useDaumPostcode } from '../../hooks/useDaumPostcode';
 import { adminApi } from '../../api/adminApi';
 import { ApiError } from '../../api/axiosInstance';
 import Badge from '../../components/common/dataDisplay/badge/Badge';
@@ -74,6 +75,19 @@ const createRoleAssignForm = (): RoleAssignFormState => ({
   scopeTypeCd: 'GLOBAL',
   scopeId: '',
 });
+
+/**
+ * 범위가 고정된 역할 코드 → 강제 범위 매핑.
+ * 백엔드에서 이 역할들은 항상 아래 범위로 저장되므로(기본 사원=SELF, 최고 관리자=GLOBAL),
+ * UI에서도 범위 선택 창을 숨기고 강제 범위를 그대로 전송한다.
+ */
+const FIXED_SCOPE_ROLE_CODES: Record<string, RoleScopeType> = {
+  ROLE_SUPER_ADMIN: 'GLOBAL', // 최고 관리자 → 전체
+  ROLE_EMPLOYEE_SELF: 'SELF', // 기본 사원 → 본인
+};
+
+const getFixedScopeType = (roleCode?: string | null): RoleScopeType | null =>
+  roleCode ? FIXED_SCOPE_ROLE_CODES[roleCode] ?? null : null;
 
 const employeeStatusLabels = Object.fromEntries(
   adminEmployeeStatusOptions.map((status) => [status.code, status.label]),
@@ -213,6 +227,7 @@ const DetailRow = ({
 export default function AdminEmployeesPage() {
   const [searchParams] = useSearchParams();
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
+  const { open: openPostcode } = useDaumPostcode();
   const [employees, setEmployees] = useState<AdminEmployeeListItem[]>([]);
   const [pagination, setPagination] = useState<PageInfo | null>(null);
   const [keyword, setKeyword] = useState('');
@@ -417,6 +432,18 @@ export default function AdminEmployeesPage() {
     return scopeOptionMap[roleAssignForm.scopeTypeCd as ScopedOptionType];
   }, [roleAssignForm.scopeTypeCd, scopeOptionMap]);
 
+  // 선택된 역할이 범위 고정 역할(기본 사원·최고 관리자)이면 강제 범위를 구한다.
+  const selectedAssignRoleCode = useMemo(
+    () =>
+      roles.find((role) => String(role.roleId) === roleAssignForm.roleId)
+        ?.roleCode ?? null,
+    [roles, roleAssignForm.roleId],
+  );
+  const fixedScopeType = getFixedScopeType(selectedAssignRoleCode);
+  const fixedScopeLabel = fixedScopeType
+    ? roleScopeTypeOptions.find((option) => option.value === fixedScopeType)?.label
+    : null;
+
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPage(1);
@@ -584,6 +611,22 @@ export default function AdminEmployeesPage() {
         ...current,
         scopeTypeCd: value as RoleScopeType,
         scopeId: '',
+      }));
+      return;
+    }
+
+    if (key === 'roleId') {
+      // 범위 고정 역할을 고르면 강제 범위로 맞추고 범위 대상은 비운다.
+      const nextRoleCode = roles.find(
+        (role) => String(role.roleId) === value,
+      )?.roleCode;
+      const forcedScope = getFixedScopeType(nextRoleCode);
+      setRoleAssignForm((current) => ({
+        ...current,
+        roleId: value,
+        ...(forcedScope
+          ? { scopeTypeCd: forcedScope, scopeId: '' }
+          : {}),
       }));
       return;
     }
@@ -822,6 +865,18 @@ export default function AdminEmployeesPage() {
       ...current,
       [key]: value,
     }));
+  };
+
+  const handleSearchRegisterAddress = () => {
+    void openPostcode((data) => {
+      setRegisterForm((current) => ({
+        ...current,
+        zip: data.zonecode,
+        addr: data.address,
+      }));
+    }).catch(() => {
+      setRegisterError('우편번호 서비스를 불러오지 못했습니다.');
+    });
   };
 
   const resetRegisterForm = () => {
@@ -1072,9 +1127,13 @@ export default function AdminEmployeesPage() {
           <div className="grid gap-5 xl:grid-cols-[240px_1fr]">
             <aside className="flex flex-col gap-4">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white text-slate-300">
-                  <Camera size={44} />
-                </div>
+                <ProfileAvatar
+                  fileId={selectedDetail.prflImgFileId}
+                  name={selectedDetail.empNm}
+                  size={208}
+                  rounded="xl"
+                  className="aspect-square !h-auto !w-full border border-slate-200"
+                />
                 <div className="mt-4">
                   <h3 className="text-lg font-bold text-slate-950">
                     {selectedDetail.empNm}
@@ -1340,19 +1399,25 @@ export default function AdminEmployeesPage() {
                           })),
                         ]}
                       />
-                      <Select
-                        label="범위"
-                        value={roleAssignForm.scopeTypeCd}
-                        disabled={Boolean(assignmentSubmitting)}
-                        onChange={(event) =>
-                          updateRoleAssignForm(
-                            'scopeTypeCd',
-                            event.target.value,
-                          )
-                        }
-                        options={roleScopeTypeOptions}
-                      />
-                      {requiresScopeId(roleAssignForm.scopeTypeCd) && (
+                      {fixedScopeType ? (
+                        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                          이 역할은 범위가 <span className="text-slate-700">{fixedScopeLabel}</span>(으)로 자동 지정됩니다.
+                        </p>
+                      ) : (
+                        <Select
+                          label="범위"
+                          value={roleAssignForm.scopeTypeCd}
+                          disabled={Boolean(assignmentSubmitting)}
+                          onChange={(event) =>
+                            updateRoleAssignForm(
+                              'scopeTypeCd',
+                              event.target.value,
+                            )
+                          }
+                          options={roleScopeTypeOptions}
+                        />
+                      )}
+                      {!fixedScopeType && requiresScopeId(roleAssignForm.scopeTypeCd) && (
                         <Select
                           label="범위 대상"
                           value={roleAssignForm.scopeId}
@@ -1537,17 +1602,33 @@ export default function AdminEmployeesPage() {
               updateRegisterForm('mblTelno', event.target.value)
             }
           />
-          <FormField
-            label="우편번호"
-            required
-            value={registerForm.zip}
-            onChange={(event) => updateRegisterForm('zip', event.target.value)}
-          />
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <FormField
+                label="우편번호"
+                required
+                readOnly
+                placeholder="주소 검색"
+                value={registerForm.zip}
+                onChange={(event) => updateRegisterForm('zip', event.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              leftIcon={<MapPin size={15} />}
+              onClick={handleSearchRegisterAddress}
+              className="h-10 shrink-0 whitespace-nowrap"
+            >
+              주소 검색
+            </Button>
+          </div>
           <div className="md:col-span-2">
             <FormField
               label="주소"
               required
               value={registerForm.addr}
+              placeholder="주소 검색 후 상세주소 입력"
               onChange={(event) =>
                 updateRegisterForm('addr', event.target.value)
               }

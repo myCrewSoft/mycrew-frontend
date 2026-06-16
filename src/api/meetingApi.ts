@@ -1,49 +1,122 @@
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
+import type { VideoTokenResponse } from '../types'
 import type {
-  CreateInstantMeetingRequest,
-  CreateScheduledMeetingRequest,
-  MeetingListParams,
-  MeetingSummaryResponse,
+  MeetingDetail,
+  MeetingCreateRequest,
+  MeetingListItem,
+  MeetingMinutesResponse,
+  MeetingMinutesUpdateRequest,
+  MeetingUpdateRequest,
 } from '../types/meeting.dto'
 
-// 화상회의 목록을 조회합니다.
-// 백엔드가 준비되면 /api/v1/meetings?status=live 같은 형태로 바로 호출됩니다.
-const getMeetings = (params?: MeetingListParams) => {
-  return axiosInstance.get<ApiResponse<MeetingSummaryResponse[]>>('/meetings', {
-    params,
-  })
-}
+const MEETING_API_PREFIX = '/api/meetings'
+const VIDEO_CONFERENCE_API_PREFIX = '/api/video-conferences'
 
-// 화상회의 상세 정보를 조회합니다.
-// 지금 화면은 목록 DTO만으로 모달을 열지만, 백엔드 상세 API가 준비되면 이 함수를 연결하면 됩니다.
-const getMeeting = (meetingId: number) => {
-  return axiosInstance.get<ApiResponse<MeetingSummaryResponse>>(
-    `/meetings/${meetingId}`,
+const getMeetingList = () =>
+  axiosInstance.get<ApiResponse<MeetingListItem[]>>(MEETING_API_PREFIX)
+
+const getMeeting = (mtngId: number) =>
+  axiosInstance.get<ApiResponse<MeetingDetail>>(
+    `${MEETING_API_PREFIX}/${mtngId}`,
+  )
+
+const createMeeting = (payload: MeetingCreateRequest) =>
+  axiosInstance.post<ApiResponse<MeetingDetail>>(MEETING_API_PREFIX, payload)
+
+const updateMeeting = (mtngId: number, payload: MeetingUpdateRequest) =>
+  axiosInstance.put<ApiResponse<void>>(
+    `${MEETING_API_PREFIX}/${mtngId}`,
+    payload,
+  )
+
+const deleteMeeting = (mtngId: number) =>
+  axiosInstance.delete<ApiResponse<void>>(`${MEETING_API_PREFIX}/${mtngId}`)
+
+const getMom = (mtngId: number) =>
+  axiosInstance.get<ApiResponse<MeetingMinutesResponse>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+  )
+
+const createEmptyMom = (mtngId: number) =>
+  axiosInstance.post<ApiResponse<number>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+  )
+
+const updateMom = (mtngId: number, payload: MeetingMinutesUpdateRequest) =>
+  axiosInstance.put<ApiResponse<MeetingMinutesResponse>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes`,
+    payload,
+  )
+
+const requestMomApproval = (mtngId: number) =>
+  axiosInstance.post<ApiResponse<void>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes/approval`,
+  )
+
+const issueToken = (vconfId: number) =>
+  axiosInstance.post<ApiResponse<VideoTokenResponse>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/token`,
+  )
+
+const leaveConf = (vconfId: number) =>
+  axiosInstance.patch<ApiResponse<void>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/leave`,
+  )
+
+const endConf = (vconfId: number) =>
+  axiosInstance.patch<ApiResponse<void>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/end`,
+    undefined,
+    { timeout: 120_000 },
+  )
+
+const uploadRcrdg = (vconfId: number, file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return axiosInstance.post<ApiResponse<void>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/upload`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120_000,
+    },
   )
 }
 
-// "지금 바로 회의 시작" 버튼에서 사용할 즉시 회의 생성 API입니다.
-// 백엔드 구현 전에는 화면에서 실패를 조용히 처리하고, 구현 후에는 inviteUrl로 입장시키면 됩니다.
-const createInstantMeeting = (payload: CreateInstantMeetingRequest) => {
-  return axiosInstance.post<ApiResponse<MeetingSummaryResponse>>(
-    '/meetings',
-    payload,
-  )
-}
+const getRcrdgStreamUrl = (vconfId: number, atchFileId: number) =>
+  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/stream`
 
-// 예약 회의를 생성합니다.
-// 즉시 회의와 같은 POST /meetings를 쓰되, 날짜/시간이 포함된 payload를 보냅니다.
-const createScheduledMeeting = (payload: CreateScheduledMeetingRequest) => {
-  return axiosInstance.post<ApiResponse<MeetingSummaryResponse>>(
-    '/meetings',
-    payload,
+const getRcrdgDownloadUrl = (vconfId: number, atchFileId: number) =>
+  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/download`
+
+const transcribe = (vconfId: number, audioChunk: Blob) => {
+  const formData = new FormData()
+  formData.append('audio', audioChunk, 'chunk.webm')
+
+  return axiosInstance.post<ApiResponse<string>>(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/stt`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
   )
 }
 
 export const meetingApi = {
-  getMeetings,
+  getMeetingList,
   getMeeting,
-  createInstantMeeting,
-  createScheduledMeeting,
+  createMeeting,
+  updateMeeting,
+  deleteMeeting,
+  getMom,
+  createEmptyMom,
+  updateMom,
+  requestMomApproval,
+  issueToken,
+  leaveConf,
+  endConf,
+  uploadRcrdg,
+  getRcrdgStreamUrl,
+  getRcrdgDownloadUrl,
+  transcribe,
 }
