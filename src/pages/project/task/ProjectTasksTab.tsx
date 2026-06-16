@@ -12,6 +12,7 @@ import type { ProjectTask, ProjectTaskStatusCode, ProjectTaskViewMode } from './
 
 interface ProjectTasksTabProps {
   projectId: string | number
+  focusTaskId?: string | null
   viewMode: ProjectTaskViewMode
   createModalOpen: boolean
   createStatus: ProjectTaskStatusCode
@@ -22,6 +23,7 @@ interface ProjectTasksTabProps {
 
 const ProjectTasksTab = ({
   projectId,
+  focusTaskId,
   viewMode,
   createModalOpen,
   createStatus,
@@ -57,6 +59,16 @@ const ProjectTasksTab = ({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchTasks()
   }, [fetchTasks])
+
+  useEffect(() => {
+    if (!focusTaskId || tasks.length === 0) return
+
+    const targetTask = tasks.find((task) => String(task.taskId) === focusTaskId)
+    if (!targetTask) return
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedTask(targetTask)
+  }, [focusTaskId, tasks])
 
   const filteredTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase()
