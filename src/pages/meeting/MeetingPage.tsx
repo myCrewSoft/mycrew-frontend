@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-assignment */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -19,6 +20,7 @@ import {
   UserPlus,
   Video,
   X,
+  AlertCircle,
 } from 'lucide-react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -46,7 +48,6 @@ import type {
 } from '../../types'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import MeetingRoomAvailabilityTimeline from './MeetingRoomAvailabilityTimeline'
-import MeetingMinutesPage from './MeetingMinutesPage'
 import type {
   MeetingDetail,
   MeetingCreateRequest,
@@ -146,6 +147,11 @@ const isReservationOverlapping = (
 ) =>
   new Date(beginDt).getTime() < new Date(reservation.endDateTime).getTime() &&
   new Date(endDt).getTime() > new Date(reservation.startDateTime).getTime()
+
+const isCurrentEditingMeetingReservation = (
+  reservation: ReservationResponse,
+  editingMeetingId: number | null,
+) => editingMeetingId !== null && reservation.mtngId === editingMeetingId
 
 
 const formatTime = (dateTime?: string | null) => {
@@ -257,7 +263,6 @@ const MeetingPage = () => {
   )
 
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
-  const [selectedMinutesMeeting, setSelectedMinutesMeeting] = useState<MeetingDetail | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
   const [meetingDateTo, setMeetingDateTo] = useState('')
@@ -269,7 +274,14 @@ const MeetingPage = () => {
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null)
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>(createDefaultScheduleForm)
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Array<string | number>>([])
-  const [scheduleValidationMessage, setScheduleValidationMessage] = useState('')
+  const [formErrors, setFormErrors] = useState<{
+    mtngNm?: string
+    dateRange?: string
+    confRm?: string
+  }>({})
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const scrollToErrorRef = useRef(false)
+
 
   const { data: meetings, execute: fetchMeetings } = useApi<MeetingListItem[], []>(
     meetingApi.getMeetingList,
@@ -362,6 +374,10 @@ const MeetingPage = () => {
   ])
 
   const meetingList = useMemo(() => meetings ?? [], [meetings])
+  const availableMeetingRooms = useMemo(
+    () => (meetingRooms ?? []).filter((room) => room.useYn !== 'N'),
+    [meetingRooms],
+  )
 
   const filteredMeetings = meetingList
     .filter((meeting: MeetingListItem) => meeting.mtngSttus === selectedFilter)
@@ -531,7 +547,6 @@ const MeetingPage = () => {
 
       if (!detail) return
       setSelectedMeeting(null)
-      setSelectedMinutesMeeting(detail)
     },
     [fetchMeetingDetail],
   )
@@ -608,8 +623,37 @@ const MeetingPage = () => {
     field: keyof ScheduleForm,
     value: string | boolean | number | number[] | null,
   ) => {
-    setScheduleValidationMessage('')
-    setScheduleForm((current : ScheduleForm) => ({ ...current, [field]: value }))
+    // 해당 필드 에러만 초기화
+    if (field === 'mtngNm') setFormErrors((prev) => ({ ...prev, mtngNm: undefined }))
+    if (field === 'beginDt' || field === 'endDt') setFormErrors((prev) => ({ ...prev, dateRange: undefined }))
+    if (field === 'confRmId' || field === 'useMeetingRoom') setFormErrors((prev) => ({ ...prev, confRm: undefined }))
+
+    setScheduleForm((current: ScheduleForm) => {
+      const next = { ...current, [field]: value }
+
+      const roomId = field === 'confRmId' ? (value as number | null) : current.confRmId
+      const beginDt = field === 'beginDt' ? (value as string) : current.beginDt
+      const endDt = field === 'endDt' ? (value as string) : current.endDt
+
+      if (next.useMeetingRoom && roomId !== null) {
+        const overlapping = (roomReservations ?? []).some(
+          (reservation) =>
+            reservation.roomId === roomId &&
+            !isCurrentEditingMeetingReservation(reservation, editingMeetingId) &&
+            isReservationOverlapping(beginDt, endDt, reservation),
+        )
+        if (overlapping) {
+          queueMicrotask(() =>
+            setFormErrors((prev) => ({
+              ...prev,
+              confRm: '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택하거나 시간을 변경해 주세요.',
+            })),
+          )
+        }
+      }
+
+      return next
+    })
   }
 
   const closeSchedulePanel = () => {
@@ -617,7 +661,7 @@ const MeetingPage = () => {
     setEditingMeetingId(null)
     setScheduleForm(createDefaultScheduleForm())
     setSelectedEmployeeIds([])
-    setScheduleValidationMessage('')
+    setFormErrors({})
   }
 
   const handleEditMeeting = (meeting: MeetingDetail) => {
@@ -638,7 +682,6 @@ const MeetingPage = () => {
     setSelectedEmployeeIds(
       meeting.ptcptList.map((participant) => participant.empId),
     )
-    setScheduleValidationMessage('')
     setSelectedMeeting(null)
     setSchedulePanelOpen(true)
   }
@@ -664,25 +707,30 @@ const MeetingPage = () => {
     }
   }
 
+  const mtngNmRef = useRef<HTMLDivElement | null>(null)
+  const dateRangeRef = useRef<HTMLDivElement | null>(null)
+  const confRmRef = useRef<HTMLDivElement | null>(null)
+
   const handleSubmitScheduleMeeting = async () => {
+    const errors: typeof formErrors = {}
+    let firstErrorRef: React.RefObject<HTMLDivElement | null> | null = null
+
     if (!scheduleForm.mtngNm.trim()) {
-      setScheduleValidationMessage('회의 제목을 입력해주세요.')
-      return
+      errors.mtngNm = '회의 제목을 입력해주세요.'
+      if (!firstErrorRef) firstErrorRef = mtngNmRef
     }
 
     if (!scheduleForm.beginDt || !scheduleForm.endDt) {
-      setScheduleValidationMessage('회의 시작 일시와 종료 일시를 입력해주세요.')
-      return
-    }
-
-    if (new Date(scheduleForm.beginDt) >= new Date(scheduleForm.endDt)) {
-      setScheduleValidationMessage('종료 일시는 시작 일시보다 늦어야 합니다.')
-      return
+      errors.dateRange = '회의 시작 일시와 종료 일시를 입력해주세요.'
+      if (!firstErrorRef) firstErrorRef = dateRangeRef
+    } else if (new Date(scheduleForm.beginDt) >= new Date(scheduleForm.endDt)) {
+      errors.dateRange = '종료 일시는 시작 일시보다 늦어야 합니다.'
+      if (!firstErrorRef) firstErrorRef = dateRangeRef
     }
 
     if (scheduleForm.useMeetingRoom && scheduleForm.confRmId === null) {
-      setScheduleValidationMessage('사용할 회의실을 선택해주세요.')
-      return
+      errors.confRm = '사용할 회의실을 선택해주세요.'
+      if (!firstErrorRef) firstErrorRef = confRmRef
     }
 
     const selectedRoomUnavailable =
@@ -690,18 +738,18 @@ const MeetingPage = () => {
       (roomReservations ?? []).some(
         (reservation) =>
           reservation.roomId === scheduleForm.confRmId &&
-          reservation.mtngId !== editingMeetingId &&
-          isReservationOverlapping(
-            scheduleForm.beginDt,
-            scheduleForm.endDt,
-            reservation,
-          ),
+          !isCurrentEditingMeetingReservation(reservation, editingMeetingId) &&
+          isReservationOverlapping(scheduleForm.beginDt, scheduleForm.endDt, reservation),
       )
 
     if (selectedRoomUnavailable) {
-      setScheduleValidationMessage(
-        '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택해주세요.',
-      )
+      errors.confRm = '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택해주세요.'
+      if (!firstErrorRef) firstErrorRef = confRmRef
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      scrollToErrorRef.current = true 
       return
     }
 
@@ -753,7 +801,6 @@ const MeetingPage = () => {
         setEditingMeetingId(null)
         setScheduleForm(createDefaultScheduleForm())
         setSelectedEmployeeIds([])
-        setScheduleValidationMessage('')
         setSchedulePanelOpen(true)
         navigate(location.pathname, { replace: true })
       })
@@ -763,7 +810,6 @@ const MeetingPage = () => {
       const target = meetingList.find((m: MeetingListItem) => m.mtngId === detailMeetingId)
       if (target) {
         queueMicrotask(() => {
-          setSelectedMinutesMeeting(null)
           void openMeetingDetail(target.mtngId)
           navigate(location.pathname, { replace: true })
         })
@@ -797,21 +843,33 @@ const MeetingPage = () => {
         setEditingMeetingId(null)
         setScheduleForm(createDefaultScheduleForm())
         setSelectedEmployeeIds([])
-        setScheduleValidationMessage('')
+        setFormErrors({})  // 추가
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [schedulePanelOpen])
 
-  if (selectedMinutesMeeting) {
-    return (
-      <MeetingMinutesPage
-        meeting={selectedMinutesMeeting}
-        onBack={() => setSelectedMinutesMeeting(null)}
-      />
-    )
-  }
+  useEffect(() => {
+    if (!scrollToErrorRef.current) return
+    scrollToErrorRef.current = false  // ref는 setState 아니라 괜찮음
+
+    const container = scrollContainerRef.current
+    const firstTarget =
+      formErrors.mtngNm ? mtngNmRef.current :
+      formErrors.dateRange ? dateRangeRef.current :
+      formErrors.confRm ? confRmRef.current :
+      null
+
+    if (!container || !firstTarget) return
+
+    const containerTop = container.getBoundingClientRect().top
+    const targetTop = firstTarget.getBoundingClientRect().top
+    container.scrollBy({
+      top: targetTop - containerTop - 16,
+      behavior: 'smooth',
+    })
+  }, [formErrors])
 
   // ─────────────────────────────────────────────────────────────
   // 목록 화면
@@ -1304,10 +1362,10 @@ const MeetingPage = () => {
                 <X size={20} />
               </button>
             </header>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            
+            <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               <div className="flex flex-col gap-5">
-                <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <section ref={mtngNmRef} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-col gap-4">
                     <FormField
                       label="회의 제목"
@@ -1315,10 +1373,16 @@ const MeetingPage = () => {
                       value={scheduleForm.mtngNm}
                       onChange={(e) => handleScheduleFormChange('mtngNm', e.target.value)}
                     />
+                    {formErrors.mtngNm && (
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-red-600">
+                        <AlertCircle size={14} />
+                        {formErrors.mtngNm}
+                      </p>
+                    )}
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                <section ref={dateRangeRef} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h3 className="mb-4 text-sm font-bold text-slate-900">일정</h3>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
@@ -1334,26 +1398,39 @@ const MeetingPage = () => {
                       onChange={(e) => handleScheduleFormChange('endDt', e.target.value)}
                     />
                   </div>
+                  {formErrors.dateRange && (
+                    <p className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-red-600">
+                      <AlertCircle size={14} />
+                      {formErrors.dateRange}
+                    </p>
+                  )}
                 </section>
 
-                <MeetingRoomAvailabilityTimeline
-                  rooms={(meetingRooms ?? []).filter((room) => room.useYn === 'Y')}
-                  reservations={roomReservations ?? []}
-                  beginDt={scheduleForm.beginDt}
-                  endDt={scheduleForm.endDt}
-                  selectedRoomId={
-                    scheduleForm.useMeetingRoom ? scheduleForm.confRmId : null
-                  }
-                  editingMeetingId={editingMeetingId}
-                  loading={roomReservationsLoading}
-                  errorMessage={roomReservationsError?.message ?? null}
-                  onSelectRoom={(roomId) => {
-                    handleScheduleFormChange('useMeetingRoom', true)
-                    handleScheduleFormChange('confRmId', roomId)
-                    setScheduleValidationMessage('')
-                  }}
-                />
-
+                {scheduleForm.useMeetingRoom && (
+                  <div ref={confRmRef}>
+                    <MeetingRoomAvailabilityTimeline
+                      rooms={availableMeetingRooms}
+                      reservations={roomReservations ?? []}
+                      beginDt={scheduleForm.beginDt}
+                      endDt={scheduleForm.endDt}
+                      selectedRoomId={scheduleForm.confRmId}
+                      editingMeetingId={editingMeetingId}
+                      loading={roomReservationsLoading}
+                      errorMessage={roomReservationsError?.message ?? null}
+                      onSelectRoom={(roomId) => {
+                        handleScheduleFormChange('useMeetingRoom', true)
+                        handleScheduleFormChange('confRmId', roomId)
+                      }}
+                    />
+                    {/* 회의실 겹침 경고 */}
+                    {formErrors.confRm && (
+                      <p className="mt-2 flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                        <AlertCircle size={14} />
+                        {formErrors.confRm}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <section className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h3 className="mb-4 text-sm font-bold text-slate-900">회의 진행 방식</h3>
                   <div className="flex flex-col gap-3">
@@ -1394,13 +1471,14 @@ const MeetingPage = () => {
                           className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400"
                         >
                           <option value="">회의실을 선택하세요</option>
-                          {(meetingRooms ?? [])
-                            .filter((room) => room.useYn === 'Y')
-                            .map((room) => {
+                          {availableMeetingRooms.map((room) => {
                               const unavailable = (roomReservations ?? []).some(
                                 (reservation) =>
                                   reservation.roomId === room.roomId &&
-                                  reservation.mtngId !== editingMeetingId &&
+                                  !isCurrentEditingMeetingReservation(
+                                    reservation,
+                                    editingMeetingId,
+                                  ) &&
                                   isReservationOverlapping(
                                     scheduleForm.beginDt,
                                     scheduleForm.endDt,
@@ -1441,11 +1519,6 @@ const MeetingPage = () => {
               <Button variant="outline" onClick={closeSchedulePanel}>
                 취소
               </Button>
-              {scheduleValidationMessage && (
-                <p className="mr-auto self-center text-sm font-semibold text-red-600">
-                  {scheduleValidationMessage}
-                </p>
-              )}
               <Button
                 loading={createConfLoading || updateMeetingLoading}
                 onClick={() => void handleSubmitScheduleMeeting()}
