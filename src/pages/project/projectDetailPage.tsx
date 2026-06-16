@@ -1,8 +1,8 @@
 ﻿// src/pages/project/ProjectDetailPage.tsx
 import { projectApi } from '../../api/projectApi'
 import { useApi } from '../../hooks/useApi'
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Share2,
   Plus,
@@ -43,7 +43,10 @@ const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'succes
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const { projId } = useParams<{ projId: string }>()
-  const [tab, setTab] = useState('overview')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'tasks' ? 'tasks' : 'overview'
+  const focusTaskId = searchParams.get('taskId')
+  const [tab, setTab] = useState(initialTab)
   const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
@@ -78,6 +81,13 @@ const ProjectDetailPage = () => {
     setTaskCreateStatus(status)
     setTaskCreateModalOpen(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'tasks') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab('tasks')
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -179,6 +189,7 @@ const ProjectDetailPage = () => {
       {tab === 'tasks' && (
         <ProjectTasksTab
           projectId={project.projId}
+          focusTaskId={focusTaskId}
           viewMode={taskViewMode}
           createModalOpen={taskCreateModalOpen}
           createStatus={taskCreateStatus}

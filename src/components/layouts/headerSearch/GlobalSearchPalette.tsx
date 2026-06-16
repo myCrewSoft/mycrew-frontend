@@ -1,19 +1,22 @@
 import {
   BookOpen,
   CalendarDays,
+  CheckSquare,
   Clock3,
-  FileText,
-  Folder,
+  FolderKanban,
   Mail,
   Search,
-  Users,
+  Video,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { searchApi } from '../../../api/searchApi'
 import { useApi } from '../../../hooks/useApi'
-import type { SearchResponse, SearchType } from '../../../types'
+import type {
+  SearchResponseDto,
+  SearchType,
+} from '../../../types/search.dto'
 import IconButton from '../../common/button/IconButton'
 import Badge from '../../common/dataDisplay/badge/Badge'
 
@@ -26,53 +29,59 @@ interface GlobalSearchPaletteContentProps {
   onClose: () => void
 }
 
-const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
-  SCHEDULE: '일정',
-  MEETING: '예약',
-  PROJECT: '프로젝트',
-  TASK: '업무',
-  EDUCATION: '교육',
-  MAIL: '메일',
-}
-
-const TYPE_ORDER: SearchType[] = [
-  'SCHEDULE',
-  'MEETING',
+const SEARCH_TYPE_ORDER: SearchType[] = [
   'PROJECT',
   'TASK',
+  'SCHEDULE',
+  'MEETING',
   'EDUCATION',
   'MAIL',
 ]
 
-const getTypeIcon = (type: SearchType) => {
-  if (type === 'SCHEDULE') return CalendarDays
-  if (type === 'MEETING') return Users
-  if (type === 'PROJECT') return Folder
-  if (type === 'TASK') return FileText
-  if (type === 'EDUCATION') return BookOpen
-  if (type === 'MAIL') return Mail
-  return FileText
+const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
+  PROJECT: '프로젝트',
+  TASK: '업무',
+  SCHEDULE: '일정',
+  MEETING: '회의',
+  EDUCATION: '교육',
+  MAIL: '메일',
 }
 
-const getFallbackPath = (item: SearchResponse): string => {
-  const id = item.id
-  switch (item.type) {
-    case 'SCHEDULE':
-      return `/calendar?scheduleId=${id}`
-    case 'MEETING':
-      return '/reservations'
-    case 'PROJECT':
-      return '/dashboard'
-    case 'TASK':
-      return '/dashboard'
-    case 'EDUCATION':
-      return `/education/${id}`
-    case 'MAIL':
-      return '/mail'
-    default:
-      return '/dashboard'
-  }
+const getTypeIcon = (type?: SearchType) => {
+  if (type === 'PROJECT') return FolderKanban
+  if (type === 'TASK') return CheckSquare
+  if (type === 'SCHEDULE') return CalendarDays
+  if (type === 'MEETING') return Video
+  if (type === 'EDUCATION') return BookOpen
+  return Mail
 }
+
+const getFallbackPath = (item: SearchResponseDto) => {
+  const id = item.id
+
+  if (item.type === 'PROJECT') return `/project/${id}`
+
+  if (item.type === 'TASK') {
+    const projectId = item.parentId
+    const taskId = id
+
+    if (!projectId) {
+      return '/project'
+    }
+
+    return `/project/${projectId}?tab=tasks&taskId=${taskId}`
+  }
+
+  if (item.type === 'SCHEDULE') return `/calendar?scheduleId=${id}`
+  if (item.type === 'MEETING') return '/meeting/scheduled'
+  if (item.type === 'EDUCATION') return `/education/${id}`
+  if (item.type === 'MAIL') return '/mail'
+
+  return '/dashboard'
+}
+
+const getResultKey = (item: SearchResponseDto, index: number) =>
+  `${item.type ?? 'UNKNOWN'}-${item.parentId ?? 'root'}-${item.id ?? index}`
 
 const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps) => {
   if (!open) {
@@ -88,7 +97,7 @@ const GlobalSearchPaletteContent = ({
   const navigate = useNavigate()
 
   const [keyword, setKeyword] = useState('')
-  const [results, setResults] = useState<SearchResponse[]>([])
+  const [results, setResults] = useState<SearchResponseDto[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -100,7 +109,7 @@ const GlobalSearchPaletteContent = ({
   const activeItem = results[activeIndex]
 
   const handleOpenItem = useCallback(
-    (item: SearchResponse) => {
+    (item: SearchResponseDto) => {
       navigate(getFallbackPath(item))
       onClose()
     },
@@ -108,12 +117,12 @@ const GlobalSearchPaletteContent = ({
   )
 
   const groupedResults = useMemo(() => {
-    return TYPE_ORDER.reduce(
-      (acc, type) => {
-        acc[type] = results.filter((item) => item.type === type)
-        return acc
+    return SEARCH_TYPE_ORDER.reduce(
+      (groups, type) => {
+        groups[type] = results.filter((item) => item.type === type)
+        return groups
       },
-      {} as Record<SearchType, SearchResponse[]>,
+      {} as Record<SearchType, SearchResponseDto[]>,
     )
   }, [results])
 
@@ -230,18 +239,21 @@ const GlobalSearchPaletteContent = ({
 
             {!loading && !trimmedKeyword && (
               <div className="px-5 py-10 text-center">
-                <p className="text-sm text-slate-400">
-                  검색어를 입력하면 결과가 표시됩니다.
+                <p className="text-sm font-bold text-slate-800">
+                  검색어를 입력해 주세요.
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  프로젝트, 업무, 일정, 회의, 교육, 메일을 한 번에 찾을 수 있습니다.
                 </p>
               </div>
             )}
 
             {!loading && results.length > 0 && (
               <div className="py-3">
-                {TYPE_ORDER.map((type) => {
+                {SEARCH_TYPE_ORDER.map((type) => {
                   const sectionItems = groupedResults[type]
 
-                  if (!sectionItems || sectionItems.length === 0) {
+                  if (sectionItems.length === 0) {
                     return null
                   }
 
@@ -252,18 +264,19 @@ const GlobalSearchPaletteContent = ({
                       </p>
 
                       <div className="space-y-1 px-3">
-                        {sectionItems.map((item) => {
+                        {sectionItems.map((item, index) => {
                           const flatIndex = results.findIndex(
                             (result) =>
                               result.type === item.type &&
-                              result.id === item.id,
+                              result.id === item.id &&
+                              result.parentId === item.parentId,
                           )
-                          const Icon = getTypeIcon(item.type as SearchType)
+                          const Icon = getTypeIcon(item.type)
                           const active = flatIndex === activeIndex
 
                           return (
                             <button
-                              key={`${item.type}-${item.id}`}
+                              key={getResultKey(item, index)}
                               type="button"
                               onMouseEnter={() => setActiveIndex(flatIndex)}
                               onClick={() => handleOpenItem(item)}
@@ -279,7 +292,7 @@ const GlobalSearchPaletteContent = ({
 
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-sm font-bold text-slate-950">
-                                  {item.title}
+                                  {item.title ?? '제목 없음'}
                                 </span>
                                 {item.description && (
                                   <span className="mt-0.5 block truncate text-xs text-slate-500">
@@ -306,12 +319,14 @@ const GlobalSearchPaletteContent = ({
 
           {previewOpen && activeItem && (
             <aside className="hidden w-60 shrink-0 p-5 md:block">
-              <Badge variant="neutral">
-                {SEARCH_TYPE_LABEL[activeItem.type as SearchType]}
-              </Badge>
+              {activeItem.type && (
+                <Badge variant="neutral">
+                  {SEARCH_TYPE_LABEL[activeItem.type]}
+                </Badge>
+              )}
 
               <h3 className="mt-4 text-base font-bold text-slate-950">
-                {activeItem.title}
+                {activeItem.title ?? '제목 없음'}
               </h3>
 
               {activeItem.description && (
