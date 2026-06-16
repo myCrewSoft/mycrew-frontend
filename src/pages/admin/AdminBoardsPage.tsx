@@ -234,6 +234,8 @@ const AdminBoardsPage = () => {
   const [editTarget, setEditTarget] = useState<BoardResponse | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BoardResponse | null>(null)
   const [commentContent, setCommentContent] = useState('')
+  const [replyTargetId, setReplyTargetId] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState('')
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentContent, setEditingCommentContent] = useState('')
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
@@ -436,6 +438,8 @@ const AdminBoardsPage = () => {
     setEditingCommentContent('')
     setDeletingCommentId(null)
     setCommentContent('')
+    setReplyTargetId(null)
+    setReplyContent('')
     setLikeState({
       boardId: board.boardId,
       isLiked: board.isLiked ?? false,
@@ -502,6 +506,8 @@ const AdminBoardsPage = () => {
     setRiskAnalysis(null)
     setDetailTarget(null)
     setCommentContent('')
+    setReplyTargetId(null)
+    setReplyContent('')
     setEditingCommentId(null)
     setEditingCommentContent('')
   }
@@ -632,6 +638,23 @@ const AdminBoardsPage = () => {
 
     setEditingCommentId(commentId)
     setEditingCommentContent(commentContent ?? '')
+    setReplyTargetId(null)
+    setReplyContent('')
+  }
+
+  const toggleReply = (commentId: number | undefined) => {
+    if (!commentId) return
+
+    if (replyTargetId === commentId) {
+      setReplyTargetId(null)
+      setReplyContent('')
+      return
+    }
+
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setReplyTargetId(commentId)
+    setReplyContent('')
   }
 
   const submitComment = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -686,6 +709,87 @@ const AdminBoardsPage = () => {
     } catch (commentError) {
       showToast({
         title: '댓글을 등록하지 못했습니다.',
+        description: commentError instanceof ApiError
+          ? commentError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const submitReply = async (
+    event: React.FormEvent<HTMLFormElement>,
+    parentCommentId: number,
+  ) => {
+    event.preventDefault()
+
+    const trimmedContent = replyContent.trim()
+    if (
+      !detailTarget ||
+      !trimmedContent ||
+      creatingComment ||
+      detailTarget.cmntUseYn?.toUpperCase() === 'N'
+    ) {
+      return
+    }
+
+    const siblingReplies = (detailTarget.commentList ?? []).filter(
+      (comment) => comment.commentPrtId === parentCommentId,
+    )
+    const nextReplyOrder = siblingReplies.length + 1
+
+    try {
+      const response = await createBoardComment({
+        boardId: detailTarget.boardId,
+        commentCn: trimmedContent,
+        commentPrtId: parentCommentId,
+        commentDepth: 1,
+        commentOrder: nextReplyOrder,
+      })
+
+      setDetailTarget((currentDetail) => {
+        if (!currentDetail) return currentDetail
+
+        const nextCommentList = [...(currentDetail.commentList ?? [])]
+        const parentIndex = nextCommentList.findIndex(
+          (comment) => comment.commentId === parentCommentId,
+        )
+        let insertIndex = parentIndex >= 0
+          ? parentIndex + 1
+          : nextCommentList.length
+
+        while (
+          insertIndex < nextCommentList.length &&
+          nextCommentList[insertIndex].commentPrtId === parentCommentId
+        ) {
+          insertIndex += 1
+        }
+
+        nextCommentList.splice(insertIndex, 0, {
+          commentId: response.data,
+          boardId: currentDetail.boardId,
+          commentCn: trimmedContent,
+          wrterEmpId: currentEmployeeId ?? undefined,
+          wrteDt: new Date().toISOString(),
+          commentPrtId: parentCommentId,
+          commentDepth: 1,
+          commentOrder: nextReplyOrder,
+        })
+
+        return {
+          ...currentDetail,
+          commentList: nextCommentList,
+        }
+      })
+      setReplyTargetId(null)
+      setReplyContent('')
+      showToast({
+        title: '답글을 등록했습니다.',
+        variant: 'success',
+      })
+    } catch (commentError) {
+      showToast({
+        title: '답글을 등록하지 못했습니다.',
         description: commentError instanceof ApiError
           ? commentError.message
           : '잠시 후 다시 시도해주세요.',
@@ -755,6 +859,14 @@ const AdminBoardsPage = () => {
             ),
           }
         : currentDetail)
+      if (replyTargetId === commentId) {
+        setReplyTargetId(null)
+        setReplyContent('')
+      }
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null)
+        setEditingCommentContent('')
+      }
       showToast({
         title: '댓글을 삭제했습니다.',
         variant: 'success',
@@ -1465,38 +1577,85 @@ const AdminBoardsPage = () => {
                           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
                             {comment.commentCn}
                           </p>
-                          {comment.wrterEmpId === currentEmployeeId &&
-                            comment.commentId && (
-                            <div className="mt-2 flex items-center gap-3">
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-slate-500 hover:text-blue-600"
-                                onClick={() =>
-                                  toggleCommentEdit(
-                                    comment.commentId,
-                                    comment.commentCn,
-                                  )
-                                }
-                              >
-                                수정
-                              </button>
-                              <button
-                                type="button"
-                                disabled={deletingComment}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                onClick={() =>
-                                  void removeComment(comment.commentId as number)
-                                }
-                              >
-                                <Trash2 size={12} />
-                                {deletingCommentId === comment.commentId
-                                  ? '삭제 중'
-                                  : '삭제'}
-                              </button>
-                            </div>
-                          )}
+                     <div className="mt-2 inline-flex items-center gap-3 align-middle">
+  {/* 1. 답글 버튼 조건부 렌더링 */}
+  {!comment.commentDepth && comment.commentId && (
+    <button
+      type="button"
+      className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+      onClick={() => toggleReply(comment.commentId)}
+    >
+      {replyTargetId === comment.commentId ? '취소' : '답글'}
+    </button>
+  )}
+
+  {/* 2. 수정 버튼 조건부 렌더링 (내가 쓴 글일 때만 보임) */}
+  {comment.wrterEmpId === currentEmployeeId && comment.commentId && (
+    <button
+      type="button"
+      className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+      onClick={() =>
+        toggleCommentEdit(
+          comment.commentId,
+          comment.commentCn,
+        )
+      }
+    >
+      수정
+    </button>
+  )}
+
+  {/* 3. 삭제 버튼 조건부 렌더링 (내가 쓴 글일 때만 보임) */}
+  {comment.wrterEmpId === currentEmployeeId && comment.commentId && (
+    <button
+      type="button"
+      disabled={deletingComment}
+      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+      onClick={() =>
+        void removeComment(comment.commentId as number)
+      }
+    >
+      <Trash2 size={12} />
+      {deletingCommentId === comment.commentId ? '삭제 중' : '삭제'}
+    </button>
+  )}
+</div>
+                          
                         </>
                       )}
+                      {!comment.commentDepth &&
+                        replyTargetId === comment.commentId &&
+                        comment.commentId && (
+                          <form
+                            className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+                            onSubmit={(event) =>
+                              void submitReply(event, comment.commentId as number)
+                            }
+                          >
+                            <Textarea
+                              value={replyContent}
+                              onChange={(event) => setReplyContent(event.target.value)}
+                              placeholder="답글을 입력하세요."
+                              maxLength={1000}
+                              autoFocus
+                              className="min-h-20 resize-none rounded-md"
+                            />
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                              <span className="text-xs font-medium text-slate-400">
+                                {replyContent.length}/1000
+                              </span>
+                              <Button
+                                type="submit"
+                                size="sm"
+                                leftIcon={<Send size={14} />}
+                                loading={creatingComment}
+                                disabled={!replyContent.trim()}
+                              >
+                                답글 등록
+                              </Button>
+                            </div>
+                          </form>
+                        )}
                       </div>
                     </div>
                     )
