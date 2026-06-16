@@ -11,7 +11,8 @@ interface HeaderPopoverProps {
   // trigger는 팝오버를 여는 버튼 영역입니다. open, toggle, close를 넘겨서 버튼 상태를 제어할 수 있게 합니다.
   trigger: (props: HeaderPopoverRenderProps) => ReactNode
   // children에는 메일 목록, 메신저 목록, 알림 목록처럼 팝오버마다 다른 본문 UI를 넣습니다.
-  children?: ReactNode
+  // 함수를 넘기면 open/toggle/close 를 전달받아 본문에서 팝오버를 닫을 수 있습니다.
+  children?: ReactNode | ((props: HeaderPopoverRenderProps) => ReactNode)
   // footer는 "전체 보기"처럼 하단에 고정해서 보여줄 액션이 있을 때 사용합니다.
   footer?: ReactNode
   className?: string
@@ -95,7 +96,11 @@ const HeaderPopover = ({
           </div>
 
           {/* children 영역은 팝오버마다 자유롭게 다른 UI를 넣는 자리입니다. */}
-          <div className={bodyClassName}>{children}</div>
+          <div className={bodyClassName}>
+            {typeof children === 'function'
+              ? children({ open, toggle, close })
+              : children}
+          </div>
 
           {footer && (
             <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-center">

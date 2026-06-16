@@ -5,6 +5,7 @@ import {
   FileText,
   MailPlus,
   Paperclip,
+  Pencil,
   Reply,
   ReplyAll,
   Forward,
@@ -12,7 +13,9 @@ import {
   Search,
   Send,
   Star,
+  Tag,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   useCallback,
@@ -23,7 +26,7 @@ import {
   type ChangeEvent,
   type FormEvent,
 } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../api/axiosInstance';
 import { authApi } from '../../api/authApi';
 import { mailApi } from '../../api/mailApi';
@@ -39,6 +42,7 @@ import { useToast } from '../../components/common/toast/useToast';
 import type {
   MailDetailResponse,
   MailDraftRequest,
+  MailLabelResponse,
   MailListResult,
   MailRouteBox,
   MailSendRequest,
@@ -419,6 +423,7 @@ interface MailListProps {
   loading: boolean;
   selectedMailId: number | null;
   selectedIds: number[];
+  draftView: boolean;
   onSelect: (mailId: number) => void;
   onToggleSelect: (mailId: number) => void;
   onToggleImportant: (mail: MailSummaryResponse) => void;
@@ -429,6 +434,7 @@ function MailList({
   loading,
   selectedMailId,
   selectedIds,
+  draftView,
   onSelect,
   onToggleSelect,
   onToggleImportant,
@@ -472,7 +478,7 @@ function MailList({
             <button
               type="button"
               onClick={() => onSelect(mail.mailId)}
-              className={`flex w-full items-start gap-3 py-4 pr-5 text-left transition ${
+              className={`flex min-w-0 flex-1 items-start gap-3 py-4 pr-5 text-left transition ${
                 selected ? 'bg-blue-50' : 'bg-white hover:bg-slate-50'
               }`}
             >
@@ -506,6 +512,7 @@ function MailList({
                 <span className="text-xs font-semibold text-slate-400">
                   {formatDateTime(mail.sentAt)}
                 </span>
+                {!draftView ? (
                 <button
                   type="button"
                   onClick={(event) => {
@@ -524,6 +531,7 @@ function MailList({
                     fill={mail.important ? 'currentColor' : 'none'}
                   />
                 </button>
+                ) : null}
               </div>
             </div>
             </button>
@@ -534,10 +542,102 @@ function MailList({
   );
 }
 
+function MailLabelEditor({ mailId }: { mailId: number }) {
+  const [allLabels, setAllLabels] = useState<MailLabelResponse[]>([]);
+  const [applied, setApplied] = useState<MailLabelResponse[]>([]);
+
+  const load = useCallback(async () => {
+    try {
+      const [labelsRes, mineRes] = await Promise.all([
+        mailApi.getUserLabels(),
+        mailApi.getMailLabels(mailId),
+      ]);
+      setAllLabels(labelsRes.data.data ?? []);
+      setApplied(mineRes.data.data ?? []);
+    } catch {
+      setAllLabels([]);
+      setApplied([]);
+    }
+  }, [mailId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
+
+  const appliedIds = new Set(applied.map((label) => label.labelId));
+  const available = allLabels.filter((label) => !appliedIds.has(label.labelId));
+
+  const apply = async (labelId: number) => {
+    try {
+      await mailApi.applyLabel(mailId, labelId);
+      await load();
+    } catch {
+      // ignore
+    }
+  };
+
+  const remove = async (labelId: number) => {
+    try {
+      await mailApi.removeLabel(mailId, labelId);
+      await load();
+    } catch {
+      // ignore
+    }
+  };
+
+  if (allLabels.length === 0 && applied.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span className="text-xs font-bold text-slate-500">라벨</span>
+      {applied.map((label) => (
+        <span
+          key={label.labelId}
+          className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700"
+        >
+          <Tag size={12} />
+          {label.name}
+          <button
+            type="button"
+            onClick={() => void remove(label.labelId)}
+            className="hover:text-red-500"
+            aria-label={`${label.name} 제거`}
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+      {available.length > 0 ? (
+        <select
+          value=""
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            if (value) {
+              void apply(value);
+            }
+          }}
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600"
+        >
+          <option value="">+ 라벨 추가</option>
+          {available.map((label) => (
+            <option key={label.labelId} value={label.labelId}>
+              {label.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
+  );
+}
+
 interface MailDetailPanelProps {
   detail: MailDetailResponse | null;
   loading: boolean;
   trashView: boolean;
+  draftView: boolean;
   onMarkRead: () => void;
   onReply: () => void;
   onReplyAll: () => void;
@@ -546,6 +646,8 @@ interface MailDetailPanelProps {
   onToggleImportant: () => void;
   onMoveTrash: () => void;
   onRestore: () => void;
+  onEditDraft: () => void;
+  onSendDraft: () => void;
   onDownloadAttachment: (attachmentId: number, fileName: string) => void;
 }
 
@@ -553,6 +655,7 @@ function MailDetailPanel({
   detail,
   loading,
   trashView,
+  draftView,
   onMarkRead,
   onReply,
   onReplyAll,
@@ -561,6 +664,8 @@ function MailDetailPanel({
   onToggleImportant,
   onMoveTrash,
   onRestore,
+  onEditDraft,
+  onSendDraft,
   onDownloadAttachment,
 }: MailDetailPanelProps) {
   const participantGroups = useMemo(() => {
@@ -606,6 +711,27 @@ function MailDetailPanel({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {draftView ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Pencil size={15} />}
+                  onClick={onEditDraft}
+                >
+                  수정
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={<Send size={15} />}
+                  onClick={onSendDraft}
+                >
+                  전송
+                </Button>
+              </>
+            ) : (
+              <>
             {!trashView ? (
               <>
                 <Button
@@ -675,6 +801,8 @@ function MailDetailPanel({
                 휴지통
               </Button>
             )}
+              </>
+            )}
           </div>
         </div>
 
@@ -697,6 +825,8 @@ function MailDetailPanel({
             </Badge>
           ))}
         </div>
+
+        <MailLabelEditor mailId={detail.mailId} />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
@@ -751,15 +881,19 @@ function MailDetailPanel({
 }
 
 export default function MailPage() {
-  const { mailbox } = useParams<{ mailbox?: string }>();
+  const { mailbox, labelId } = useParams<{ mailbox?: string; labelId?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const currentMailbox = (
     mailbox && mailbox in mailboxMeta ? mailbox : 'inbox'
   ) as MailRouteBox;
+  const labelMode = Boolean(labelId);
+  const labelIdNum = labelId ? Number(labelId) : null;
   const meta = mailboxMeta[currentMailbox];
   const trashView = currentMailbox === 'trash';
-  const inboxView = currentMailbox === 'inbox';
+  const draftView = currentMailbox === 'draft';
+  const inboxView = !labelMode && currentMailbox === 'inbox';
 
   const [mails, setMails] = useState<MailSummaryResponse[]>([]);
   const [pagination, setPagination] = useState<MailListResult['pagination']>(
@@ -776,6 +910,7 @@ export default function MailPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [composePrefill, setComposePrefill] = useState<ComposePrefill | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [labelName, setLabelName] = useState('');
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [scopeRequired, setScopeRequired] = useState(false);
@@ -807,14 +942,17 @@ export default function MailPage() {
         }
       }
 
-      const response = trashView
-        ? await mailApi.getTrashMails({ page, size: PAGE_SIZE })
-        : await mailApi.getMails({
-            type: meta.apiType,
-            keyword: keyword || undefined,
-            page,
-            size: PAGE_SIZE,
-          });
+      const response =
+        labelMode && labelIdNum != null
+          ? await mailApi.getMailsByLabel(labelIdNum, { page, size: PAGE_SIZE })
+          : trashView
+            ? await mailApi.getTrashMails({ page, size: PAGE_SIZE })
+            : await mailApi.getMails({
+                type: meta.apiType,
+                keyword: keyword || undefined,
+                page,
+                size: PAGE_SIZE,
+              });
       const nextMails = response.data.data ?? [];
       setMails(nextMails);
       setPagination(response.data.pagination ?? null);
@@ -841,7 +979,42 @@ export default function MailPage() {
     } finally {
       setListLoading(false);
     }
-  }, [keyword, meta.apiType, page, syncMails, trashView]);
+  }, [keyword, meta.apiType, page, syncMails, trashView, labelMode, labelIdNum]);
+
+  useEffect(() => {
+    if (!labelMode || labelIdNum == null) {
+      return;
+    }
+    let active = true;
+    mailApi
+      .getUserLabels()
+      .then((res) => {
+        if (!active) return;
+        const found = (res.data.data ?? []).find(
+          (item) => item.labelId === labelIdNum,
+        );
+        setLabelName(found?.name ?? '라벨');
+      })
+      .catch(() => {
+        if (active) setLabelName('라벨');
+      });
+    return () => {
+      active = false;
+    };
+  }, [labelMode, labelIdNum]);
+
+  // 헤더 메일 팝오버 등에서 ?mailId=로 진입하면 해당 메일을 자동 선택한다.
+  useEffect(() => {
+    const mailIdParam = searchParams.get('mailId');
+    if (!mailIdParam) {
+      return;
+    }
+    const id = Number(mailIdParam);
+    if (!Number.isNaN(id)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedMailId(id);
+    }
+  }, [searchParams]);
 
   const loadDetail = useCallback(async () => {
     if (!selectedMailId) {
@@ -852,7 +1025,9 @@ export default function MailPage() {
     setDetailLoading(true);
 
     try {
-      const response = await mailApi.getMailDetail(selectedMailId);
+      const response = draftView
+        ? await mailApi.getDraft(selectedMailId)
+        : await mailApi.getMailDetail(selectedMailId);
       setDetail(response.data.data ?? null);
     } catch (error) {
       if (error instanceof ApiError && error.errorCode === 'MAIL_003') {
@@ -867,7 +1042,7 @@ export default function MailPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, [selectedMailId, showToast]);
+  }, [draftView, selectedMailId, showToast]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -1002,8 +1177,6 @@ export default function MailPage() {
     setComposeOpen(true);
   };
 
-  const draftView = currentMailbox === 'draft';
-
   const handleSaveDraft = async (request: MailDraftRequest) => {
     try {
       await mailApi.saveDraft(request);
@@ -1066,6 +1239,36 @@ export default function MailPage() {
         description: getMailErrorMessage(error),
         variant: 'danger',
       });
+    }
+  };
+
+  const handleSendDraft = async (mailId: number) => {
+    if (!window.confirm('저장된 임시메일을 바로 전송하시겠습니까?')) {
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      await mailApi.sendDraft(mailId);
+      setComposeOpen(false);
+      setComposePrefill(null);
+      setSelectedIds([]);
+      setSelectedMailId(null);
+      setDetail(null);
+      showToast({ title: '임시보관 메일을 전송했습니다.', variant: 'success' });
+      navigate('/mail/sent');
+    } catch (error) {
+      if (error instanceof ApiError && error.errorCode === 'MAIL_003') {
+        setScopeRequired(true);
+      }
+      showToast({
+        title: '임시보관 메일 전송 실패',
+        description: getMailErrorMessage(error),
+        variant: 'danger',
+      });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -1234,10 +1437,12 @@ export default function MailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight text-slate-950">
-              {meta.title}
+              {labelMode ? labelName || '라벨' : meta.title}
             </h1>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              {meta.description}
+              {labelMode
+                ? '이 라벨이 적용된 메일을 모아봅니다.'
+                : meta.description}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1378,11 +1583,8 @@ export default function MailPage() {
               loading={listLoading}
               selectedMailId={selectedMailId}
               selectedIds={selectedIds}
-              onSelect={
-                draftView
-                  ? (mailId) => void openDraftForEdit(mailId)
-                  : setSelectedMailId
-              }
+              draftView={draftView}
+              onSelect={setSelectedMailId}
               onToggleSelect={toggleSelect}
               onToggleImportant={handleSummaryImportant}
             />
@@ -1394,6 +1596,7 @@ export default function MailPage() {
             detail={detail}
             loading={detailLoading}
             trashView={trashView}
+            draftView={draftView}
             onMarkRead={() => {
               if (detail) {
                 void mutateAndReload(
@@ -1429,6 +1632,16 @@ export default function MailPage() {
                   () => mailApi.restoreTrashMail(detail.mailId),
                   '메일을 복원했습니다.',
                 );
+              }
+            }}
+            onEditDraft={() => {
+              if (detail) {
+                void openDraftForEdit(detail.mailId);
+              }
+            }}
+            onSendDraft={() => {
+              if (detail) {
+                void handleSendDraft(detail.mailId);
               }
             }}
           />

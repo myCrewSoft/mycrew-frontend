@@ -5,6 +5,9 @@ import type {
   MailBulkResponse,
   MailDetailResponse,
   MailDraftRequest,
+  MailLabelRequest,
+  MailLabelResponse,
+  MailUnreadCountResponse,
   MailImportantUpdateRequest,
   MailListQuery,
   MailMutationResponse,
@@ -110,6 +113,52 @@ export const mailApi = {
       `/api/mails/drafts/${mailId}`,
     ),
 
+  sendDraft: (mailId: number) =>
+    axiosInstance.post<ApiResponse<MailSendResponse>>(
+      `/api/mails/drafts/${mailId}/send`,
+    ),
+
   deleteDraft: (mailId: number) =>
     axiosInstance.delete<ApiResponse<void>>(`/api/mails/drafts/${mailId}`),
+
+  getMailUnreadCount: () =>
+    axiosInstance.get<ApiResponse<MailUnreadCountResponse>>(
+      '/api/mails/unread-count',
+    ),
+
+  getUserLabels: () =>
+    axiosInstance.get<ApiResponse<MailLabelResponse[]>>('/api/mails/labels'),
+
+  createLabel: (request: MailLabelRequest) =>
+    axiosInstance.post<ApiResponse<MailLabelResponse>>('/api/mails/labels', request),
+
+  renameLabel: (labelId: number, request: MailLabelRequest) =>
+    axiosInstance.patch<ApiResponse<MailLabelResponse>>(
+      `/api/mails/labels/${labelId}`,
+      request,
+    ),
+
+  deleteLabel: (labelId: number) =>
+    axiosInstance.delete<ApiResponse<void>>(`/api/mails/labels/${labelId}`),
+
+  getMailsByLabel: (labelId: number, query: { page?: number; size?: number }) =>
+    axiosInstance.get<ApiResponse<MailSummaryResponse[]>>(
+      `/api/mails/labels/${labelId}/mails`,
+      { params: query },
+    ),
+
+  getMailLabels: (mailId: number) =>
+    axiosInstance.get<ApiResponse<MailLabelResponse[]>>(
+      `/api/mails/${mailId}/labels`,
+    ),
+
+  applyLabel: (mailId: number, labelId: number) =>
+    axiosInstance.post<ApiResponse<void>>(
+      `/api/mails/${mailId}/labels/${labelId}`,
+    ),
+
+  removeLabel: (mailId: number, labelId: number) =>
+    axiosInstance.delete<ApiResponse<void>>(
+      `/api/mails/${mailId}/labels/${labelId}`,
+    ),
 };

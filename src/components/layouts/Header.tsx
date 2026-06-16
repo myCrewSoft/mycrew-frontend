@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bell, Mail, MessageSquare, Search } from 'lucide-react'
+import { mailApi } from '../../api/mailApi'
 import { notificationApi } from '../../api/notificationApi'
 import { useApi } from '../../hooks/useApi'
 import type { NotificationUnreadCountResponse } from '../../types'
@@ -8,6 +9,7 @@ import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
 import GlobalSearchPalette from './headerSearch/GlobalSearchPalette'
 import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
 import { useMessengerSocketContext } from './headerPopover/messenger/MessengerSocketProvider'
+import MailPopoverContent from './headerPopover/MailPopoverContent'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
 import { NOTIFICATION_RECEIVED_EVENT } from './headerPopover/useNotificationStream'
 import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
@@ -28,6 +30,11 @@ const Header = () => {
     data: notificationUnreadCount,
     execute: fetchNotificationUnreadCount,
   } = useApi<NotificationUnreadCountResponse>(notificationApi.getUnreadCount)
+
+  const { data: mailUnread, execute: fetchMailUnread } = useApi(
+    mailApi.getMailUnreadCount,
+  )
+  const [mailRefreshKey, setMailRefreshKey] = useState(0)
 
   const handleCloseNotifications = () => {
     void readAllNotifications()
@@ -68,6 +75,25 @@ const Header = () => {
       )
     }
   }, [fetchNotificationUnreadCount])
+
+  useEffect(() => {
+    const handleMailNotification = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { notification?: { alrmTypeCd?: string } }
+        | undefined
+      if (detail?.notification?.alrmTypeCd === '10') {
+        void fetchMailUnread().catch(() => undefined)
+        setMailRefreshKey((current) => current + 1)
+      }
+    }
+
+    window.addEventListener(NOTIFICATION_RECEIVED_EVENT, handleMailNotification)
+    return () =>
+      window.removeEventListener(
+        NOTIFICATION_RECEIVED_EVENT,
+        handleMailNotification,
+      )
+  }, [fetchMailUnread])
 
   useEffect(() => {
     if (
@@ -113,8 +139,15 @@ const Header = () => {
               <NotificationIconButton
                 active={open}
                 label="메일"
-                count={12}
-                onClick={toggle}
+                count={mailUnread?.count ?? 0}
+                badgeVariant="danger"
+                onClick={() => {
+                  if (!open) {
+                    void fetchMailUnread().catch(() => undefined)
+                    setMailRefreshKey((current) => current + 1)
+                  }
+                  toggle()
+                }}
                 icon={
                   <Mail
                     size={20}
@@ -124,7 +157,12 @@ const Header = () => {
               />
             )}
           >
-            {/* Mail popover content can be added here when the mail module is ready. */}
+            {({ close }) => (
+              <MailPopoverContent
+                refreshSignal={mailRefreshKey}
+                onSelect={close}
+              />
+            )}
           </HeaderPopover>
 
           <HeaderPopover
