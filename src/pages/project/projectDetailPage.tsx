@@ -26,6 +26,7 @@ import ProjectSummaryCard from './ProjectSummaryCard'
 import ProjectUrgentTaskCard from './ProjectUrgentTaskCard'
 import ProjectEditDrawer from './ProjectEditDrawer'
 import { employeeApi } from '../../api/employeeApi'
+import ProjectDriveTab from './ProjectDriveTab'
 
 const STATUS_LABEL: Record<string, string> = {
   '01': '예정',
@@ -69,7 +70,7 @@ const ProjectDetailPage = () => {
     { value: 'overview', label: '개요' },
     { value: 'tasks', label: '업무' },
     { value: 'gantt', label: '간트차트' },
-    { value: 'board', label: '보드' },
+    { value: 'board', label: '프로젝트 커뮤니티' },
     { value: 'drive', label: '프로젝트 드라이브' },
   ]
 
@@ -192,8 +193,10 @@ const ProjectDetailPage = () => {
         <ProjectBoardTab projectId={Number(projectId)} />
       )}
 
+      {tab === 'drive' && <ProjectDriveTab projId={project.projId} />}
+
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
-      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && (
+      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && tab !== 'drive' &&(
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">
@@ -202,6 +205,7 @@ const ProjectDetailPage = () => {
         </div>
       )}
 
+      
       {/* 수정 Drawer */}
       <ProjectEditDrawer
         key={project.projId}

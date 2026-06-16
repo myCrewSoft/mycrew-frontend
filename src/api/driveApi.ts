@@ -42,8 +42,10 @@ export const driveApi = {
     axiosInstance.patch<ApiResponse<string>>(`/api/drive/items/${driveItemId}/delete`),
 
   //휴지통 목록 조회
-  getTrashList: () =>
-    axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive/trash'),
+  getTrashList: (page = 0) =>
+    axiosInstance.get<ApiResponse<DriveResponseDto[]>>('/api/drive/trash',{
+      params: {page}
+    }),
 
   // 휴지통 단건 복구
   restoreItem: (driveItemId: number) =>
@@ -57,5 +59,11 @@ export const driveApi = {
   downloadFile: (driveItemId: number) =>
     axiosInstance.get(`/api/drive/files/${driveItemId}/download`, {
       responseType: 'blob',
+    }),
+
+  //즐겨찾기 목록 조회
+  getBookmarkList: (page = 0) =>
+    axiosInstance.get('/api/drive/bookmark', {
+      params:{page}
     }),
 }
