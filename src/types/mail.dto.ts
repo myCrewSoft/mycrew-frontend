@@ -99,6 +99,19 @@ export interface MailDraftRequest {
   content?: string;
 }
 
+export interface MailUnreadCountResponse {
+  count: number;
+}
+
+export interface MailLabelResponse {
+  labelId: number;
+  name: string;
+}
+
+export interface MailLabelRequest {
+  name: string;
+}
+
 export interface MailSendResponse {
   mailId: number;
   externalMessageId: string;
