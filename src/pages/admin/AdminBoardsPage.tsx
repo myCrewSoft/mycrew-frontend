@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Eye,
-  FileText,
-  FolderKanban,
-  Megaphone,
   MessageSquare,
   Paperclip,
   Pencil,
@@ -11,7 +9,6 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
-  ShieldQuestion,
   Sparkles,
   Square,
   ThumbsUp,
@@ -55,13 +52,20 @@ import BoardAttachmentImage from '../board/BoardAttachmentImage'
 import BoardContentViewer from '../board/BoardContentViewer'
 import BoardWriteForm from '../board/BoardWriteForm'
 
-interface BoardTypeOption {
-  value: AdminBoardKind
-  label: string
-  icon: typeof Megaphone
-}
-
 type AdminBoardKind = BoardKind | 'project'
+
+const adminBoardKinds: AdminBoardKind[] = [
+  'notice',
+  'department',
+  'free',
+  'anonymous',
+  'project',
+]
+
+const getAdminBoardKindFromParam = (value: string | null): AdminBoardKind =>
+  adminBoardKinds.includes(value as AdminBoardKind)
+    ? (value as AdminBoardKind)
+    : 'notice'
 
 type DepartmentBoardOption = BoardSideBarResponse & {
   deptCd?: string
@@ -147,14 +151,6 @@ const getAdminBoardDetail = ({
   })
 }
 
-const boardTypeOptions: BoardTypeOption[] = [
-  { value: 'notice', label: '공지사항', icon: Megaphone },
-  { value: 'department', label: '부서게시판', icon: FileText },
-  { value: 'free', label: '자유게시판', icon: MessageSquare },
-  { value: 'anonymous', label: '익명게시판', icon: ShieldQuestion },
-  { value: 'project', label: '프로젝트 게시판', icon: FolderKanban },
-]
-
 const boardLabelByType: Record<AdminBoardKind, string> = {
   notice: '공지사항',
   department: '부서게시판',
@@ -222,7 +218,12 @@ const parseBoardLikeState = (
 
 const AdminBoardsPage = () => {
   const { showToast } = useToast()
-  const [boardType, setBoardType] = useState<AdminBoardKind>('notice')
+  const [searchParams] = useSearchParams()
+  const selectedBoardTypeParam = searchParams.get('boardType')
+  const boardType = useMemo(
+    () => getAdminBoardKindFromParam(selectedBoardTypeParam),
+    [selectedBoardTypeParam],
+  )
   const [departmentCode, setDepartmentCode] = useState('')
   const [projectId, setProjectId] = useState(0)
   const [page, setPage] = useState(1)
@@ -393,13 +394,6 @@ const AdminBoardsPage = () => {
   const attachmentCount = boards.filter(
     (board) => Boolean(board.boardAtchFileId),
   ).length
-
-  const changeBoardType = (nextType: AdminBoardKind) => {
-    setBoardType(nextType)
-    setPage(1)
-    setKeyword('')
-    setSearchText('')
-  }
 
   const submitSearch = () => {
     setPage(1)
@@ -1036,29 +1030,6 @@ const AdminBoardsPage = () => {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {boardTypeOptions.map((option) => {
-          const Icon = option.icon
-          const active = boardType === option.value
-
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => changeBoardType(option.value)}
-              className={`flex h-14 items-center gap-3 rounded-lg border px-4 text-left transition ${
-                active
-                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
-              }`}
-            >
-              <Icon size={19} />
-              <span className="text-sm font-bold">{option.label}</span>
-            </button>
-          )
-        })}
-      </div>
-
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white px-5 py-4">
           <p className="text-xs font-bold text-slate-500">전체 게시글</p>
@@ -1127,7 +1098,7 @@ const AdminBoardsPage = () => {
             <SearchInput
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
-              placeholder="게시글 제목 검색"
+              placeholder="게시글 제목&내용 검색"
             />
             <Button type="submit" className="shrink-0">
               검색

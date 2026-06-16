@@ -735,7 +735,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
         <SearchInput
           value={searchKeyword}
           onChange={(event) => setSearchKeyword(event.target.value)}
-          placeholder="제목 검색"
+          placeholder="제목&내용 검색"
           wrapperClassName="max-w-sm"
         />
         <Button type="submit" variant="outline">
