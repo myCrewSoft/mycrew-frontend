@@ -8,6 +8,7 @@ import type {
   RoomUpdateRequest,
 } from '../types'
 import type { ApiResponse } from './axiosInstance'
+import { roomApi } from './roomApi'
 
 const formatDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
@@ -97,7 +98,7 @@ const deleteReservation = (reservationId: number) => {
 }
 
 export const meetingRoomReservationApi = {
-  getMeetingRooms,
+  getMeetingRooms: roomApi.getRoomList,
   getMeetingRoom,
   createMeetingRoom,
   updateMeetingRoom,

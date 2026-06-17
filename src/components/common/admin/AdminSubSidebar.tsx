@@ -8,6 +8,7 @@ import AdminRanksSubSidebar from './AdminRanksSubSidebar';
 import AdminRolesSubSidebar from './AdminRolesSubSidebar';
 import AdminAttendanceSubSidebar from './AdminAttendanceSubSidebar';
 import { subSidebarClass } from './adminLayoutStyles';
+import AdminReservationSubSidebar from './AdminReservationSubSidebar';
 
 export default function AdminSubSidebar() {
   const location = useLocation();
@@ -41,6 +42,9 @@ export default function AdminSubSidebar() {
     content = <AdminBoardsSubSidebar selectedBoardType={selectedBoardType} />;
   } else if (pathname.startsWith('/admin/attendance')) {
     content = <AdminAttendanceSubSidebar />;
+  } else if (pathname.startsWith('/admin/reservations')) {
+    const selectedType = searchParams.get('view') ?? 'rooms'
+    content = <AdminReservationSubSidebar selectedType={selectedType} />
   } else {
     content = <AdminGenericSubSidebar pathname={pathname} />;
   }
