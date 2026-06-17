@@ -1,4 +1,4 @@
-import { Search, Send, UserPlus, X } from 'lucide-react'
+import { Search, Send, Sparkles, UserPlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import { employeeApi } from '../../api/employeeApi'
@@ -35,6 +35,10 @@ type Props = {
   onApproversChange: (next: SelectedApprover[]) => void
   onClose: () => void
   onSubmit: () => Promise<void>
+  aiPrompt?: string
+  aiGenerating?: boolean
+  onAiPromptChange?: (value: string) => void
+  onGenerateAiDraft?: () => Promise<void>
   // ── 휴가 신청 모드(옵션) ──
   leaveMode?: boolean
   leaveInfo?: LeaveDraftInfo
@@ -59,6 +63,10 @@ export default function ApprovalDraftModal({
   onApproversChange,
   onClose,
   onSubmit,
+  aiPrompt = '',
+  aiGenerating = false,
+  onAiPromptChange,
+  onGenerateAiDraft,
   leaveMode = false,
   leaveInfo,
   leaveTypes = [],
@@ -83,6 +91,7 @@ export default function ApprovalDraftModal({
   useEffect(() => { formRef.current = form }, [form])
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const showAiDraft = Boolean(onGenerateAiDraft && onAiPromptChange && !leaveMode && !otMode)
 
   // 모달 열릴 때 템플릿 목록 로드
   useEffect(() => {
@@ -213,6 +222,33 @@ export default function ApprovalDraftModal({
         {/* ── 왼쪽: 기안서 내용 ── */}
         <div className="approval-draft-layout__main">
           <div className="approval-draft-form">
+            {showAiDraft && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-black text-blue-700">
+                  <Sparkles size={16} />
+                  <span>AI 초안 생성</span>
+                </div>
+                <textarea
+                  className="min-h-20 w-full resize-y rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
+                  placeholder="예: 6월 20일부터 21일까지 개인 사유로 휴가 신청서 작성해줘."
+                  value={aiPrompt}
+                  disabled={aiGenerating || saving}
+                  onChange={(event) => onAiPromptChange?.(event.target.value)}
+                />
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={aiGenerating}
+                    disabled={!aiPrompt.trim() || saving}
+                    leftIcon={<Sparkles size={14} />}
+                    onClick={() => void onGenerateAiDraft?.()}
+                  >
+                    AI로 임시저장
+                  </Button>
+                </div>
+              </div>
+            )}
             {/* 휴가 신청 모드: 휴가 정보 입력 */}
             {leaveMode && leaveInfo && onLeaveInfoChange && (
               <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">

@@ -4,6 +4,8 @@ import type { ApiResponse } from './axiosInstance';
 
 import type {
   ApprovalActionRequestDTO,
+  ApprovalAiDraftRequestDTO,
+  ApprovalAiDraftResponseDTO,
   ApprovalAvailabilityResponse,
   ApprovalDocumentDetailResponse,
   ApprovalDraftCountResponse,
@@ -38,6 +40,7 @@ type ApprovalAvailabilityAxiosResponse = AxiosResponse<ApiResponse<ApprovalAvail
 type ApprovalTemplateAxiosResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse>>;
 type ApprovalTemplateListResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse[]>>;
 type ApprovalDraftCountAxiosResponse = AxiosResponse<ApiResponse<ApprovalDraftCountResponse>>;
+type ApprovalAiDraftAxiosResponse = AxiosResponse<ApiResponse<ApprovalAiDraftResponseDTO>>;
 
 const APPROVAL_BASE_URL = '/api/approval';
 
@@ -50,6 +53,16 @@ export const approvalApi = {
     data: ApprovalDraftRequestDTO,
   ): Promise<AxiosResponse<ApiResponse<number>>> => {
     return axiosInstance.post(`${APPROVAL_BASE_URL}/drafts`, data);
+  },
+
+  /**
+   * AI 기안서 초안 생성 및 임시저장
+   * POST /api/approval/ai/drafts
+   */
+  createAiDraft: (
+    data: ApprovalAiDraftRequestDTO,
+  ): Promise<ApprovalAiDraftAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/drafts`, data);
   },
 
   /**

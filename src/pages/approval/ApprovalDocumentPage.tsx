@@ -138,7 +138,11 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     setDraftApprovers,
     draftError,
     draftSaving,
+    aiPrompt,
+    aiGenerating,
     isEditingDraft,
+    setAiPrompt,
+    handleGenerateAiDraft,
     openDraftForEdit,
     handleSaveDraft,
     closeDraft,
@@ -513,6 +517,10 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
         form={draftForm}
         approvers={draftApprovers}
         error={draftError}
+        aiPrompt={isEditingDraft ? undefined : aiPrompt}
+        aiGenerating={aiGenerating}
+        onAiPromptChange={isEditingDraft ? undefined : setAiPrompt}
+        onGenerateAiDraft={isEditingDraft ? undefined : handleGenerateAiDraft}
         onChange={setDraftForm}
         onApproversChange={setDraftApprovers}
         onClose={closeDraft}

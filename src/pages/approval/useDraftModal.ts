@@ -28,6 +28,8 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
   const [draftApprovers, setDraftApprovers] = useState<SelectedApprover[]>([])
   const [draftError, setDraftError] = useState('')
   const [draftSaving, setDraftSaving] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
   // 수정 모드일 때 대상 기안문 일련번호. null 이면 신규 작성.
   const [editingDocSn, setEditingDocSn] = useState<number | null>(null)
 
@@ -38,6 +40,7 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
       setDraftForm(defaultDraftForm)
       setDraftApprovers([])
       setDraftError('')
+      setAiPrompt('')
       setDraftOpen(true)
     }
     window.addEventListener('approval:open-draft', openDraft)
@@ -65,8 +68,50 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
       }))
     setDraftApprovers(approvers)
     setDraftError('')
+    setAiPrompt('')
     setDraftOpen(true)
   }, [])
+
+  const resetDraftState = useCallback(() => {
+    setDraftForm(defaultDraftForm)
+    setDraftApprovers([])
+    setEditingDocSn(null)
+    setAiPrompt('')
+  }, [])
+
+  const handleGenerateAiDraft = useCallback(async () => {
+    const prompt = aiPrompt.trim()
+    if (!prompt) {
+      setDraftError('AI에게 요청할 기안 내용을 입력하세요.')
+      return
+    }
+
+    setAiGenerating(true)
+    setDraftError('')
+    try {
+      const response = await approvalApi.createAiDraft({
+        userPrompt: prompt,
+        tmplatCd: draftForm.tmplatCd.trim() || undefined,
+      })
+      const result = response.data.data
+      setDraftOpen(false)
+      resetDraftState()
+      showToast({
+        title: 'AI 기안서 초안이 임시저장되었습니다.',
+        description: result?.docTtl
+          ? `${result.docTtl} 문서를 임시저장함에서 수정할 수 있습니다.`
+          : undefined,
+        variant: 'success',
+      })
+      if (onSuccess) await onSuccess()
+      window.dispatchEvent(new Event('approval:refresh-counts'))
+      navigate('/approval/sent/temporary')
+    } catch (error) {
+      setDraftError(getApiErrorMessage(error, 'AI 기안서 초안 생성에 실패했습니다.'))
+    } finally {
+      setAiGenerating(false)
+    }
+  }, [aiPrompt, draftForm.tmplatCd, navigate, onSuccess, resetDraftState, showToast])
 
   const handleSaveDraft = useCallback(async () => {
     if (!draftForm.docTtl.trim()) {
@@ -103,9 +148,7 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     try {
       await approvalApi.saveTemporaryDraft(request)
       setDraftOpen(false)
-      setDraftForm(defaultDraftForm)
-      setDraftApprovers([])
-      setEditingDocSn(null)
+      resetDraftState()
       showToast({
         title: isEditing ? '기안서를 수정했습니다.' : '기안서를 임시저장했습니다.',
         variant: 'success',
@@ -125,12 +168,13 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     } finally {
       setDraftSaving(false)
     }
-  }, [draftForm, draftApprovers, editingDocSn, showToast, navigate, onSuccess])
+  }, [draftForm, draftApprovers, editingDocSn, showToast, navigate, onSuccess, resetDraftState])
 
   const closeDraft = useCallback(() => {
     setDraftOpen(false)
     setDraftError('')
     setEditingDocSn(null)
+    setAiPrompt('')
   }, [])
 
   return {
@@ -142,7 +186,11 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     setDraftApprovers,
     draftError,
     draftSaving,
+    aiPrompt,
+    aiGenerating,
     isEditingDraft: editingDocSn != null,
+    setAiPrompt,
+    handleGenerateAiDraft,
     openDraftForEdit,
     handleSaveDraft,
     closeDraft,

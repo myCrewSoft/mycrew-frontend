@@ -43,6 +43,30 @@ export interface ApprovalDraftRequestDTO {
   approvalLines?: ApprovalStepRequestDTO[];
 }
 
+/** 전자결재 AI 기안서 초안 생성 요청 */
+export interface ApprovalAiDraftRequestDTO {
+  /** AI에게 전달할 기안서 작성 요청 내용 */
+  userPrompt: string;
+
+  /** 우선 활용할 결재 양식 코드 */
+  tmplatCd?: string;
+}
+
+/** 전자결재 AI 기안서 초안 생성 응답 */
+export interface ApprovalAiDraftResponseDTO {
+  /** AI가 생성해 임시저장한 기안문 일련번호 */
+  drftDocSn: number;
+
+  /** AI가 생성한 기안서 제목 */
+  docTtl: string;
+
+  /** AI 초안에 적용된 결재 양식 코드 */
+  tmplatCd?: Nullable<string>;
+
+  /** AI 초안 생성 중 서버가 보정한 내용 또는 사용자 확인이 필요한 경고 */
+  warnings?: string[];
+}
+
 /** 결재 단계 요청 */
 export interface ApprovalStepRequestDTO {
   /** 결재 방식 코드 */
