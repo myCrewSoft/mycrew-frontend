@@ -56,11 +56,17 @@ export type ReservationResponse = Omit<
 > & {
   mtngId: number | null;
 };
+export type RsrvStatsSummary = components['schemas']['RsrvStatsSummary'];
+export type RsrvListItem = components['schemas']['RsrvListItem'];
+export type PopularRmItem = components['schemas']['PopularRmItem'];
+export type RsrvSearchRequest = components['schemas']['RsrvSearchRequest'];
 
 // 회의실
 export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
 export type RoomUpdateRequest = components['schemas']['RoomUpdateRequest'];
 export type RoomResponse = components['schemas']['RoomResponse'];
+export type ConfRmStatsSummary = components['schemas']['ConfRmStatsSummary'];
+export type ConfRmListItem = components['schemas']['ConfRmListItem'];
 
 // 업무
 export type TaskCreateRequest = components['schemas']['TaskCreateRequest'];
