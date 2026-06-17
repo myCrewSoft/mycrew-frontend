@@ -387,6 +387,29 @@
   cursor: not-allowed;
 }
 
+.approval-draft-form__content-section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.approval-draft-form__content-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.approval-draft-form__content-header .approval-draft-form__label {
+  margin-bottom: 0;
+}
+
+.approval-draft-form__content-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .approval-draft-form__content-editor {
   display: block;
   width: 100%;
@@ -394,6 +417,16 @@
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background-color: #ffffff;
+}
+
+.approval-draft-form__html-editor {
+  min-height: 28rem;
+  border-radius: 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.approval-draft-form__preview-wrap .approval-page__html-document {
+  min-height: calc(50vh);
 }
 
 /* 문서 뷰어 iframe 래퍼 */
@@ -524,7 +557,6 @@
   margin-top: 0;
 }
 
-.approval-page__html-document > *:last
 .approval-page__html-document > *:last-child {
   margin-bottom: 0;
 }

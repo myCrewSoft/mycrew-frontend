@@ -1,10 +1,11 @@
-import { Search, Send, Sparkles, UserPlus, X } from 'lucide-react'
+import { Code2, Eye, Pencil, Search, Send, Sparkles, UserPlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { approvalApi } from '../../api/approvalApi'
 import { employeeApi } from '../../api/employeeApi'
 import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Button from '../../components/common/button/Button'
 import FormField from '../../components/common/form/formField/FormField'
+import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import type { EmployeeLookupResponse } from '../../types'
 import type { ApprovalTemplateResponse } from '../../types/approval'
@@ -15,6 +16,9 @@ import type {
   OtDraftInfo,
   SelectedApprover,
 } from './approval.types'
+import ApprovalHtmlDocument from './ApprovalHtmlDocument'
+
+const DRAFT_EDITOR_ID = 'approval-draft-html-editor'
 
 // lookup 응답의 profileImageUrl(`/api/files/images/{id}`)에서 파일 ID만 추출한다.
 const extractProfileFileId = (
@@ -37,8 +41,11 @@ type Props = {
   onSubmit: () => Promise<void>
   aiPrompt?: string
   aiGenerating?: boolean
+  aiApprovalLineGenerating?: boolean
+  canGenerateAiApprovalLine?: boolean
   onAiPromptChange?: (value: string) => void
   onGenerateAiDraft?: () => Promise<void>
+  onGenerateAiApprovalLine?: () => Promise<void>
   // ── 휴가 신청 모드(옵션) ──
   leaveMode?: boolean
   leaveInfo?: LeaveDraftInfo
@@ -65,8 +72,11 @@ export default function ApprovalDraftModal({
   onSubmit,
   aiPrompt = '',
   aiGenerating = false,
+  aiApprovalLineGenerating = false,
+  canGenerateAiApprovalLine = false,
   onAiPromptChange,
   onGenerateAiDraft,
+  onGenerateAiApprovalLine,
   leaveMode = false,
   leaveInfo,
   leaveTypes = [],
@@ -84,14 +94,28 @@ export default function ApprovalDraftModal({
   const [employeeResults, setEmployeeResults] = useState<EmployeeLookupResponse[]>([])
   const [employeeLoading, setEmployeeLoading] = useState(false)
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false)
+  const [contentViewMode, setContentViewMode] = useState<'visual' | 'code' | 'preview'>('visual')
+  const [aiConfirmOpen, setAiConfirmOpen] = useState(false)
   // iframe 에디터: ref + 최신 form/onChange를 ref로 보관해 stale closure 방지
   const editorFrameRef = useRef<HTMLIFrameElement>(null)
+  const editorDocumentRef = useRef<Document | null>(null)
+  const editorHtmlRef = useRef('')
   const formRef = useRef(form)
   const onChangeRef = useRef(onChange)
   useEffect(() => { formRef.current = form }, [form])
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const showAiDraft = Boolean(onGenerateAiDraft && onAiPromptChange && !leaveMode && !otMode)
+  const showAiDraft = Boolean(
+    (onGenerateAiDraft || onGenerateAiApprovalLine) && onAiPromptChange && !leaveMode && !otMode,
+  )
+
+  useEffect(() => {
+    if (!open) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setContentViewMode('visual')
+    editorDocumentRef.current = null
+    editorHtmlRef.current = ''
+  }, [open])
 
   // 모달 열릴 때 템플릿 목록 로드
   useEffect(() => {
@@ -107,36 +131,43 @@ export default function ApprovalDraftModal({
 
   // 템플릿 선택 or 모달 열릴 때 iframe에 HTML을 직접 기록 (style 격리)
   useEffect(() => {
-    if (!open) return
+    if (!open || contentViewMode !== 'visual') return
     const frame = editorFrameRef.current
     if (!frame) return
     const doc = frame.contentDocument
     if (!doc) return
     const html = formRef.current.aprvlFullCn
-    doc.open()
-    doc.write(html || '<p></p>')
-    doc.close()
-    const body = doc.body
+    let body = doc.body
+    if (editorDocumentRef.current !== doc || editorHtmlRef.current !== html || !body) {
+      doc.open()
+      doc.write(html || '<p></p>')
+      doc.close()
+      editorDocumentRef.current = doc
+      editorHtmlRef.current = html
+      body = doc.body
+    }
     if (!body) return
-    body.contentEditable = 'true'
-    body.style.outline = 'none'
-    body.style.cursor = 'text'
+    const editableBody = body
+    editableBody.contentEditable = 'true'
+    editableBody.style.outline = 'none'
+    editableBody.style.cursor = 'text'
     const controller = new AbortController()
     doc.addEventListener(
       'input',
       () => {
         // head 스타일을 보존하면서 body 내용만 갱신
         const headHtml = doc.head?.innerHTML ?? ''
-        const bodyHtml = body.innerHTML
+        const bodyHtml = editableBody.innerHTML
         const fullHtml = headHtml
           ? `<!DOCTYPE html><html><head>${headHtml}</head><body>${bodyHtml}</body></html>`
           : bodyHtml
+        editorHtmlRef.current = fullHtml
         onChangeRef.current({ ...formRef.current, aprvlFullCn: fullHtml })
       },
       { signal: controller.signal },
     )
     return () => controller.abort()
-  }, [form.tmplatCd, open])
+  }, [contentViewMode, form.aprvlFullCn, form.tmplatCd, open])
 
   // 사원 검색 디바운스
   useEffect(() => {
@@ -194,7 +225,25 @@ export default function ApprovalDraftModal({
     onApproversChange(approvers.filter((a) => a.id !== id))
   }
 
+  const closeDraftModal = () => {
+    setAiConfirmOpen(false)
+    onClose()
+  }
+
+  const openAiConfirm = () => {
+    if (!onGenerateAiDraft || !aiPrompt.trim() || aiGenerating || aiApprovalLineGenerating || saving) {
+      return
+    }
+    setAiConfirmOpen(true)
+  }
+
+  const confirmAiDraftGeneration = () => {
+    setAiConfirmOpen(false)
+    void onGenerateAiDraft?.()
+  }
+
   return (
+    <>
     <Modal
       open={open}
       title={title ?? '기안서 작성'}
@@ -202,12 +251,12 @@ export default function ApprovalDraftModal({
         description ??
         '결재 양식을 선택하고 내용을 작성한 뒤, 오른쪽에서 결재자를 순서대로 지정하세요.'
       }
-      onClose={onClose}
+      onClose={closeDraftModal}
       size="xl"
       maxWidthClassName="max-w-7xl"
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={closeDraftModal}>
             취소
           </Button>
           <Button loading={saving} leftIcon={<Send size={16} />} onClick={() => void onSubmit()}>
@@ -226,13 +275,13 @@ export default function ApprovalDraftModal({
               <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-4">
                 <div className="mb-3 flex items-center gap-2 text-sm font-black text-blue-700">
                   <Sparkles size={16} />
-                  <span>AI 초안 생성</span>
+                  <span>AI 작성 지원</span>
                 </div>
                 <textarea
                   className="min-h-20 w-full resize-y rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-blue-500"
                   placeholder="예: 6월 20일부터 21일까지 개인 사유로 휴가 신청서 작성해줘."
                   value={aiPrompt}
-                  disabled={aiGenerating || saving}
+                  disabled={aiGenerating || aiApprovalLineGenerating || saving}
                   onChange={(event) => onAiPromptChange?.(event.target.value)}
                 />
                 <div className="mt-3 flex justify-end">
@@ -240,11 +289,11 @@ export default function ApprovalDraftModal({
                     variant="outline"
                     size="sm"
                     loading={aiGenerating}
-                    disabled={!aiPrompt.trim() || saving}
+                    disabled={!onGenerateAiDraft || !aiPrompt.trim() || aiApprovalLineGenerating || saving}
                     leftIcon={<Sparkles size={14} />}
-                    onClick={() => void onGenerateAiDraft?.()}
+                    onClick={openAiConfirm}
                   >
-                    AI로 임시저장
+                    AI 양식 생성
                   </Button>
                 </div>
               </div>
@@ -389,15 +438,62 @@ export default function ApprovalDraftModal({
               />
             </div>
 
-            {/* 결재 내용 – iframe 에디터 (style 태그 격리) */}
-            <div>
-              <label className="approval-draft-form__label">결재 내용</label>
-              <iframe
-                ref={editorFrameRef}
-                className="approval-draft-form__content-editor"
-                title="결재 내용 편집기"
-                sandbox="allow-same-origin"
-              />
+            {/* 결재 내용 – 문서 편집/HTML 편집/미리보기 */}
+            <div className="approval-draft-form__content-section">
+              <div className="approval-draft-form__content-header">
+                <label className="approval-draft-form__label">결재 내용</label>
+                <div className="approval-draft-form__content-toolbar">
+                  <Button
+                    size="sm"
+                    variant={contentViewMode === 'visual' ? 'primary' : 'outline'}
+                    leftIcon={<Pencil size={15} />}
+                    onClick={() => setContentViewMode('visual')}
+                  >
+                    문서 편집
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={contentViewMode === 'code' ? 'primary' : 'outline'}
+                    leftIcon={<Code2 size={15} />}
+                    onClick={() => setContentViewMode('code')}
+                  >
+                    HTML 편집
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={contentViewMode === 'preview' ? 'primary' : 'outline'}
+                    leftIcon={<Eye size={15} />}
+                    onClick={() => setContentViewMode('preview')}
+                  >
+                    미리보기
+                  </Button>
+                </div>
+              </div>
+
+              {contentViewMode === 'visual' ? (
+                <iframe
+                  ref={editorFrameRef}
+                  className="approval-draft-form__content-editor"
+                  title="결재 내용 편집기"
+                  sandbox="allow-same-origin"
+                />
+              ) : null}
+
+              {contentViewMode === 'code' ? (
+                <Textarea
+                  id={DRAFT_EDITOR_ID}
+                  aria-label="결재 내용 HTML 편집"
+                  className="approval-draft-form__html-editor"
+                  value={form.aprvlFullCn}
+                  onChange={(event) => onChange({ ...form, aprvlFullCn: event.target.value })}
+                />
+              ) : null}
+
+              {contentViewMode === 'preview' ? (
+                <div className="approval-draft-form__preview-wrap">
+                  <ApprovalHtmlDocument html={form.aprvlFullCn} />
+                </div>
+              ) : null}
             </div>
 
             {error ? <p className="approval-draft-form__error">{error}</p> : null}
@@ -415,6 +511,24 @@ export default function ApprovalDraftModal({
             <p className="approval-approver-panel__desc">
               결재자를 검색해 추가하면 위에서부터 1순위로 순차 결재됩니다.
             </p>
+
+            {onGenerateAiApprovalLine && (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={aiApprovalLineGenerating}
+                disabled={
+                  !canGenerateAiApprovalLine ||
+                  aiGenerating ||
+                  aiApprovalLineGenerating ||
+                  saving
+                }
+                leftIcon={<Sparkles size={14} />}
+                onClick={() => void onGenerateAiApprovalLine()}
+              >
+                AI 결재선 지정
+              </Button>
+            )}
 
             {/* 사원 검색 */}
             <div className="approval-approver-panel__search" ref={dropdownRef}>
@@ -514,5 +628,16 @@ export default function ApprovalDraftModal({
 
       </div>
     </Modal>
+    <Modal
+      open={open && aiConfirmOpen}
+      title="전자결재 AI 요청 확인"
+      description="해당 기능은 AI 요청 응답시간에 따라 대기시간이 길어지거나 실패 또는 성공할 수 있습니다. 해당 정보는 AI의 작업이 완료된 후 알림창을 통해 송신되며, 임시저장 기안서 목록에서 확인할 수 있습니다."
+      onClose={() => setAiConfirmOpen(false)}
+      variant="confirm"
+      confirmText="확인"
+      cancelText="취소"
+      onConfirm={confirmAiDraftGeneration}
+    />
+    </>
   )
 }

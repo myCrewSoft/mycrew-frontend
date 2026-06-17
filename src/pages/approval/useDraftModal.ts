@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { approvalApi } from '../../api/approvalApi'
 import { useToast } from '../../components/common/toast/useToast'
 import type {
+  ApprovalAiApprovalLineJobResponseDTO,
+  ApprovalAiApproverCandidateDTO,
+  ApprovalAiContentJobResponseDTO,
   ApprovalDocumentDetailResponse,
   ApprovalDraftRequestDTO,
 } from '../../types/approval'
@@ -10,7 +13,6 @@ import { defaultDraftForm } from './approval.types'
 import type { DraftFormState, SelectedApprover } from './approval.types'
 import { getApiErrorMessage } from './approval.utils'
 
-// LocalDateTime 문자열을 datetime-local input 값(yyyy-MM-ddTHH:mm)으로 변환
 const toDateTimeLocalValue = (value?: string | null): string => {
   if (!value) return ''
   const date = new Date(value)
@@ -18,6 +20,80 @@ const toDateTimeLocalValue = (value?: string | null): string => {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
+
+const AI_DRAFT_JOB_POLL_INTERVAL_MS = 2_000
+const AI_DRAFT_JOB_TIMEOUT_MS = 10 * 60 * 1_000
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+
+const pollAiDraftContentJob = async (
+  jobId: number,
+): Promise<ApprovalAiContentJobResponseDTO> => {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < AI_DRAFT_JOB_TIMEOUT_MS) {
+    await delay(AI_DRAFT_JOB_POLL_INTERVAL_MS)
+    const response = await approvalApi.getAiDraftContentJob(jobId)
+    const job = response.data.data
+
+    if (!job) {
+      throw new Error('AI 기안서 본문 생성 작업 상태를 확인할 수 없습니다.')
+    }
+    if (job.status === 'SUCCEEDED') {
+      return job
+    }
+    if (job.status === 'FAILED') {
+      throw new Error(job.errorMessage || 'AI 기안서 본문 생성에 실패했습니다.')
+    }
+  }
+
+  throw new Error('AI 기안서 본문 생성 시간이 초과되었습니다.')
+}
+
+const pollAiApprovalLineJob = async (
+  jobId: number,
+): Promise<ApprovalAiApprovalLineJobResponseDTO> => {
+  const startedAt = Date.now()
+
+  while (Date.now() - startedAt < AI_DRAFT_JOB_TIMEOUT_MS) {
+    await delay(AI_DRAFT_JOB_POLL_INTERVAL_MS)
+    const response = await approvalApi.getAiApprovalLineJob(jobId)
+    const job = response.data.data
+
+    if (!job) {
+      throw new Error('AI 결재선 자동 지정 작업 상태를 확인할 수 없습니다.')
+    }
+    if (job.status === 'SUCCEEDED') {
+      return job
+    }
+    if (job.status === 'FAILED') {
+      throw new Error(job.errorMessage || 'AI 결재선 자동 지정에 실패했습니다.')
+    }
+  }
+
+  throw new Error('AI 결재선 자동 지정 시간이 초과되었습니다.')
+}
+
+const hasApprovalLineContext = (form: DraftFormState, aiPrompt: string) =>
+  Boolean(
+    aiPrompt.trim() ||
+    form.docTtl.trim() ||
+    form.tmplatCd.trim() ||
+    form.aprvlFullCn.trim(),
+  )
+
+const toSelectedApprover = (
+  approver: ApprovalAiApproverCandidateDTO,
+): SelectedApprover => ({
+  id: approver.empId,
+  name: approver.empNm,
+  department: approver.deptNm ?? '',
+  position: approver.jobPstnNm ?? approver.jobGrdNm ?? '',
+  prflImgFileId: approver.prflImgFileId ?? null,
+})
 
 export function useDraftModal(onSuccess?: () => void | Promise<void>) {
   const navigate = useNavigate()
@@ -30,10 +106,9 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
   const [draftSaving, setDraftSaving] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
-  // 수정 모드일 때 대상 기안문 일련번호. null 이면 신규 작성.
+  const [aiApprovalLineGenerating, setAiApprovalLineGenerating] = useState(false)
   const [editingDocSn, setEditingDocSn] = useState<number | null>(null)
 
-  // 사이드바 "기안서 작성" 버튼 이벤트 수신 (항상 신규 작성 모드로 연다)
   useEffect(() => {
     const openDraft = () => {
       setEditingDocSn(null)
@@ -47,7 +122,6 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     return () => window.removeEventListener('approval:open-draft', openDraft)
   }, [])
 
-  // 임시저장 문서를 수정 모드로 모달에 불러온다.
   const openDraftForEdit = useCallback((detail: ApprovalDocumentDetailResponse) => {
     setEditingDocSn(detail.drftDocSn)
     setDraftForm({
@@ -56,7 +130,6 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
       aprvlHopeDt: toDateTimeLocalValue(detail.aprvlHopeDt),
       aprvlFullCn: detail.aprvlFullCn ?? '',
     })
-    // 결재선(단계별 1명 순차 결재)을 순서대로 결재자 목록으로 복원
     const approvers: SelectedApprover[] = [...(detail.approvalSteps ?? [])]
       .sort((a, b) => a.aprvlOrd - b.aprvlOrd)
       .map((step) => ({
@@ -79,7 +152,7 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     setAiPrompt('')
   }, [])
 
-  const handleGenerateAiDraft = useCallback(async () => {
+  const handleGenerateAiDraftContent = useCallback(async () => {
     const prompt = aiPrompt.trim()
     if (!prompt) {
       setDraftError('AI에게 요청할 기안 내용을 입력하세요.')
@@ -89,29 +162,97 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     setAiGenerating(true)
     setDraftError('')
     try {
-      const response = await approvalApi.createAiDraft({
+      if (editingDocSn == null) {
+        const response = await approvalApi.createAiDraftContentSaveJob({
+          userPrompt: prompt,
+          tmplatCd: draftForm.tmplatCd.trim() || undefined,
+        })
+        const startedJob = response.data.data
+        if (!startedJob?.jobId) {
+          throw new Error('AI 기안서 양식 임시저장 작업을 시작하지 못했습니다.')
+        }
+
+        setDraftOpen(false)
+        resetDraftState()
+        showToast({
+          title: 'AI 양식 생성 요청을 접수했습니다.',
+          description: '완료되면 알림으로 안내됩니다. 임시저장함에서 확인하세요.',
+          variant: 'success',
+        })
+        return
+      }
+
+      const response = await approvalApi.createAiDraftContentJob({
         userPrompt: prompt,
         tmplatCd: draftForm.tmplatCd.trim() || undefined,
       })
-      const result = response.data.data
-      setDraftOpen(false)
-      resetDraftState()
+      const startedJob = response.data.data
+      if (!startedJob?.jobId) {
+        throw new Error('AI 기안서 본문 생성 작업을 시작하지 못했습니다.')
+      }
+      const result =
+        startedJob.status === 'SUCCEEDED'
+          ? startedJob
+          : await pollAiDraftContentJob(startedJob.jobId)
+
+      setDraftForm((current) => ({
+        ...current,
+        docTtl: result.docTtl ?? current.docTtl,
+        tmplatCd: result.tmplatCd ?? current.tmplatCd,
+        aprvlFullCn: result.aprvlFullCn ?? current.aprvlFullCn,
+      }))
       showToast({
-        title: 'AI 기안서 초안이 임시저장되었습니다.',
-        description: result?.docTtl
-          ? `${result.docTtl} 문서를 임시저장함에서 수정할 수 있습니다.`
-          : undefined,
+        title: 'AI 양식 생성이 완료되었습니다.',
+        description: '내용을 확인한 뒤 결재선을 지정하거나 직접 수정할 수 있습니다.',
         variant: 'success',
       })
-      if (onSuccess) await onSuccess()
-      window.dispatchEvent(new Event('approval:refresh-counts'))
-      navigate('/approval/sent/temporary')
     } catch (error) {
-      setDraftError(getApiErrorMessage(error, 'AI 기안서 초안 생성에 실패했습니다.'))
+      setDraftError(getApiErrorMessage(error, 'AI 기안서 본문 생성에 실패했습니다.'))
     } finally {
       setAiGenerating(false)
     }
-  }, [aiPrompt, draftForm.tmplatCd, navigate, onSuccess, resetDraftState, showToast])
+  }, [aiPrompt, draftForm.tmplatCd, editingDocSn, resetDraftState, showToast])
+
+  const handleGenerateAiApprovalLine = useCallback(async () => {
+    if (!hasApprovalLineContext(draftForm, aiPrompt)) {
+      setDraftError('결재선 자동 지정을 위해 기안 내용이나 제목을 입력하세요.')
+      return
+    }
+
+    setAiApprovalLineGenerating(true)
+    setDraftError('')
+    try {
+      const response = await approvalApi.createAiApprovalLineJob({
+        userPrompt: aiPrompt.trim() || undefined,
+        docTtl: draftForm.docTtl.trim() || undefined,
+        tmplatCd: draftForm.tmplatCd.trim() || undefined,
+        aprvlFullCn: draftForm.aprvlFullCn.trim() ? draftForm.aprvlFullCn : undefined,
+      })
+      const startedJob = response.data.data
+      if (!startedJob?.jobId) {
+        throw new Error('AI 결재선 자동 지정 작업을 시작하지 못했습니다.')
+      }
+      const result =
+        startedJob.status === 'SUCCEEDED'
+          ? startedJob
+          : await pollAiApprovalLineJob(startedJob.jobId)
+      const approvers = (result.approvers ?? []).map(toSelectedApprover)
+      if (approvers.length === 0) {
+        throw new Error('AI가 유효한 결재자를 추천하지 못했습니다.')
+      }
+
+      setDraftApprovers(approvers)
+      showToast({
+        title: 'AI 결재선이 지정되었습니다.',
+        description: '추천된 결재자를 확인하고 필요하면 수정하세요.',
+        variant: 'success',
+      })
+    } catch (error) {
+      setDraftError(getApiErrorMessage(error, 'AI 결재선 자동 지정에 실패했습니다.'))
+    } finally {
+      setAiApprovalLineGenerating(false)
+    }
+  }, [aiPrompt, draftForm, showToast])
 
   const handleSaveDraft = useCallback(async () => {
     if (!draftForm.docTtl.trim()) {
@@ -126,11 +267,11 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
       setDraftError('결재자를 한 명 이상 선택하세요.')
       return
     }
+
     setDraftSaving(true)
     setDraftError('')
     const isEditing = editingDocSn != null
     const request: ApprovalDraftRequestDTO = {
-      // 수정 모드면 대상 문서 일련번호를 함께 보내 기존 임시저장 문서를 갱신한다.
       drftDocSn: isEditing ? editingDocSn : undefined,
       docTtl: draftForm.docTtl.trim(),
       tmplatCd: draftForm.tmplatCd.trim() || undefined,
@@ -138,13 +279,13 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
         ? new Date(draftForm.aprvlHopeDt).toISOString()
         : undefined,
       aprvlFullCn: draftForm.aprvlFullCn,
-      // 결재자 1명 = 1단계 순차 결재 (병렬 결재 아님)
-      approvalLines: draftApprovers.map((a, idx) => ({
+      approvalLines: draftApprovers.map((approver, idx) => ({
         aprvlOrd: idx + 1,
         aprvlMthdCd: '01',
-        aprvrEmpIds: [a.id],
+        aprvrEmpIds: [approver.id],
       })),
     }
+
     try {
       await approvalApi.saveTemporaryDraft(request)
       setDraftOpen(false)
@@ -154,9 +295,7 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
         variant: 'success',
       })
       if (onSuccess) await onSuccess()
-      // 사이드바 카운트 갱신 신호
       window.dispatchEvent(new Event('approval:refresh-counts'))
-      // 신규 작성 시에만 임시저장함으로 이동 (수정 시 현재 화면 유지)
       if (!isEditing) navigate('/approval/sent/temporary')
     } catch (error) {
       setDraftError(
@@ -188,9 +327,14 @@ export function useDraftModal(onSuccess?: () => void | Promise<void>) {
     draftSaving,
     aiPrompt,
     aiGenerating,
+    aiContentGenerating: aiGenerating,
+    aiApprovalLineGenerating,
+    canGenerateAiApprovalLine: hasApprovalLineContext(draftForm, aiPrompt),
     isEditingDraft: editingDocSn != null,
     setAiPrompt,
-    handleGenerateAiDraft,
+    handleGenerateAiDraft: handleGenerateAiDraftContent,
+    handleGenerateAiDraftContent,
+    handleGenerateAiApprovalLine,
     openDraftForEdit,
     handleSaveDraft,
     closeDraft,

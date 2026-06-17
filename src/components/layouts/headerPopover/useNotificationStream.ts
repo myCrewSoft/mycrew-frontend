@@ -36,20 +36,20 @@ const isNotificationResponse = (
 
 const parseNotification = (raw: string) => {
   try {
-    const parsed = JSON.parse(raw)
+    const parsed: unknown = JSON.parse(raw)
 
-    if (isNotificationResponse(parsed)) {
-      return parsed
+    if (!isObjectRecord(parsed)) return null
+    const parsedRecord: Record<string, unknown> = parsed
+    const data = parsedRecord.data
+
+    if (isNotificationResponse(parsedRecord)) {
+      return parsedRecord
     }
 
-    if (isObjectRecord(parsed) && isNotificationResponse(parsed.data)) {
-      return parsed.data
-    }
+    return isNotificationResponse(data) ? data : null
   } catch {
     return null
   }
-
-  return null
 }
 
 const dispatchNotificationReceived = (raw: string) => {
