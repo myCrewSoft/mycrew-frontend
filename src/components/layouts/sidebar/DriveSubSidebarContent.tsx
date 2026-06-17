@@ -22,13 +22,13 @@ export default function DriveSubSidebarContent() {
         <SubSidebarMenuItem
           icon={Users}
           label="프로젝트 드라이브"
-          path="/drive/shared"
-          active={location.pathname === '/drive/shared'}
+          path="/drive/project"
+          active={location.pathname === '/drive/project'}
         />
         <SubSidebarMenuItem
           icon={Star}
           label="즐겨찾기 목록"
-          path="/drive/shared"
+          path="/drive/bookmark"
           active={location.pathname === '/drive/bookmark'}
         />
         <SubSidebarMenuItem
