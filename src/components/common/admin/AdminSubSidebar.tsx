@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import AdminBoardsSubSidebar from './AdminBoardsSubSidebar';
 import AdminDepartmentsSubSidebar from './AdminDepartmentsSubSidebar';
 import AdminEmployeesSubSidebar from './AdminEmployeesSubSidebar';
 import AdminGenericSubSidebar from './AdminGenericSubSidebar';
@@ -13,6 +14,7 @@ export default function AdminSubSidebar() {
   const [searchParams] = useSearchParams();
   const pathname = location.pathname;
   const selectedEmpStatCd = searchParams.get('empStatCd') ?? '';
+  const selectedBoardType = searchParams.get('boardType') ?? 'notice';
 
   // 대시보드(관리자 메인)·조직도·결재 양식 관리는 자체 레이아웃을 써서 별도 서브 사이드바 없음
   if (
@@ -35,6 +37,8 @@ export default function AdminSubSidebar() {
     content = <AdminRanksSubSidebar />;
   } else if (pathname.startsWith('/admin/departments')) {
     content = <AdminDepartmentsSubSidebar />;
+  } else if (pathname.startsWith('/admin/boards')) {
+    content = <AdminBoardsSubSidebar selectedBoardType={selectedBoardType} />;
   } else if (pathname.startsWith('/admin/attendance')) {
     content = <AdminAttendanceSubSidebar />;
   } else {
