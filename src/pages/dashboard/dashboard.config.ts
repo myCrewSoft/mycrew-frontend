@@ -1,17 +1,14 @@
 import {
   Bell,
-  Bot,
   BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
   ClipboardCheck,
   FileText,
-  FolderClock,
+  Mail,
   Megaphone,
   MessageSquare,
-  MousePointer2,
   Timer,
-  Users,
   type LucideIcon,
 } from 'lucide-react'
 import type { DashboardLayoutItem, DashboardWidgetKey } from '../../types/dashboard'
@@ -25,62 +22,38 @@ export interface DashboardWidgetConfig {
 
 export const DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
   {
+    key: 'attendance',
+    title: '근태',
+    icon: Timer,
+    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 5, maxH: 4 },
+  },
+  {
+    key: 'approval',
+    title: '전자결재',
+    icon: FileText,
+    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  },
+  {
     key: 'todaySchedule',
     title: '오늘 일정',
     icon: CalendarDays,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
   {
-    key: 'notice',
-    title: '공지사항',
-    icon: Megaphone,
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  },
-  {
-    key: 'unreadNotification',
-    title: '안 읽은 알림',
-    icon: Bell,
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 5, maxH: 4 },
-  },
-  {
-    key: 'messenger',
-    title: '메신저',
-    icon: MessageSquare,
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  },
-  {
-    key: 'meetingSchedule',
-    title: '회의 일정',
+    key: 'meeting',
+    title: '오늘 회의',
     icon: CalendarCheck,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
   {
-    key: 'reservationStatus',
-    title: '예약 현황',
+    key: 'reservation',
+    title: '회의실 예약',
     icon: ClipboardCheck,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
   {
-    key: 'quickLinks',
-    title: '빠른 실행',
-    icon: MousePointer2,
-    defaultSize: { w: 3, h: 3, minW: 3, minH: 2, maxW: 4, maxH: 4 },
-  },
-  {
-    key: 'attendance',
-    title: '내 근태 상태',
-    icon: Timer,
-    defaultSize: { w: 3, h: 3, minW: 3, minH: 2, maxW: 4, maxH: 4 },
-  },
-  {
-    key: 'departmentBoard',
-    title: '부서 게시글',
-    icon: Users,
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  },
-  {
-    key: 'approval',
-    title: '내 결재함',
+    key: 'task',
+    title: '업무',
     icon: FileText,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
@@ -91,28 +64,43 @@ export const DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
     defaultSize: { w: 5, h: 3, minW: 4, minH: 2, maxW: 8, maxH: 5 },
   },
   {
-    key: 'recentDrive',
-    title: '최근 문서함',
-    icon: FolderClock,
+    key: 'board',
+    title: '게시판',
+    icon: Megaphone,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
   {
-    key: 'aiSummary',
-    title: 'AI 요약',
-    icon: Bot,
+    key: 'mail',
+    title: '메일',
+    icon: Mail,
+    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  },
+  {
+    key: 'messenger',
+    title: '메신저',
+    icon: MessageSquare,
+    defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  },
+  {
+    key: 'notification',
+    title: '알림',
+    icon: Bell,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
   },
 ]
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayoutItem[] = [
-  { i: 'todaySchedule', x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'notice', x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'unreadNotification', x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 5, maxH: 4 },
-  { i: 'messenger', x: 0, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'meetingSchedule', x: 4, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'reservationStatus', x: 8, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'quickLinks', x: 0, y: 6, w: 3, h: 3, minW: 3, minH: 2, maxW: 4, maxH: 4 },
-  { i: 'attendance', x: 3, y: 6, w: 3, h: 3, minW: 3, minH: 2, maxW: 4, maxH: 4 },
+  { i: 'attendance', x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 5, maxH: 4 },
+  { i: 'approval', x: 4, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'todaySchedule', x: 8, y: 0, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'meeting', x: 0, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'reservation', x: 4, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'task', x: 8, y: 3, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'projectProgress', x: 0, y: 6, w: 5, h: 3, minW: 4, minH: 2, maxW: 8, maxH: 5 },
+  { i: 'board', x: 5, y: 6, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'messenger', x: 9, y: 6, w: 3, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'notification', x: 0, y: 9, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'mail', x: 4, y: 9, w: 4, h: 3, minW: 3, minH: 2, maxW: 6, maxH: 5 },
 ]
 
 // 관리자 메인 대시보드 기본 레이아웃
@@ -121,7 +109,7 @@ export const ADMIN_DASHBOARD_LAYOUT: DashboardLayoutItem[] = [
   { i: 'projectProgress', x: 0, y: 0, w: 8, h: 4, minW: 4, minH: 2, maxW: 8, maxH: 5 },
   { i: 'attendance', x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 2, maxW: 4, maxH: 4 },
   { i: 'todaySchedule', x: 0, y: 4, w: 6, h: 4, minW: 3, minH: 2, maxW: 6, maxH: 5 },
-  { i: 'notice', x: 6, y: 4, w: 6, h: 4, minW: 3, minH: 2, maxW: 6, maxH: 5 },
+  { i: 'board', x: 6, y: 4, w: 6, h: 4, minW: 3, minH: 2, maxW: 6, maxH: 5 },
 ]
 
 export const DASHBOARD_WIDGET_CONFIG_MAP = DASHBOARD_WIDGETS.reduce(
