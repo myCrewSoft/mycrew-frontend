@@ -66,7 +66,7 @@ const isReservationVisibleOnDate = (
 const getReservationBlockStyle = (
   reservation: ReservationResponse,
 ): CSSProperties => {
-  if (reservation.intgRsrvYn === 'Y') {
+  if (reservation.allDayYn === 'Y') {
     return { left: '0%', width: '100%' }
   }
 
@@ -95,7 +95,7 @@ const ReservationPage = () => {
   const [formValues, setFormValues] = useState<ReservationCreateRequest>({
     roomId: 0,
     title: '',
-    intgRsrvYn: 'N',
+    allDayYn: 'N',
     startDateTime: '',
     endDateTime: '',
   })
@@ -156,7 +156,7 @@ const ReservationPage = () => {
     setFormValues({
       roomId: roomId ?? filteredRooms[0]?.roomId ?? rooms[0]?.roomId ?? 0,
       title: '',
-      intgRsrvYn: 'N',
+      allDayYn: 'N',
       startDateTime: resolvedStartDateTime,
       endDateTime: addMinutesToDateTime(resolvedStartDateTime, 30),
     })

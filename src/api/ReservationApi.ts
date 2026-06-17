@@ -2,19 +2,14 @@ import axiosInstance from './axiosInstance'
 import type {
   ReservationCreateRequest,
   ReservationResponse,
-  RoomResponse,
 } from '../types'
 import type { ApiResponse } from './axiosInstance'
+import { roomApi } from './roomApi'
 
 const formatDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate(),
   ).padStart(2, '0')}`
-
-// 회의실 목록 조회 API입니다.
-const getMeetingRooms = () => {
-  return axiosInstance.get<ApiResponse<RoomResponse[]>>('/api/meeting-rooms')
-}
 
 // 선택한 기간의 회의실 예약 목록을 조회합니다.
 const getReservations = (begin: string, end: string) => {
@@ -44,7 +39,7 @@ const createReservation = (payload: ReservationCreateRequest) => {
 }
 
 export const meetingRoomReservationApi = {
-  getMeetingRooms,
+  getMeetingRooms: roomApi.getRoomList,
   getReservations,
   getMyUpcomingReservations,
   createReservation,
