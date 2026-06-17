@@ -24,6 +24,15 @@ const toTimestamp = (value: string) => {
 const isSameDate = (beginDt: string, endDt: string) =>
   beginDt.slice(0, 10) === endDt.slice(0, 10)
 
+const isVisibleOnDate = (reservation: ReservationResponse, dateKey: string) =>
+  reservation.startDateTime.slice(0, 10) <= dateKey &&
+  reservation.endDateTime.slice(0, 10) >= dateKey
+
+const isCurrentEditingMeetingReservation = (
+  reservation: ReservationResponse,
+  editingMeetingId: number | null,
+) => editingMeetingId !== null && reservation.mtngId === editingMeetingId
+
 const isOverlapping = (
   beginDt: string,
   endDt: string,
@@ -93,6 +102,8 @@ const getBlockStyle = (
   }
 }
 
+const getTimeLabel = (dateTime: string) => dateTime.slice(11, 16)
+
 const MeetingRoomAvailabilityTimeline = ({
   rooms,
   reservations,
@@ -115,8 +126,8 @@ const MeetingRoomAvailabilityTimeline = ({
 
   const visibleReservations = reservations.filter(
     (reservation) =>
-      reservation.mtngId !== editingMeetingId &&
-      reservation.startDateTime.slice(0, 10) === beginDt.slice(0, 10),
+      !isCurrentEditingMeetingReservation(reservation, editingMeetingId) &&
+      isVisibleOnDate(reservation, beginDt.slice(0, 10)),
   )
 
   return (
@@ -230,31 +241,43 @@ const MeetingRoomAvailabilityTimeline = ({
                         />
                       ))}
 
-                      {roomReservations.map((reservation) => (
+                      {hasValidRange && (
                         <span
-                          key={reservation.reservationId}
-                          className="absolute inset-y-2 rounded-sm border-x-2 border-red-400 bg-red-100/80"
-                          style={getBlockStyle(
-                            reservation.startDateTime,
-                            reservation.endDateTime,
-                            startMinutes,
-                            endMinutes,
-                          )}
-                          title={`${reservation.title} (${reservation.startDateTime.slice(11, 16)}-${reservation.endDateTime.slice(11, 16)})`}
-                        />
-                      ))}
-
-                      {selected && !unavailable && (
-                        <span
-                          className="absolute inset-y-1.5 rounded border-2 border-blue-500 bg-blue-100/80"
+                          className={`pointer-events-none absolute inset-y-1.5 z-10 flex items-center overflow-hidden rounded border-2 px-2 text-[10px] font-bold ${
+                            selected
+                              ? 'border-blue-500 bg-blue-100/85 text-blue-700'
+                              : 'border-blue-300 border-dashed bg-blue-50/55 text-blue-600'
+                          }`}
                           style={getBlockStyle(
                             beginDt,
                             endDt,
                             startMinutes,
                             endMinutes,
                           )}
-                        />
+                        >
+                          {selected ? '선택 시간' : ''}
+                        </span>
                       )}
+
+                      {roomReservations.map((reservation) => (
+                        <span
+                          key={reservation.reservationId}
+                          className="absolute inset-y-2 z-20 flex items-center overflow-hidden rounded-sm border-x-2 border-red-400 bg-red-100/90 px-2 text-[10px] font-bold text-red-700"
+                          style={getBlockStyle(
+                            reservation.startDateTime,
+                            reservation.endDateTime,
+                            startMinutes,
+                            endMinutes,
+                          )}
+                          title={`${reservation.title} (${getTimeLabel(
+                            reservation.startDateTime,
+                          )}-${getTimeLabel(reservation.endDateTime)})`}
+                        >
+                          <span className="truncate">
+                            {reservation.title || reservation.reserverName}
+                          </span>
+                        </span>
+                      ))}
                     </div>
                   </button>
                 )
