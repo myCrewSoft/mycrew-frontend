@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Folder, FileImage, LayoutList, LayoutGrid, Info, X } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Folder, FileImage, LayoutList, LayoutGrid, Info, X, Star } from 'lucide-react'
 import IconButton from '../../components/common/button/IconButton'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import DropdownMenu from '../../components/common/overlay/dropdownMenu/DropdownMenu'
@@ -41,9 +41,9 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => (
   <aside className="flex h-full w-72 flex-shrink-0 flex-col border-l border-slate-200 bg-white">
     <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
       <div className="flex items-center gap-2">
-        {item ? <FileIcon item={item} /> : <Folder size={18} className="text-amber-400" />}
+        {item ? <FileIcon item={item} /> : <Star size={18} className="text-amber-400" />}
         <span className="text-sm font-semibold text-slate-800 truncate max-w-[140px]">
-          {item ? item.itemNm : '휴지통'}
+          {item ? item.itemNm : '즐겨찾기'}
         </span>
       </div>
       <IconButton size="sm" aria-label="닫기" onClick={onClose}><X size={16} /></IconButton>
@@ -77,7 +77,7 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => (
             )}
             {item?.itemTypeCd === '01' && (
               <tr>
-                <td className="py-2 text-slate-500">하위 파일</td>
+                <td className="py-2 text-slate-500">하위 항목</td>
                 <td className="py-2 text-slate-800 font-medium">{item.childCnt ?? 0}개</td>
               </tr>
             )}
@@ -92,12 +92,12 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => (
                   <td className="py-2 text-slate-800 font-medium">{item.frstRegDt ?? '-'}</td>
                 </tr>
                 <tr>
-                  <td className="py-2 text-slate-500">삭제자</td>
-                  <td className="py-2 text-slate-800 font-medium">{item.deltrMbrNm ?? '-'}</td>
+                  <td className="py-2 text-slate-500">수정자</td>
+                  <td className="py-2 text-slate-800 font-medium">{item.lastMdfrNm ?? '-'}</td>
                 </tr>
                 <tr>
-                  <td className="py-2 text-slate-500">삭제일</td>
-                  <td className="py-2 text-slate-800 font-medium">{item.delDt ?? '-'}</td>
+                  <td className="py-2 text-slate-500">수정일</td>
+                  <td className="py-2 text-slate-800 font-medium">{item.lastMdfcnDt ?? '-'}</td>
                 </tr>
               </>
             )}
@@ -108,52 +108,40 @@ const DetailPanel = ({ item, onClose }: DetailPanelProps) => (
   </aside>
 )
 
-export default function DriveTrashPage() {
+export default function DriveFavoritePage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selectedItem, setSelectedItem] = useState<DriveResponseDto | null>(null)
   const [showPanel, setShowPanel] = useState(false)
   const [page, setPage] = useState(0)
+  const [unbookmarkModalOpen, setUnbookmarkModalOpen] = useState(false)
+  const [unbookmarkTarget, setUnbookmarkTarget] = useState<number | null>(null)
 
-  const [restoreModalOpen, setRestoreModalOpen] = useState(false)
-  const [restoreTarget, setRestoreTarget] = useState<number | null>(null)
-
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
-
-  const { data: items, loading, pagination, execute: fetchList } = useApiList(
-    () => driveApi.getTrashList(page),
+  const { data: items, loading, pagination, execute: fetchList } = useApiList<DriveResponseDto>(
+    () => driveApi.getBookmarkList(page),
     { immediate: false }
   )
 
-  const { execute: restoreItem } = useApi(driveApi.restoreItem, { immediate: false })
-  const { execute: hardDeleteItem } = useApi(driveApi.hardDeleteItem, { immediate: false })
+  const { execute: toggleBookmark } = useApi(driveApi.toggleBookmark, { immediate: false })
 
   useEffect(() => { void fetchList() }, [page, fetchList])
 
-  const handleRestoreOpen = (driveItemId: number) => {
-    setRestoreTarget(driveItemId)
-    setRestoreModalOpen(true)
+  const handleUnbookmarkOpen = (driveItemId: number) => {
+    setUnbookmarkTarget(driveItemId)
+    setUnbookmarkModalOpen(true)
   }
 
-  const handleRestoreConfirm = async () => {
-    if (!restoreTarget) return
-    await restoreItem(restoreTarget)
-    setRestoreModalOpen(false)
-    setRestoreTarget(null)
+  const handleUnbookmarkConfirm = async () => {
+    if (!unbookmarkTarget) return
+    await toggleBookmark(unbookmarkTarget)
+    setUnbookmarkModalOpen(false)
+    setUnbookmarkTarget(null)
+    setSelectedItem(null)
     void fetchList()
   }
 
-  const handleDeleteOpen = (driveItemId: number) => {
-    setDeleteTarget(driveItemId)
-    setDeleteModalOpen(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return
-    await hardDeleteItem(deleteTarget)
-    setDeleteModalOpen(false)
-    setDeleteTarget(null)
-    void fetchList()
+  const handleStarClick = (e: React.MouseEvent, item: DriveResponseDto) => {
+    e.stopPropagation()
+    handleUnbookmarkOpen(item.driveItemId)
   }
 
   const handleRowClick = (item: DriveResponseDto) => {
@@ -183,17 +171,20 @@ export default function DriveTrashPage() {
         <div className="flex-1 overflow-y-auto">
           {(items ?? []).length === 0 ? (
             <div className="flex h-full items-center justify-center p-8">
-              <EmptyState title="휴지통이 비어있습니다." description="삭제된 파일이 여기에 표시됩니다." />
+              <EmptyState
+                title="즐겨찾기한 항목이 없습니다."
+                description="자주 사용하는 파일이나 폴더를 즐겨찾기에 추가해보세요."
+              />
             </div>
           ) : viewMode === 'list' ? (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs text-slate-500">
-                  <th className="w-8 py-2 pl-5 pr-3 text-center whitespace-nowrap">종류</th>
+                  <th className="w-10 py-2 pl-5 pr-2"><span className="sr-only">즐겨찾기</span></th>
+                  <th className="w-8 py-2 pr-3 text-center whitespace-nowrap">종류</th>
                   <th className="py-2 pr-4">이름</th>
                   <th className="w-24 py-2 pr-4 whitespace-nowrap">크기</th>
-                  <th className="w-28 py-2 pr-4 whitespace-nowrap">삭제자</th>
-                  <th className="w-36 py-2 pr-4 whitespace-nowrap">삭제한 날짜</th>
+                  <th className="w-36 py-2 pr-4 whitespace-nowrap">수정한 날짜</th>
                   <th className="w-12 py-2 pr-4"></th>
                 </tr>
               </thead>
@@ -206,7 +197,10 @@ export default function DriveTrashPage() {
                       selectedItem?.driveItemId === item.driveItemId ? 'bg-blue-50' : ''
                     }`}
                   >
-                    <td className="py-2.5 pl-5 pr-3 text-center"><FileIcon item={item} /></td>
+                    <td className="py-2.5 pl-5 pr-2" onClick={(e) => handleStarClick(e, item)}>
+                      <Star size={15} className="fill-amber-400 text-amber-400" />
+                    </td>
+                    <td className="py-2.5 pr-3 text-center"><FileIcon item={item} /></td>
                     <td className="py-2.5 pr-4 font-medium text-slate-800">
                       <div className="flex items-center">
                         <span>{item.itemNm}</span>
@@ -215,13 +209,11 @@ export default function DriveTrashPage() {
                       </div>
                     </td>
                     <td className="py-2.5 pr-4 text-slate-500">{item.fileSz ?? '-'}</td>
-                    <td className="py-2.5 pr-4 text-slate-500">{item.deltrMbrNm ?? '-'}</td>
-                    <td className="py-2.5 pr-4 text-slate-500">{item.delDt ?? '-'}</td>
+                    <td className="py-2.5 pr-4 text-slate-500">{item.lastMdfcnDt ?? '-'}</td>
                     <td className="py-2.5 pr-4" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu
                         items={[
-                          { label: '복구', onClick: () => handleRestoreOpen(item.driveItemId) },
-                          { label: '영구삭제', danger: true, onClick: () => handleDeleteOpen(item.driveItemId) },
+                          { label: '즐겨찾기 해제', danger: true, onClick: () => handleUnbookmarkOpen(item.driveItemId) },
                         ]}
                       />
                     </td>
@@ -239,6 +231,9 @@ export default function DriveTrashPage() {
                     selectedItem?.driveItemId === item.driveItemId ? 'border-blue-300 bg-blue-50' : 'border-slate-100 bg-white'
                   }`}
                 >
+                  <div className="absolute right-2 top-2" onClick={(e) => handleStarClick(e, item)}>
+                    <Star size={14} className="fill-amber-400 text-amber-400" />
+                  </div>
                   <div className="flex h-12 w-12 items-center justify-center"><FileIcon item={item} /></div>
                   <div className="flex w-full flex-col items-center gap-0.5">
                     <span className="w-full truncate text-center text-xs font-medium text-slate-700">{item.itemNm}</span>
@@ -246,13 +241,12 @@ export default function DriveTrashPage() {
                       <ChildCntBadge item={item} />
                       <ScopeBadge item={item} />
                     </div>
-                    <span className="text-xs text-slate-400">{item.deltrMbrNm ?? '-'}</span>
+                    <span className="text-xs text-slate-400">{item.lastMdfcnDt ?? '-'}</span>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu
                       items={[
-                        { label: '복구', onClick: () => handleRestoreOpen(item.driveItemId) },
-                        { label: '영구삭제', danger: true, onClick: () => handleDeleteOpen(item.driveItemId) },
+                        { label: '즐겨찾기 해제', danger: true, onClick: () => handleUnbookmarkOpen(item.driveItemId) },
                       ]}
                     />
                   </div>
@@ -277,25 +271,14 @@ export default function DriveTrashPage() {
       {showPanel && <DetailPanel item={selectedItem} onClose={() => setShowPanel(false)} />}
 
       <Modal
-        open={restoreModalOpen}
-        title="복구"
+        open={unbookmarkModalOpen}
+        title="즐겨찾기 해제"
         variant="confirm"
-        confirmText="복구"
-        onConfirm={handleRestoreConfirm}
-        onClose={() => { setRestoreModalOpen(false); setRestoreTarget(null) }}
+        confirmText="해제"
+        onConfirm={handleUnbookmarkConfirm}
+        onClose={() => { setUnbookmarkModalOpen(false); setUnbookmarkTarget(null) }}
       >
-        <p className="text-sm text-slate-600">해당 항목을 복구하시겠습니까?</p>
-      </Modal>
-
-      <Modal
-        open={deleteModalOpen}
-        title="영구삭제"
-        variant="confirm"
-        confirmText="영구삭제"
-        onConfirm={handleDeleteConfirm}
-        onClose={() => { setDeleteModalOpen(false); setDeleteTarget(null) }}
-      >
-        <p className="text-sm text-slate-600">영구삭제된 항목은 복구할 수 없습니다. 정말 삭제하시겠습니까?</p>
+        <p className="text-sm text-slate-600">즐겨찾기에서 해제하시겠습니까?</p>
       </Modal>
     </div>
   )
