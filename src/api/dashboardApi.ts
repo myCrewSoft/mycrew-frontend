@@ -2,6 +2,11 @@ import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
 import type {
+  AdminAttendanceWidgetResponseDto,
+  AdminDashboardWidgetData,
+  AdminImportantScheduleWidgetResponseDto,
+  AdminNoticeWidgetResponseDto,
+  AdminProjectStatusWidgetResponseDto,
   ApprovalWidgetResponseDto,
   AttendanceWidgetResponseDto,
   DashboardLayoutRequestDto,
@@ -84,5 +89,54 @@ export const dashboardApi = {
 
   getAiSummary: (): Promise<AxiosResponse<ApiResponse<AiSummaryWidgetResponseDto>>> => {
     return axiosInstance.get('/api/dashboard/widgets/ai-summary')
+  },
+
+  // ===== 관리자 대시보드 위젯 (조직 전체 현황) =====
+
+  getAdminAttendance: (): Promise<
+    AxiosResponse<ApiResponse<AdminAttendanceWidgetResponseDto>>
+  > => {
+    return axiosInstance.get('/api/admin/dashboard/widgets/attendance')
+  },
+
+  getAdminImportantSchedule: (): Promise<
+    AxiosResponse<ApiResponse<AdminImportantScheduleWidgetResponseDto>>
+  > => {
+    return axiosInstance.get('/api/admin/dashboard/widgets/schedule')
+  },
+
+  getAdminProjectStatus: (): Promise<
+    AxiosResponse<ApiResponse<AdminProjectStatusWidgetResponseDto>>
+  > => {
+    return axiosInstance.get('/api/admin/dashboard/widgets/project')
+  },
+
+  getAdminNotice: (): Promise<
+    AxiosResponse<ApiResponse<AdminNoticeWidgetResponseDto>>
+  > => {
+    return axiosInstance.get('/api/admin/dashboard/widgets/notice')
+  },
+
+  /**
+   * 관리자 대시보드 위젯 디스패처.
+   * 관리자 전용 데이터가 있는 위젯(근태/중요일정/프로젝트현황/공지)은 관리자 엔드포인트를 호출하고,
+   * 그 외 위젯은 사용자 엔드포인트로 위임한다.
+   */
+  getAdminWidget: (
+    widgetKey: DashboardWidgetKey,
+    boardTypeCd: DashboardBoardType = 'NOTICE',
+  ): Promise<AxiosResponse<ApiResponse<AdminDashboardWidgetData | DashboardWidgetData>>> => {
+    switch (widgetKey) {
+      case 'attendance':
+        return dashboardApi.getAdminAttendance()
+      case 'todaySchedule':
+        return dashboardApi.getAdminImportantSchedule()
+      case 'projectProgress':
+        return dashboardApi.getAdminProjectStatus()
+      case 'board':
+        return dashboardApi.getAdminNotice()
+      default:
+        return dashboardApi.getWidget(widgetKey, boardTypeCd)
+    }
   },
 }

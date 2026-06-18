@@ -11,7 +11,16 @@ import 'react-resizable/css/styles.css'
 import Button from '../../components/common/button/Button'
 import { dashboardApi } from '../../api/dashboardApi'
 import { useApi } from '../../hooks/useApi'
-import type { DashboardLayoutItem, DashboardWidgetKey } from '../../types/dashboard'
+import type {
+  DashboardBoardType,
+  DashboardLayoutItem,
+  DashboardLayoutJson,
+  DashboardServerLayoutItem,
+  DashboardVariant,
+  DashboardWidgetData,
+  DashboardWidgetKey,
+  DashboardWidgetStateMap,
+} from '../../types/dashboard'
 import {
   DASHBOARD_WIDGET_CONFIG_MAP,
   DASHBOARD_WIDGETS,
@@ -33,6 +42,8 @@ interface DashboardPageProps {
   title?: string
   /** 상단 설명 문구 */
   description?: string
+  /** 'admin'이면 관리자 전용 위젯 엔드포인트/렌더러를 사용한다. (기본 'user') */
+  variant?: DashboardVariant
 }
 
 const isDashboardWidgetKey = (value: string): value is DashboardWidgetKey =>
@@ -77,11 +88,75 @@ const getNextPosition = (layout: DashboardLayoutItem[]) => {
   return { x: 0, y: maxY }
 }
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : '위젯 데이터를 불러오지 못했습니다.'
+
+const useDashboardWidgetData = (
+  activeWidgetKeys: DashboardWidgetKey[],
+  boardType: DashboardBoardType,
+  variant: DashboardVariant,
+) => {
+  const [widgetStates, setWidgetStates] = useState<DashboardWidgetStateMap>({})
+  const activeSignature = useMemo(
+    () => [...activeWidgetKeys].sort().join('|'),
+    [activeWidgetKeys],
+  )
+
+  const fetchWidget = useCallback(
+    async (widgetKey: DashboardWidgetKey) => {
+      setWidgetStates((current) => ({
+        ...current,
+        [widgetKey]: {
+          data: current[widgetKey]?.data ?? null,
+          loading: true,
+          error: null,
+        },
+      }))
+
+      try {
+        const response =
+          variant === 'admin'
+            ? await dashboardApi.getAdminWidget(widgetKey, boardType)
+            : await dashboardApi.getWidget(widgetKey, boardType)
+        // 관리자 위젯 데이터는 렌더 시점에 관리자 타입으로 다시 캐스팅한다.
+        const nextData = (response.data.data ?? null) as DashboardWidgetData | null
+        setWidgetStates((current) => ({
+          ...current,
+          [widgetKey]: {
+            data: nextData,
+            loading: false,
+            error: null,
+          },
+        }))
+      } catch (error) {
+        setWidgetStates((current) => ({
+          ...current,
+          [widgetKey]: {
+            data: current[widgetKey]?.data ?? null,
+            loading: false,
+            error: getErrorMessage(error),
+          },
+        }))
+      }
+    },
+    [boardType, variant],
+  )
+
+  useEffect(() => {
+    if (!activeWidgetKeys.length) return
+
+    void Promise.all(activeWidgetKeys.map((widgetKey) => fetchWidget(widgetKey)))
+  }, [activeSignature, activeWidgetKeys, fetchWidget])
+
+  return { widgetStates, refetchWidget: fetchWidget }
+}
+
 const DashboardPage = ({
   defaultLayout = DEFAULT_DASHBOARD_LAYOUT,
   storageKey = DEFAULT_STORAGE_KEY,
   title = '대시보드',
   description = '오늘 필요한 업무 정보를 한 화면에서 확인합니다.',
+  variant = 'user',
 }: DashboardPageProps = {}) => {
   const [editMode, setEditMode] = useState(false)
   const [layout, setLayout] = useState<DashboardLayoutItem[]>(() =>
@@ -98,6 +173,15 @@ const DashboardPage = ({
   const activeWidgetKeys = useMemo(
     () => new Set(layout.map((item) => item.i)),
     [layout],
+  )
+  const activeWidgetKeySet = useMemo(
+    () => new Set(activeWidgetKeys),
+    [activeWidgetKeys],
+  )
+  const { widgetStates } = useDashboardWidgetData(
+    activeWidgetKeys,
+    boardType,
+    variant,
   )
 
   const availableWidgets = useMemo(
@@ -248,6 +332,7 @@ const DashboardPage = ({
               widgetKey={item.i}
               dataMap={dashboardMockData}
               editMode={editMode}
+              variant={variant}
               onRemove={handleRemoveWidget}
             />
           </div>

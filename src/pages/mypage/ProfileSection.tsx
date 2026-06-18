@@ -188,48 +188,39 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
     <div className="flex flex-col gap-5">
       {/* 히어로 카드 */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="h-28 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500" />
+        <div className="h-24 bg-gradient-to-r from-blue-600 via-indigo-500 to-violet-500" />
         <div className="px-6 pb-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="-mt-12 flex items-end gap-4">
-              <div className="relative flex-shrink-0">
-                <ProfileAvatar
-                  fileId={myPage.prflImgFileId}
-                  name={myPage.empNm}
-                  size={96}
-                  rounded="2xl"
-                  className="h-24 w-24 text-3xl ring-4 ring-white"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => void handleImageChange(event)}
-                />
-                <button
-                  type="button"
-                  onClick={handlePickImage}
-                  disabled={uploading}
-                  aria-label="프로필 이미지 변경"
-                  title="프로필 이미지 변경"
-                  className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {uploading ? (
-                    <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Camera size={15} aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-              <div className="min-w-0 pb-1">
-                <h2 className="truncate text-xl font-black text-slate-950">
-                  {formatMyPageValue(myPage.empNm, '사용자')}
-                </h2>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
-                  {getMyPageMeta(myPage)}
-                </p>
-              </div>
+          {/* 아바타는 배너에 겹치고, 수정 버튼은 우측 상단에 배치 */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="relative -mt-12 flex-shrink-0">
+              <ProfileAvatar
+                fileId={myPage.prflImgFileId}
+                name={myPage.empNm}
+                size={96}
+                rounded="2xl"
+                className="h-24 w-24 text-3xl ring-4 ring-white"
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => void handleImageChange(event)}
+              />
+              <button
+                type="button"
+                onClick={handlePickImage}
+                disabled={uploading}
+                aria-label="프로필 이미지 변경"
+                title="프로필 이미지 변경"
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white shadow-md transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {uploading ? (
+                  <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Camera size={15} aria-hidden="true" />
+                )}
+              </button>
             </div>
 
             {!editing && (
@@ -238,10 +229,21 @@ export default function ProfileSection({ state }: ProfileSectionProps) {
                 size="sm"
                 leftIcon={<Pencil size={14} />}
                 onClick={() => setEditing(true)}
+                className="mt-4"
               >
                 개인정보 수정
               </Button>
             )}
+          </div>
+
+          {/* 이름·소속 정보는 흰 영역에 배치하여 배너/아바타와 겹치지 않도록 함 */}
+          <div className="mt-3 min-w-0">
+            <h2 className="truncate text-xl font-black text-slate-950">
+              {formatMyPageValue(myPage.empNm, '사용자')}
+            </h2>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-500">
+              {getMyPageMeta(myPage)}
+            </p>
           </div>
         </div>
       </div>
