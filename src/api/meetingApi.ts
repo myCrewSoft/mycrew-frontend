@@ -54,6 +54,11 @@ const requestMomApproval = (mtngId: number) =>
     `${MEETING_API_PREFIX}/${mtngId}/minutes/approval`,
   )
 
+const regenerateAiDraft = (mtngId: number) =>
+  axiosInstance.post<ApiResponse<string>>(
+    `${MEETING_API_PREFIX}/${mtngId}/minutes/regenerate`,
+  )
+
 const issueToken = (vconfId: number) =>
   axiosInstance.post<ApiResponse<VideoTokenResponse>>(
     `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/token`,
@@ -85,11 +90,17 @@ const uploadRcrdg = (vconfId: number, file: File) => {
   )
 }
 
-const getRcrdgStreamUrl = (vconfId: number, atchFileId: number) =>
-  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/stream`
+const downloadRcrdg = (vconfId: number, atchFileId: number) =>
+  axiosInstance.get(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/download`,
+    { responseType: 'blob' },
+  )
 
-const getRcrdgDownloadUrl = (vconfId: number, atchFileId: number) =>
-  `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/download`
+const streamRcrdg = (vconfId: number, atchFileId: number) =>
+  axiosInstance.get(
+    `${VIDEO_CONFERENCE_API_PREFIX}/${vconfId}/recordings/${atchFileId}/stream`,
+    { responseType: 'blob' },
+  )
 
 const transcribe = (vconfId: number, audioChunk: Blob) => {
   const formData = new FormData()
@@ -112,11 +123,12 @@ export const meetingApi = {
   createEmptyMom,
   updateMom,
   requestMomApproval,
+  regenerateAiDraft,
   issueToken,
   leaveConf,
   endConf,
   uploadRcrdg,
-  getRcrdgStreamUrl,
-  getRcrdgDownloadUrl,
+  downloadRcrdg,
+  streamRcrdg,
   transcribe,
 }
