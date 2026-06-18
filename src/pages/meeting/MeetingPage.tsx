@@ -48,6 +48,7 @@ import type {
 } from '../../types'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import MeetingRoomAvailabilityTimeline from './MeetingRoomAvailabilityTimeline'
+import MeetingMinutesPage from './MeetingMinutesPage'
 import type {
   MeetingDetail,
   MeetingCreateRequest,
@@ -263,6 +264,8 @@ const MeetingPage = () => {
   )
 
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
+  const [activeMinutesMeeting, setActiveMinutesMeeting] = useState<MeetingDetail | null>(null)
+  const [rcrdgBlobUrl, setRcrdgBlobUrl] = useState<string | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
   const [meetingDateTo, setMeetingDateTo] = useState('')
@@ -547,6 +550,7 @@ const MeetingPage = () => {
 
       if (!detail) return
       setSelectedMeeting(null)
+      setActiveMinutesMeeting(detail)
     },
     [fetchMeetingDetail],
   )
@@ -567,12 +571,23 @@ const MeetingPage = () => {
         return
       }
 
-      window.location.assign(
-        meetingApi.getRcrdgDownloadUrl(
-          detail.vconfId,
-          detail.rcrdgAtchFileId,
-        ),
-      )
+      try {
+        const response = await meetingApi.downloadRcrdg(detail.vconfId, detail.rcrdgAtchFileId)
+        const url = URL.createObjectURL(new Blob([response.data as BlobPart]))
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `recording_${detail.vconfId}.webm`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } catch {
+        showToast({
+          title: '녹취록을 다운로드하지 못했습니다.',
+          description: '잠시 후 다시 시도해 주세요.',
+          variant: 'danger',
+        })
+      }
     },
     [fetchMeetingDetail, showToast],
   )
@@ -598,14 +613,13 @@ const MeetingPage = () => {
           return
         }
 
-        const streamUrl = meetingApi.getRcrdgStreamUrl(
-          detail.vconfId,
-          detail.rcrdgAtchFileId,
-        )
+        const response = await meetingApi.streamRcrdg(detail.vconfId, detail.rcrdgAtchFileId)
+        const blob = new Blob([response.data as BlobPart], { type: (response.data as Blob).type || 'audio/webm' })
+        const blobUrl = URL.createObjectURL(blob)
         if (streamWindow) {
-          streamWindow.location.href = streamUrl
+          streamWindow.location.href = blobUrl
         } else {
-          window.location.assign(streamUrl)
+          window.location.assign(blobUrl)
         }
       } catch {
         streamWindow?.close()
@@ -836,6 +850,28 @@ const MeetingPage = () => {
   ])
 
   useEffect(() => {
+    if (!selectedMeeting?.vconfId || !selectedMeeting?.rcrdgAtchFileId) {
+      return
+    }
+    let active = true
+    let createdUrl: string | null = null
+    void meetingApi.streamRcrdg(selectedMeeting.vconfId, selectedMeeting.rcrdgAtchFileId)
+      .then((res) => {
+        if (!active) return
+        createdUrl = URL.createObjectURL(new Blob([res.data as BlobPart], { type: (res.data as Blob).type || 'audio/webm' }))
+        setRcrdgBlobUrl(createdUrl)
+      })
+      .catch(() => {
+        if (active) setRcrdgBlobUrl(null)
+      })
+    return () => {
+      active = false
+      if (createdUrl) URL.revokeObjectURL(createdUrl)
+      setRcrdgBlobUrl(null)
+    }
+  }, [selectedMeeting?.vconfId, selectedMeeting?.rcrdgAtchFileId])
+
+  useEffect(() => {
     if (!schedulePanelOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -874,6 +910,15 @@ const MeetingPage = () => {
   // ─────────────────────────────────────────────────────────────
   // 목록 화면
   // ─────────────────────────────────────────────────────────────
+
+  if (activeMinutesMeeting) {
+    return (
+      <MeetingMinutesPage
+        meeting={activeMinutesMeeting}
+        onBack={() => setActiveMinutesMeeting(null)}
+      />
+    )
+  }
 
   return (
     <PageComponent>
@@ -1284,15 +1329,13 @@ const MeetingPage = () => {
                 </div>
               </div>
               {selectedMeeting.vconfId !== null &&
-                selectedMeeting.rcrdgAtchFileId && (
+                selectedMeeting.rcrdgAtchFileId &&
+                rcrdgBlobUrl && (
                   <audio
                     controls
                     preload="metadata"
                     className="mt-4 w-full"
-                    src={meetingApi.getRcrdgStreamUrl(
-                      selectedMeeting.vconfId,
-                      selectedMeeting.rcrdgAtchFileId,
-                    )}
+                    src={rcrdgBlobUrl}
                   >
                     브라우저가 오디오 재생을 지원하지 않습니다.
                   </audio>
