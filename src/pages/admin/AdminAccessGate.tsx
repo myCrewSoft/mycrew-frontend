@@ -23,6 +23,8 @@ import { AdminRolesProvider } from './adminRolesContext';
 import type { AdminAccessResponse } from '../../types/admin';
 import RoomManagementPage from './Reservation/RoomAdminPage';
 import ReservationAdminPage from './Reservation/ReservationAdminPage';
+import AdminMtngStatsPage from './Meeting/AdminMtngStatsPage';
+import AdminMtngPage from './Meeting/AdminMtngPage';
 
 export default function AdminAccessGate() {
   const location = useLocation();
@@ -203,6 +205,14 @@ export default function AdminAccessGate() {
     return (
       <AdminLayout access={access}>
         <AdminBoardsPage />
+      </AdminLayout>
+    );
+  }
+
+  if (location.pathname.startsWith('/admin/meeting')) {
+    return (
+      <AdminLayout access={access}>
+        {location.pathname === '/admin/meeting/stats' ? <AdminMtngStatsPage /> : <AdminMtngPage />}
       </AdminLayout>
     );
   }
