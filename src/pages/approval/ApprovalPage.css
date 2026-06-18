@@ -388,6 +388,8 @@
 }
 
 .approval-draft-form__content-section {
+  /* 문서 편집/HTML 편집/미리보기 결재 내용 칸 높이를 하나로 통일 */
+  --approval-editor-h: 28rem;
   display: grid;
   gap: 0.5rem;
 }
@@ -413,20 +415,28 @@
 .approval-draft-form__content-editor {
   display: block;
   width: 100%;
-  height: calc(50vh);
+  height: var(--approval-editor-h);
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   background-color: #ffffff;
 }
 
 .approval-draft-form__html-editor {
-  min-height: 28rem;
+  height: var(--approval-editor-h);
+  min-height: var(--approval-editor-h);
+  max-height: var(--approval-editor-h);
+  resize: none;
   border-radius: 0.5rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
+.approval-draft-form__preview-wrap {
+  height: var(--approval-editor-h);
+  overflow-y: auto;
+}
+
 .approval-draft-form__preview-wrap .approval-page__html-document {
-  min-height: calc(50vh);
+  min-height: 100%;
 }
 
 /* 문서 뷰어 iframe 래퍼 */
@@ -495,6 +505,8 @@
 
 
 .approval-template-form {
+  /* HTML 편집/문서 미리보기 결재 내용 칸 높이를 하나로 통일 */
+  --approval-editor-h: 28rem;
   display: grid;
   gap: 1rem;
 }
@@ -512,7 +524,10 @@
 }
 
 .approval-template-form__editor {
-  min-height: 28rem;
+  height: var(--approval-editor-h);
+  min-height: var(--approval-editor-h);
+  max-height: var(--approval-editor-h);
+  resize: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -525,6 +540,13 @@
   color: #334155;
   font-size: 0.875rem;
   font-weight: 900;
+}
+
+.approval-template-form__preview-wrap .approval-page__html-document {
+  height: var(--approval-editor-h);
+  min-height: var(--approval-editor-h);
+  max-height: var(--approval-editor-h);
+  overflow-y: auto;
 }
 
 .approval-page__html-document {
