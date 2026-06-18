@@ -92,7 +92,7 @@ export interface RankResponse {
 }
 
 export interface RankCreateRequest {
-  rankId: string;
+  // 직급 ID는 서버에서 자동 생성되므로 클라이언트가 전송하지 않는다.
   rankName: string;
   sortOrder: number;
 }

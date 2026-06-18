@@ -33,7 +33,6 @@ import type { AdminEmployeeListItem } from '../../types/adminEmployee';
 const pageSize = 10;
 
 interface RankFormState {
-  rankId: string;
   rankName: string;
   sortOrder: number;
 }
@@ -47,7 +46,6 @@ interface ConfirmAction {
 }
 
 const createEmptyRankForm = (): RankFormState => ({
-  rankId: '',
   rankName: '',
   sortOrder: 1,
 });
@@ -262,7 +260,6 @@ export default function AdminRanksPage() {
     }
 
     setRankForm({
-      rankId: selectedRank.rankId,
       rankName: selectedRank.rankName,
       sortOrder: selectedRank.sortOrder,
     });
@@ -290,11 +287,6 @@ export default function AdminRanksPage() {
       return;
     }
 
-    if (rankModalMode === 'create' && !rankForm.rankId.trim()) {
-      setRankSubmitError('직급 ID를 입력해 주세요.');
-      return;
-    }
-
     setRankSubmitting(true);
     setRankSubmitError(null);
 
@@ -302,7 +294,6 @@ export default function AdminRanksPage() {
       const response =
         rankModalMode === 'create'
           ? await adminApi.createRank({
-              rankId: rankForm.rankId.trim(),
               rankName: rankForm.rankName.trim(),
               sortOrder: rankForm.sortOrder,
             })
@@ -917,7 +908,7 @@ export default function AdminRanksPage() {
         title={rankModalMode === 'create' ? '직급 생성' : '직급 수정'}
         description={
           rankModalMode === 'create'
-            ? '직급 ID, 직급명, 정렬 순서를 입력합니다.'
+            ? '직급명과 정렬 순서를 입력합니다. 직급 ID는 자동으로 생성됩니다.'
             : '직급 ID는 수정할 수 없습니다.'
         }
         onClose={closeRankModal}
@@ -945,19 +936,16 @@ export default function AdminRanksPage() {
           className="grid gap-4 md:grid-cols-2"
           onSubmit={handleRankSubmit}
         >
-          <FormField
-            label="직급 ID"
-            required={rankModalMode === 'create'}
-            disabled={rankModalMode === 'edit'}
-            value={rankForm.rankId}
-            placeholder="RANK_MANAGER"
-            onChange={(event) =>
-              setRankForm((current) => ({
-                ...current,
-                rankId: event.target.value,
-              }))
-            }
-          />
+          <div className="md:col-span-2">
+            <span className="flex items-center gap-1 text-sm font-semibold text-slate-700">
+              직급 ID
+            </span>
+            <div className="mt-2 flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-slate-500">
+              {rankModalMode === 'edit'
+                ? (selectedRank?.rankId ?? '-')
+                : '저장 시 자동 생성됩니다 (예: RANK_01)'}
+            </div>
+          </div>
           <FormField
             label="직급명"
             required
