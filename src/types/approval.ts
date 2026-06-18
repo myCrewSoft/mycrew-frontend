@@ -43,7 +43,158 @@ export interface ApprovalDraftRequestDTO {
   approvalLines?: ApprovalStepRequestDTO[];
 }
 
+/** 전자결재 AI 기안서 초안 생성 요청 */
+export interface ApprovalAiDraftRequestDTO {
+  /** AI에게 전달할 기안서 작성 요청 내용 */
+  userPrompt: string;
+
+  /** 우선 활용할 결재 양식 코드 */
+  tmplatCd?: string;
+}
+
+/** 전자결재 AI 기안서 초안 생성 응답 */
+export interface ApprovalAiDraftResponseDTO {
+  /** AI가 생성해 임시저장한 기안문 일련번호 */
+  drftDocSn: number;
+
+  /** AI가 생성한 기안서 제목 */
+  docTtl: string;
+
+  /** AI 초안에 적용된 결재 양식 코드 */
+  tmplatCd?: Nullable<string>;
+
+  /** AI 초안 생성 중 서버가 보정한 내용 또는 사용자 확인이 필요한 경고 */
+  warnings?: string[];
+}
+
+export type ApprovalAiDraftJobStatus =
+  | 'PENDING'
+  | 'RUNNING'
+  | 'SUCCEEDED'
+  | 'FAILED';
+
+/** 전자결재 AI 기안서 생성 작업 응답 */
+export interface ApprovalAiDraftJobResponseDTO {
+  /** AI 작업 ID */
+  jobId: number;
+
+  /** AI 작업 상태 */
+  status: ApprovalAiDraftJobStatus | string;
+
+  /** AI가 임시저장한 기안문 일련번호 */
+  drftDocSn?: number;
+
+  /** AI가 생성한 기안서 제목 */
+  docTtl?: string;
+
+  /** AI 초안에 적용된 결재 양식 코드 */
+  tmplatCd?: Nullable<string>;
+
+  /** AI 초안 생성 중 서버가 보정한 내용 또는 사용자 확인이 필요한 경고 */
+  warnings?: string[];
+
+  /** AI 작업 실패 메시지 */
+  errorMessage?: string;
+
+  /** AI 작업 생성 일시 */
+  createdAt?: LocalDateTimeString;
+
+  /** AI 작업 최종 갱신 일시 */
+  updatedAt?: LocalDateTimeString;
+}
+
 /** 결재 단계 요청 */
+/** 전자결재 AI 기안서 본문 생성 작업 응답 */
+export interface ApprovalAiContentJobResponseDTO {
+  /** AI 작업 ID */
+  jobId: number;
+
+  /** AI 작업 상태 */
+  status: ApprovalAiDraftJobStatus | string;
+
+  /** AI가 생성한 기안서 제목 */
+  docTtl?: string;
+
+  /** AI 초안에 적용된 결재 양식 코드 */
+  tmplatCd?: Nullable<string>;
+
+  /** AI가 생성한 기안서 HTML 본문 */
+  aprvlFullCn?: string;
+
+  /** AI 본문 생성 중 서버가 보정한 내용 또는 사용자 확인이 필요한 경고 */
+  warnings?: string[];
+
+  /** AI 작업 실패 메시지 */
+  errorMessage?: string;
+
+  /** AI 작업 생성 일시 */
+  createdAt?: LocalDateTimeString;
+
+  /** AI 작업 최종 갱신 일시 */
+  updatedAt?: LocalDateTimeString;
+}
+
+/** 전자결재 AI 결재선 자동 지정 요청 */
+export interface ApprovalAiApprovalLineRequestDTO {
+  /** AI에게 전달할 결재선 지정 요청 내용 */
+  userPrompt?: string;
+
+  /** 기안서 제목 */
+  docTtl?: string;
+
+  /** 선택된 결재 양식 코드 */
+  tmplatCd?: string;
+
+  /** 작성 중인 기안서 HTML 본문 */
+  aprvlFullCn?: string;
+}
+
+/** 전자결재 AI 결재자 후보 및 선택 결재자 정보 */
+export interface ApprovalAiApproverCandidateDTO {
+  empId: number;
+  empNm: string;
+  deptCd?: Nullable<string>;
+  deptNm?: Nullable<string>;
+  parentDeptCd?: Nullable<string>;
+  jobGrdCd?: Nullable<string>;
+  jobGrdNm?: Nullable<string>;
+  jobGrdSortOrder?: Nullable<number>;
+  jobPstnCd?: Nullable<string>;
+  jobPstnNm?: Nullable<string>;
+  jobDutyCn?: Nullable<string>;
+  execYn?: Nullable<string>;
+  hasSignatureYn?: Nullable<string>;
+  deptLeaderYn?: Nullable<string>;
+  prflImgFileId?: Nullable<number>;
+}
+
+/** 전자결재 AI 결재선 자동 지정 작업 응답 */
+export interface ApprovalAiApprovalLineJobResponseDTO {
+  /** AI 작업 ID */
+  jobId: number;
+
+  /** AI 작업 상태 */
+  status: ApprovalAiDraftJobStatus | string;
+
+  /** AI가 지정한 결재 단계 목록 */
+  approvalLines?: ApprovalStepRequestDTO[];
+
+  /** AI가 지정한 결재자 상세 정보 */
+  approvers?: ApprovalAiApproverCandidateDTO[];
+
+  /** AI 결재선 지정 중 서버가 보정한 내용 또는 사용자 확인이 필요한 경고 */
+  warnings?: string[];
+
+  /** AI 작업 실패 메시지 */
+  errorMessage?: string;
+
+  /** AI 작업 생성 일시 */
+  createdAt?: LocalDateTimeString;
+
+  /** AI 작업 최종 갱신 일시 */
+  updatedAt?: LocalDateTimeString;
+}
+
 export interface ApprovalStepRequestDTO {
   /** 결재 방식 코드 */
   aprvlMthdCd: string;

@@ -4,6 +4,12 @@ import type { ApiResponse } from './axiosInstance';
 
 import type {
   ApprovalActionRequestDTO,
+  ApprovalAiApprovalLineJobResponseDTO,
+  ApprovalAiApprovalLineRequestDTO,
+  ApprovalAiContentJobResponseDTO,
+  ApprovalAiDraftJobResponseDTO,
+  ApprovalAiDraftRequestDTO,
+  ApprovalAiDraftResponseDTO,
   ApprovalAvailabilityResponse,
   ApprovalDocumentDetailResponse,
   ApprovalDraftCountResponse,
@@ -38,6 +44,11 @@ type ApprovalAvailabilityAxiosResponse = AxiosResponse<ApiResponse<ApprovalAvail
 type ApprovalTemplateAxiosResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse>>;
 type ApprovalTemplateListResponse = AxiosResponse<ApiResponse<ApprovalTemplateResponse[]>>;
 type ApprovalDraftCountAxiosResponse = AxiosResponse<ApiResponse<ApprovalDraftCountResponse>>;
+type ApprovalAiDraftAxiosResponse = AxiosResponse<ApiResponse<ApprovalAiDraftResponseDTO>>;
+type ApprovalAiDraftJobAxiosResponse = AxiosResponse<ApiResponse<ApprovalAiDraftJobResponseDTO>>;
+type ApprovalAiContentJobAxiosResponse = AxiosResponse<ApiResponse<ApprovalAiContentJobResponseDTO>>;
+type ApprovalAiApprovalLineJobAxiosResponse =
+  AxiosResponse<ApiResponse<ApprovalAiApprovalLineJobResponseDTO>>;
 
 const APPROVAL_BASE_URL = '/api/approval';
 
@@ -50,6 +61,88 @@ export const approvalApi = {
     data: ApprovalDraftRequestDTO,
   ): Promise<AxiosResponse<ApiResponse<number>>> => {
     return axiosInstance.post(`${APPROVAL_BASE_URL}/drafts`, data);
+  },
+
+  /**
+   * AI 기안서 초안 생성 및 임시저장
+   * POST /api/approval/ai/drafts
+   */
+  createAiDraft: (
+    data: ApprovalAiDraftRequestDTO,
+  ): Promise<ApprovalAiDraftAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/drafts`, data);
+  },
+
+  /**
+   * AI 기안서 초안 생성 작업 시작
+   * POST /api/approval/ai/drafts/jobs
+   */
+  createAiDraftJob: (
+    data: ApprovalAiDraftRequestDTO,
+  ): Promise<ApprovalAiDraftJobAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/drafts/jobs`, data);
+  },
+
+  /**
+   * AI 기안서 초안 생성 작업 조회
+   * GET /api/approval/ai/drafts/jobs/{jobId}
+   */
+  getAiDraftJob: (
+    jobId: number,
+  ): Promise<ApprovalAiDraftJobAxiosResponse> => {
+    return axiosInstance.get(`${APPROVAL_BASE_URL}/ai/drafts/jobs/${jobId}`);
+  },
+
+  /**
+   * AI 기안서 본문 생성 작업 시작
+   * POST /api/approval/ai/drafts/content/jobs
+   */
+  createAiDraftContentJob: (
+    data: ApprovalAiDraftRequestDTO,
+  ): Promise<ApprovalAiContentJobAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/drafts/content/jobs`, data);
+  },
+
+  /**
+   * AI 기안서 본문 생성 작업 조회
+   * GET /api/approval/ai/drafts/content/jobs/{jobId}
+   */
+  getAiDraftContentJob: (
+    jobId: number,
+  ): Promise<ApprovalAiContentJobAxiosResponse> => {
+    return axiosInstance.get(`${APPROVAL_BASE_URL}/ai/drafts/content/jobs/${jobId}`);
+  },
+
+  /**
+   * AI 결재선 자동 지정 작업 시작
+   * POST /api/approval/ai/approval-lines/jobs
+   */
+  createAiDraftContentSaveJob: (
+    data: ApprovalAiDraftRequestDTO,
+  ): Promise<ApprovalAiDraftJobAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/drafts/content-save/jobs`, data);
+  },
+
+  getAiDraftContentSaveJob: (
+    jobId: number,
+  ): Promise<ApprovalAiDraftJobAxiosResponse> => {
+    return axiosInstance.get(`${APPROVAL_BASE_URL}/ai/drafts/content-save/jobs/${jobId}`);
+  },
+
+  createAiApprovalLineJob: (
+    data: ApprovalAiApprovalLineRequestDTO,
+  ): Promise<ApprovalAiApprovalLineJobAxiosResponse> => {
+    return axiosInstance.post(`${APPROVAL_BASE_URL}/ai/approval-lines/jobs`, data);
+  },
+
+  /**
+   * AI 결재선 자동 지정 작업 조회
+   * GET /api/approval/ai/approval-lines/jobs/{jobId}
+   */
+  getAiApprovalLineJob: (
+    jobId: number,
+  ): Promise<ApprovalAiApprovalLineJobAxiosResponse> => {
+    return axiosInstance.get(`${APPROVAL_BASE_URL}/ai/approval-lines/jobs/${jobId}`);
   },
 
   /**

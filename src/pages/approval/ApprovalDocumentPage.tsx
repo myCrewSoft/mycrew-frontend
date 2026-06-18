@@ -24,6 +24,10 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import { useToast } from '../../components/common/toast/useToast'
+import {
+  NOTIFICATION_RECEIVED_EVENT,
+  type NotificationReceivedEventDetail,
+} from '../../components/layouts/headerPopover/useNotificationStream'
 import type {
   ApprovalActionRequestDTO,
   ApprovalDocumentDetailResponse,
@@ -138,7 +142,14 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     setDraftApprovers,
     draftError,
     draftSaving,
+    aiPrompt,
+    aiGenerating,
+    aiApprovalLineGenerating,
+    canGenerateAiApprovalLine,
     isEditingDraft,
+    setAiPrompt,
+    handleGenerateAiDraft,
+    handleGenerateAiApprovalLine,
     openDraftForEdit,
     handleSaveDraft,
     closeDraft,
@@ -167,6 +178,23 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadList()
   }, [loadList])
+
+  useEffect(() => {
+    const handleApprovalNotification = (event: Event) => {
+      const detail = (event as CustomEvent<NotificationReceivedEventDetail>).detail
+      if (detail?.notification?.alrmTypeCd !== '02') return
+
+      window.dispatchEvent(new Event('approval:refresh-counts'))
+      if (currentBox === 'sent-temporary') {
+        void loadList()
+      }
+    }
+
+    window.addEventListener(NOTIFICATION_RECEIVED_EVENT, handleApprovalNotification)
+    return () => {
+      window.removeEventListener(NOTIFICATION_RECEIVED_EVENT, handleApprovalNotification)
+    }
+  }, [currentBox, loadList])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -513,6 +541,13 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
         form={draftForm}
         approvers={draftApprovers}
         error={draftError}
+        aiPrompt={aiPrompt}
+        aiGenerating={aiGenerating}
+        aiApprovalLineGenerating={aiApprovalLineGenerating}
+        canGenerateAiApprovalLine={canGenerateAiApprovalLine}
+        onAiPromptChange={setAiPrompt}
+        onGenerateAiDraft={handleGenerateAiDraft}
+        onGenerateAiApprovalLine={handleGenerateAiApprovalLine}
         onChange={setDraftForm}
         onApproversChange={setDraftApprovers}
         onClose={closeDraft}

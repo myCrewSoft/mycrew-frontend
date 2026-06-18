@@ -29,6 +29,13 @@ export default function ApprovalFavoriteTemplatePage() {
     setDraftApprovers,
     draftError,
     draftSaving,
+    aiPrompt,
+    aiGenerating,
+    aiApprovalLineGenerating,
+    canGenerateAiApprovalLine,
+    setAiPrompt,
+    handleGenerateAiDraft,
+    handleGenerateAiApprovalLine,
     handleSaveDraft,
     closeDraft,
   } = useDraftModal()
@@ -256,6 +263,13 @@ export default function ApprovalFavoriteTemplatePage() {
         form={draftForm}
         approvers={draftApprovers}
         error={draftError}
+        aiPrompt={aiPrompt}
+        aiGenerating={aiGenerating}
+        aiApprovalLineGenerating={aiApprovalLineGenerating}
+        canGenerateAiApprovalLine={canGenerateAiApprovalLine}
+        onAiPromptChange={setAiPrompt}
+        onGenerateAiDraft={handleGenerateAiDraft}
+        onGenerateAiApprovalLine={handleGenerateAiApprovalLine}
         onChange={setDraftForm}
         onApproversChange={setDraftApprovers}
         onClose={closeDraft}
