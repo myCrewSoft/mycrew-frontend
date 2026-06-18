@@ -135,6 +135,7 @@ export default function AdminAccessGate() {
     return (
       <AdminLayout access={access}>
         <DashboardPage
+          variant="admin"
           title="관리자 대시보드"
           description="조직 전체 현황을 한 화면에서 확인합니다."
           storageKey="mycrew.admin.dashboard.layout"

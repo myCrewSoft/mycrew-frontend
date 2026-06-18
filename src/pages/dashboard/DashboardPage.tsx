@@ -16,6 +16,8 @@ import type {
   DashboardLayoutItem,
   DashboardLayoutJson,
   DashboardServerLayoutItem,
+  DashboardVariant,
+  DashboardWidgetData,
   DashboardWidgetKey,
   DashboardWidgetStateMap,
 } from '../../types/dashboard'
@@ -35,6 +37,8 @@ interface DashboardPageProps {
   storageKey?: string
   title?: string
   description?: string
+  /** 'admin'이면 관리자 전용 위젯 엔드포인트/렌더러를 사용한다. (기본 'user') */
+  variant?: DashboardVariant
 }
 
 const isDashboardWidgetKey = (value: string): value is DashboardWidgetKey =>
@@ -139,6 +143,7 @@ const getErrorMessage = (error: unknown) =>
 const useDashboardWidgetData = (
   activeWidgetKeys: DashboardWidgetKey[],
   boardType: DashboardBoardType,
+  variant: DashboardVariant,
 ) => {
   const [widgetStates, setWidgetStates] = useState<DashboardWidgetStateMap>({})
   const activeSignature = useMemo(
@@ -158,11 +163,16 @@ const useDashboardWidgetData = (
       }))
 
       try {
-        const response = await dashboardApi.getWidget(widgetKey, boardType)
+        const response =
+          variant === 'admin'
+            ? await dashboardApi.getAdminWidget(widgetKey, boardType)
+            : await dashboardApi.getWidget(widgetKey, boardType)
+        // 관리자 위젯 데이터는 렌더 시점에 관리자 타입으로 다시 캐스팅한다.
+        const nextData = (response.data.data ?? null) as DashboardWidgetData | null
         setWidgetStates((current) => ({
           ...current,
           [widgetKey]: {
-            data: response.data.data ?? null,
+            data: nextData,
             loading: false,
             error: null,
           },
@@ -178,7 +188,7 @@ const useDashboardWidgetData = (
         }))
       }
     },
-    [boardType],
+    [boardType, variant],
   )
 
   useEffect(() => {
@@ -195,6 +205,7 @@ const DashboardPage = ({
   storageKey = DEFAULT_STORAGE_KEY,
   title = '대시보드',
   description = '오늘 필요한 업무 정보를 한 화면에서 확인합니다.',
+  variant = 'user',
 }: DashboardPageProps = {}) => {
   const [editMode, setEditMode] = useState(false)
   const [layout, setLayout] = useState<DashboardLayoutItem[]>(() =>
@@ -221,6 +232,7 @@ const DashboardPage = ({
   const { widgetStates } = useDashboardWidgetData(
     activeWidgetKeys,
     boardType,
+    variant,
   )
 
   const availableWidgets = useMemo(
@@ -414,6 +426,7 @@ const DashboardPage = ({
               widgetState={widgetStates[item.i]}
               boardType={boardType}
               editMode={editMode}
+              variant={variant}
               onRemove={handleRemoveWidget}
               onBoardTypeChange={setBoardType}
             />
