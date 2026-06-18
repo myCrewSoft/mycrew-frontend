@@ -1,9 +1,12 @@
 import {
+  BookOpen,
   CalendarDays,
+  CheckSquare,
   Clock3,
-  FileText,
-  Folder,
+  FolderKanban,
+  Mail,
   Search,
+  Video,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -26,74 +29,65 @@ interface GlobalSearchPaletteContentProps {
   onClose: () => void
 }
 
-// Backend search API is not ready yet, so the first UI pass uses mock data.
-// When /search is ready, change this to false and remove the mock branch later.
-const USE_MOCK_DATA = true
-
-const MOCK_SEARCH_RESULTS: SearchResponseDto[] = [
-  {
-    id: 1,
-    type: 'schedule',
-    title: '3분기 전략 회의',
-    description: '2025.05.22 14:00 · 한라 회의실',
-    badgeText: 'D-2',
-    path: '/calendar',
-  },
-  {
-    id: 2,
-    type: 'schedule',
-    title: '연간 전략 기획 보고',
-    description: '2025.06.01 10:00',
-    path: '/calendar',
-  },
-  {
-    id: 3,
-    type: 'board',
-    title: '2025 전략 방향 공유 (개발팀)',
-    description: '게시판 · 김민준 · 3일 전',
-    path: '/boards/3',
-  },
-  {
-    id: 4,
-    type: 'board',
-    title: '마케팅 전략 초안 공유',
-    description: '게시판 · 이서연 · 5일 전',
-    path: '/boards/4',
-  },
-  {
-    id: 5,
-    type: 'document',
-    title: '사업 전략_v2.pptx',
-    description: '드라이브 · 5.2MB · 1주 전',
-    path: '/drive/5',
-  },
+const SEARCH_TYPE_ORDER: SearchType[] = [
+  'PROJECT',
+  'TASK',
+  'SCHEDULE',
+  'MEETING',
+  'EDUCATION',
+  'MAIL',
 ]
 
 const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
-  schedule: '일정',
-  board: '게시글',
-  document: '문서',
+  PROJECT: '프로젝트',
+  TASK: '업무',
+  SCHEDULE: '일정',
+  MEETING: '회의',
+  EDUCATION: '교육',
+  MAIL: '메일',
 }
 
-const getTypeIcon = (type: SearchType) => {
-  if (type === 'schedule') return CalendarDays
-  if (type === 'board') return FileText
-  return Folder
+const getTypeIcon = (type?: SearchType) => {
+  if (type === 'PROJECT') return FolderKanban
+  if (type === 'TASK') return CheckSquare
+  if (type === 'SCHEDULE') return CalendarDays
+  if (type === 'MEETING') return Video
+  if (type === 'EDUCATION') return BookOpen
+  return Mail
 }
 
-// Backend may return a path later. Until then, the frontend can derive a route.
 const getFallbackPath = (item: SearchResponseDto) => {
-  if (item.type === 'schedule') return `/calendar?scheduleId=${item.id}`
-  if (item.type === 'board') return `/boards/${item.id}`
-  return `/drive/${item.id}`
+  const id = item.id
+
+  if (item.type === 'PROJECT') return `/project/${id}`
+
+  if (item.type === 'TASK') {
+    const projectId = item.parentId
+    const taskId = id
+
+    if (!projectId) {
+      return '/project'
+    }
+
+    return `/project/${projectId}?tab=tasks&taskId=${taskId}`
+  }
+
+  if (item.type === 'SCHEDULE') return `/calendar?scheduleId=${id}`
+  if (item.type === 'MEETING') return '/meeting/scheduled'
+  if (item.type === 'EDUCATION') return `/education/${id}`
+  if (item.type === 'MAIL') return '/mail'
+
+  return '/dashboard'
 }
+
+const getResultKey = (item: SearchResponseDto, index: number) =>
+  `${item.type ?? 'UNKNOWN'}-${item.parentId ?? 'root'}-${item.id ?? index}`
 
 const GlobalSearchPalette = ({ open, onClose }: GlobalSearchPaletteProps) => {
   if (!open) {
     return null
   }
 
-  // Mount content only while open so local state resets naturally on next open.
   return <GlobalSearchPaletteContent onClose={onClose} />
 }
 
@@ -103,7 +97,7 @@ const GlobalSearchPaletteContent = ({
   const navigate = useNavigate()
 
   const [keyword, setKeyword] = useState('')
-  const [apiResults, setApiResults] = useState<SearchResponseDto[]>([])
+  const [results, setResults] = useState<SearchResponseDto[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -112,57 +106,41 @@ const GlobalSearchPaletteContent = ({
   })
 
   const trimmedKeyword = keyword.trim()
-
-  // Mock search keeps the UI usable before backend integration.
-  const mockResults = useMemo(() => {
-    if (!trimmedKeyword) {
-      return MOCK_SEARCH_RESULTS.slice(0, 3)
-    }
-
-    return MOCK_SEARCH_RESULTS.filter((item) => {
-      const target = `${item.title} ${item.description ?? ''}`.toLowerCase()
-      return target.includes(trimmedKeyword.toLowerCase())
-    })
-  }, [trimmedKeyword])
-
-  const results = USE_MOCK_DATA ? mockResults : apiResults
   const activeItem = results[activeIndex]
 
   const handleOpenItem = useCallback(
     (item: SearchResponseDto) => {
-      navigate(item.path ?? getFallbackPath(item))
+      navigate(getFallbackPath(item))
       onClose()
     },
     [navigate, onClose],
   )
 
   const groupedResults = useMemo(() => {
-    return {
-      schedule: results.filter((item) => item.type === 'schedule'),
-      board: results.filter((item) => item.type === 'board'),
-      document: results.filter((item) => item.type === 'document'),
-    }
+    return SEARCH_TYPE_ORDER.reduce(
+      (groups, type) => {
+        groups[type] = results.filter((item) => item.type === type)
+        return groups
+      },
+      {} as Record<SearchType, SearchResponseDto[]>,
+    )
   }, [results])
 
-  // This effect is only for the real backend branch. setState happens inside
-  // the timer callback, not synchronously in the effect body.
   useEffect(() => {
-    if (USE_MOCK_DATA) return
-
     const timer = window.setTimeout(() => {
       if (!trimmedKeyword) {
-        setApiResults([])
+        setResults([])
         setActiveIndex(0)
         return
       }
 
       void search(trimmedKeyword)
         .then((response) => {
-          setApiResults(response.data ?? [])
+          setResults(response.data ?? [])
           setActiveIndex(0)
         })
         .catch(() => {
-          setApiResults([])
+          setResults([])
           setActiveIndex(0)
         })
     }, 250)
@@ -170,8 +148,6 @@ const GlobalSearchPaletteContent = ({
     return () => window.clearTimeout(timer)
   }, [search, trimmedKeyword])
 
-  // Keyboard events are an external subscription, so updating state in the
-  // event callback is safe and keeps arrow/enter/tab controls responsive.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -244,13 +220,13 @@ const GlobalSearchPaletteContent = ({
               previewOpen ? 'border-r border-slate-200' : ''
             }`}
           >
-            {loading && !USE_MOCK_DATA && (
+            {loading && (
               <div className="px-5 py-4 text-sm text-slate-500">
                 검색 중입니다...
               </div>
             )}
 
-            {(!loading || USE_MOCK_DATA) && results.length === 0 && (
+            {!loading && trimmedKeyword && results.length === 0 && (
               <div className="px-5 py-10 text-center">
                 <p className="text-sm font-bold text-slate-800">
                   검색 결과가 없습니다.
@@ -261,92 +237,96 @@ const GlobalSearchPaletteContent = ({
               </div>
             )}
 
-            {(!loading || USE_MOCK_DATA) && results.length > 0 && (
+            {!loading && !trimmedKeyword && (
+              <div className="px-5 py-10 text-center">
+                <p className="text-sm font-bold text-slate-800">
+                  검색어를 입력해 주세요.
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  프로젝트, 업무, 일정, 회의, 교육, 메일을 한 번에 찾을 수 있습니다.
+                </p>
+              </div>
+            )}
+
+            {!loading && results.length > 0 && (
               <div className="py-3">
-                {!trimmedKeyword && (
-                  <p className="px-5 pb-2 text-xs font-bold text-slate-500">
-                    최근 항목
-                  </p>
-                )}
+                {SEARCH_TYPE_ORDER.map((type) => {
+                  const sectionItems = groupedResults[type]
 
-                {(['schedule', 'board', 'document'] as SearchType[]).map(
-                  (type) => {
-                    const sectionItems = groupedResults[type]
+                  if (sectionItems.length === 0) {
+                    return null
+                  }
 
-                    if (sectionItems.length === 0) {
-                      return null
-                    }
+                  return (
+                    <div key={type} className="mb-3 last:mb-0">
+                      <p className="px-5 pb-2 text-xs font-bold text-blue-600">
+                        {SEARCH_TYPE_LABEL[type]} {sectionItems.length}
+                      </p>
 
-                    return (
-                      <div key={type} className="mb-3 last:mb-0">
-                        {trimmedKeyword && (
-                          <p className="px-5 pb-2 text-xs font-bold text-blue-600">
-                            {SEARCH_TYPE_LABEL[type]} {sectionItems.length}
-                          </p>
-                        )}
+                      <div className="space-y-1 px-3">
+                        {sectionItems.map((item, index) => {
+                          const flatIndex = results.findIndex(
+                            (result) =>
+                              result.type === item.type &&
+                              result.id === item.id &&
+                              result.parentId === item.parentId,
+                          )
+                          const Icon = getTypeIcon(item.type)
+                          const active = flatIndex === activeIndex
 
-                        <div className="space-y-1 px-3">
-                          {sectionItems.map((item) => {
-                            const flatIndex = results.findIndex(
-                              (result) =>
-                                result.type === item.type &&
-                                result.id === item.id,
-                            )
-                            const Icon = getTypeIcon(item.type)
-                            const active = flatIndex === activeIndex
+                          return (
+                            <button
+                              key={getResultKey(item, index)}
+                              type="button"
+                              onMouseEnter={() => setActiveIndex(flatIndex)}
+                              onClick={() => handleOpenItem(item)}
+                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                                active
+                                  ? 'border border-blue-500 bg-blue-50'
+                                  : 'border border-transparent hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-blue-600">
+                                <Icon size={17} />
+                              </span>
 
-                            return (
-                              <button
-                                key={`${item.type}-${item.id}`}
-                                type="button"
-                                onMouseEnter={() => setActiveIndex(flatIndex)}
-                                onClick={() => handleOpenItem(item)}
-                                className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
-                                  active
-                                    ? 'border border-blue-500 bg-blue-50'
-                                    : 'border border-transparent hover:bg-slate-50'
-                                }`}
-                              >
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-blue-600">
-                                  <Icon size={17} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-bold text-slate-950">
+                                  {item.title ?? '제목 없음'}
                                 </span>
-
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-sm font-bold text-slate-950">
-                                    {item.title}
+                                {item.description && (
+                                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                                    {item.description}
                                   </span>
-                                  {item.description && (
-                                    <span className="mt-0.5 block truncate text-xs text-slate-500">
-                                      {item.description}
-                                    </span>
-                                  )}
-                                </span>
-
-                                {item.badgeText && (
-                                  <Badge variant="neutral">
-                                    {item.badgeText}
-                                  </Badge>
                                 )}
-                              </button>
-                            )
-                          })}
-                        </div>
+                              </span>
+
+                              {item.badgeText && (
+                                <Badge variant="neutral">
+                                  {item.badgeText}
+                                </Badge>
+                              )}
+                            </button>
+                          )
+                        })}
                       </div>
-                    )
-                  },
-                )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
 
           {previewOpen && activeItem && (
             <aside className="hidden w-60 shrink-0 p-5 md:block">
-              <Badge variant="neutral">
-                {SEARCH_TYPE_LABEL[activeItem.type]}
-              </Badge>
+              {activeItem.type && (
+                <Badge variant="neutral">
+                  {SEARCH_TYPE_LABEL[activeItem.type]}
+                </Badge>
+              )}
 
               <h3 className="mt-4 text-base font-bold text-slate-950">
-                {activeItem.title}
+                {activeItem.title ?? '제목 없음'}
               </h3>
 
               {activeItem.description && (

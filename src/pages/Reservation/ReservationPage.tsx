@@ -6,9 +6,9 @@ import {
   type CSSProperties,
 } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
+import Modal from '../../components/common/overlay/modal/Modal'
 import PageComponent from '../../components/layouts/PageComponent'
 import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
@@ -53,20 +53,16 @@ const isReservationVisibleOnDate = (
   reservation: ReservationResponse,
   dateKey: string,
 ) => {
-  const dayStart = new Date(`${dateKey}T00:00:00`)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
+  const startDateKey = reservation.startDateTime.slice(0, 10)
+  const endDateKey = reservation.endDateTime.slice(0, 10)
 
-  return (
-    new Date(reservation.startDateTime) < dayEnd &&
-    new Date(reservation.endDateTime) > dayStart
-  )
+  return startDateKey <= dateKey && endDateKey >= dateKey
 }
 
 const getReservationBlockStyle = (
   reservation: ReservationResponse,
 ): CSSProperties => {
-  if (reservation.intgRsrvYn === 'Y') {
+  if (reservation.allDayYn === 'Y') {
     return { left: '0%', width: '100%' }
   }
 
@@ -79,8 +75,23 @@ const getReservationBlockStyle = (
   }
 }
 
+const formatReservationDateTime = (dateTime: string) => {
+  const date = new Date(dateTime)
+
+  if (Number.isNaN(date.getTime())) {
+    return dateTime.replace('T', ' ').slice(0, 16)
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
 const ReservationPage = () => {
-  const navigate = useNavigate()
   const {
     selectedDate,
     setSelectedDate,
@@ -91,11 +102,13 @@ const ReservationPage = () => {
   } = useReservation()
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [selectedReservation, setSelectedReservation] =
+    useState<ReservationResponse | null>(null)
 
   const [formValues, setFormValues] = useState<ReservationCreateRequest>({
     roomId: 0,
     title: '',
-    intgRsrvYn: 'N',
+    allDayYn: 'N',
     startDateTime: '',
     endDateTime: '',
   })
@@ -156,7 +169,7 @@ const ReservationPage = () => {
     setFormValues({
       roomId: roomId ?? filteredRooms[0]?.roomId ?? rooms[0]?.roomId ?? 0,
       title: '',
-      intgRsrvYn: 'N',
+      allDayYn: 'N',
       startDateTime: resolvedStartDateTime,
       endDateTime: addMinutesToDateTime(resolvedStartDateTime, 30),
     })
@@ -195,6 +208,10 @@ const ReservationPage = () => {
     setModalOpen(false)
     await refreshReservations()
   }
+
+  const selectedReservationRoom = selectedReservation
+    ? rooms.find((room) => room.roomId === selectedReservation.roomId)
+    : null
 
   return (
     <PageComponent
@@ -335,11 +352,9 @@ const ReservationPage = () => {
                             style={getReservationBlockStyle(reservation)}
                             onClick={(event) => {
                               event.stopPropagation()
-                              if (reservation.mtngId) {
-                                navigate(`/meeting?detailMeetingId=${reservation.mtngId}`)
-                              }
+                              setSelectedReservation(reservation)
                             }}
-                            title={reservation.mtngId ? '연결된 회의 상세 보기' : undefined}
+                            title="예약 정보 보기"
                           >
                             {reservation.title || reservation.reserverName}
                           </button>
@@ -356,12 +371,72 @@ const ReservationPage = () => {
       <ReservationCreateModal
         open={modalOpen}
         rooms={rooms}
+        reservations={reservations ?? []}
         formValues={formValues}
         loading={createLoading}
         onChange={setFormValues}
         onClose={() => setModalOpen(false)}
         onSubmit={handleCreateReservation}
       />
+
+      <Modal
+        open={selectedReservation !== null}
+        title={selectedReservation?.title || '회의실 예약'}
+        description="예약된 회의실 정보를 확인합니다."
+        onClose={() => setSelectedReservation(null)}
+        footer={
+          <Button onClick={() => setSelectedReservation(null)}>
+            확인
+          </Button>
+        }
+      >
+        {selectedReservation && (
+          <dl className="grid gap-4 text-sm">
+            <div>
+              <dt className="font-bold text-slate-500">회의실</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {selectedReservationRoom
+                  ? `${selectedReservationRoom.floor}층 ${selectedReservationRoom.roomName}${
+                      selectedReservationRoom.ho ? ` · ${selectedReservationRoom.ho}` : ''
+                    }`
+                  : `회의실 ID ${selectedReservation.roomId}`}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-bold text-slate-500">예약자</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {selectedReservation.reserverName}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-bold text-slate-500">예약 시간</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {formatReservationDateTime(selectedReservation.startDateTime)}
+                {' - '}
+                {formatReservationDateTime(selectedReservation.endDateTime)}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-bold text-slate-500">예약 유형</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {selectedReservation.intgRsrvYn === 'Y' ? '종일 예약' : '시간 예약'}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="font-bold text-slate-500">연결된 회의</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {selectedReservation.mtngId
+                  ? `회의 ID ${selectedReservation.mtngId}`
+                  : '없음'}
+              </dd>
+            </div>
+          </dl>
+        )}
+      </Modal>
     </PageComponent>
   )
 }

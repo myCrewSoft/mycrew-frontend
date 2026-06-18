@@ -88,22 +88,35 @@ const AttendanceSubSidebarContent = () => {
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [today, setToday] = useState<AtndToday | null>(null)
   const [monthRows, setMonthRows] = useState<AtndHistory[]>([])
+  // 근무 중 경과 시간을 라이브로 계산하기 위한 현재 시각(30초 간격 갱신)
+  const [now, setNow] = useState(() => Date.now())
 
   const selectedDateObject = new Date(selectedDate)
   const monthDates = getMonthDates(viewMonth)
 
-  // 오늘 근태
+  // 오늘 근태 (마운트 시 + 출퇴근 변경 이벤트 시 재조회)
   useEffect(() => {
     let active = true
-    attendanceApi
-      .getToday()
-      .then((res) => {
-        if (active) setToday(res.data.data ?? null)
-      })
-      .catch(() => {})
+    const loadToday = () => {
+      attendanceApi
+        .getToday()
+        .then((res) => {
+          if (active) setToday(res.data.data ?? null)
+        })
+        .catch(() => {})
+    }
+    loadToday()
+    window.addEventListener('attendance:refresh', loadToday)
     return () => {
       active = false
+      window.removeEventListener('attendance:refresh', loadToday)
     }
+  }, [])
+
+  // 근무 중 경과 시간 라이브 갱신 (30초)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
   }, [])
 
   // 보고 있는 월의 근태(달력 표시 + 선택일 상세)
@@ -145,16 +158,22 @@ const AttendanceSubSidebarContent = () => {
       }
     }
     if (selectedDate === todayKey && today) {
+      // 근무 중(출근했고 아직 퇴근 전)이면 출근 시각 기준 경과 시간을 라이브로 표시한다.
+      const working = today.checkedIn && !today.checkedOut
+      const liveWorkMin =
+        working && today.wrkStartDtm
+          ? Math.max(0, Math.floor((now - new Date(today.wrkStartDtm).getTime()) / 60000))
+          : today.workMin ?? 0
       return {
         statNm: today.checkedIn ? today.atndStatNm ?? '근무중' : '미출근',
         checkIn: formatTime(today.wrkStartDtm),
         checkOut: formatTime(today.wrkEndDtm),
-        workMin: today.workMin ?? 0,
+        workMin: liveWorkMin,
         lateMin: today.lateMin ?? 0,
       }
     }
     return null
-  }, [rowByDate, selectedDate, today, todayKey])
+  }, [rowByDate, selectedDate, today, todayKey, now])
 
   const moveMonth = (direction: 'prev' | 'next') => {
     setViewMonth((prev) => {

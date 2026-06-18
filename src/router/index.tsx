@@ -52,6 +52,7 @@ export const router = createBrowserRouter([
       { path: '/attendance', element: <AttendancePage /> },
       { path: '/attendance/status', element: <AttendancePage /> },
       { path: '/mail', element: <MailPage /> },
+      { path: '/mail/label/:labelId', element: <MailPage /> },
       { path: '/mail/:mailbox', element: <MailPage /> },
       { path: '/approval', element: <ApprovalPage /> },
       { path: '/approval/:folder/:status', element: <ApprovalPage /> },

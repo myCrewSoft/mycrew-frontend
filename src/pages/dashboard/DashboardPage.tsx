@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
 import {
   ReactGridLayout,
@@ -26,7 +26,6 @@ import {
   DASHBOARD_WIDGETS,
   DEFAULT_DASHBOARD_LAYOUT,
 } from './dashboard.config'
-import { dashboardMockData } from './dashboard.mock'
 import DashboardWidgetCard from './DashboardWidgetCard'
 import './dashboard.css'
 
@@ -34,13 +33,9 @@ const DEFAULT_STORAGE_KEY = 'mycrew.dashboard.layout'
 const GridLayout = WidthProvider(ReactGridLayout)
 
 interface DashboardPageProps {
-  /** 대시보드 기본 레이아웃 (미지정 시 사용자 기본 레이아웃 사용) */
   defaultLayout?: DashboardLayoutItem[]
-  /** 레이아웃 저장에 사용할 localStorage 키 */
   storageKey?: string
-  /** 상단 제목 */
   title?: string
-  /** 상단 설명 문구 */
   description?: string
   /** 'admin'이면 관리자 전용 위젯 엔드포인트/렌더러를 사용한다. (기본 'user') */
   variant?: DashboardVariant
@@ -49,38 +44,92 @@ interface DashboardPageProps {
 const isDashboardWidgetKey = (value: string): value is DashboardWidgetKey =>
   DASHBOARD_WIDGETS.some((widget) => widget.key === value)
 
+const withWidgetConstraints = (
+  item: Omit<DashboardLayoutItem, 'minW' | 'minH' | 'maxW' | 'maxH'>,
+): DashboardLayoutItem => {
+  const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
+  return {
+    ...item,
+    minW: config.defaultSize.minW,
+    minH: config.defaultSize.minH,
+    maxW: config.defaultSize.maxW,
+    maxH: config.defaultSize.maxH,
+  }
+}
+
 const normalizeLayout = (layout: readonly LayoutItem[]): DashboardLayoutItem[] =>
   layout.flatMap((item) => {
     if (!isDashboardWidgetKey(item.i)) return []
 
-      const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
-      return [{
+    return [
+      withWidgetConstraints({
         i: item.i,
         x: item.x,
         y: item.y,
         w: item.w,
         h: item.h,
-        minW: config.defaultSize.minW,
-        minH: config.defaultSize.minH,
-        maxW: config.defaultSize.maxW,
-        maxH: config.defaultSize.maxH,
-      }]
-    })
+      }),
+    ]
+  })
+
+const normalizeServerLayout = (
+  widgets: readonly DashboardServerLayoutItem[],
+): DashboardLayoutItem[] =>
+  widgets.flatMap((widget) => {
+    if (!isDashboardWidgetKey(widget.key)) return []
+
+    return [
+      withWidgetConstraints({
+        i: widget.key,
+        x: widget.x,
+        y: widget.y,
+        w: widget.w,
+        h: widget.h,
+      }),
+    ]
+  })
+
+const toServerLayoutJson = (layout: DashboardLayoutItem[]): DashboardLayoutJson => ({
+  widgets: layout.map(({ i, x, y, w, h }) => ({
+    key: i,
+    x,
+    y,
+    w,
+    h,
+  })),
+})
+
+const parseLayoutJson = (
+  value: string | null | undefined,
+  fallbackLayout: DashboardLayoutItem[],
+): DashboardLayoutItem[] => {
+  if (!value) return fallbackLayout
+
+  try {
+    const parsed = JSON.parse(value) as Partial<DashboardLayoutJson> | LayoutItem[]
+
+    if (Array.isArray(parsed)) {
+      const normalized = normalizeLayout(parsed)
+      return normalized.length ? normalized : fallbackLayout
+    }
+
+    if (Array.isArray(parsed.widgets)) {
+      const normalized = normalizeServerLayout(parsed.widgets)
+      return normalized.length ? normalized : fallbackLayout
+    }
+
+    return fallbackLayout
+  } catch {
+    return fallbackLayout
+  }
+}
 
 const getInitialLayout = (
   storageKey: string,
   fallbackLayout: DashboardLayoutItem[],
 ): DashboardLayoutItem[] => {
   const savedLayout = localStorage.getItem(storageKey)
-  if (!savedLayout) return fallbackLayout
-
-  try {
-    const parsed = JSON.parse(savedLayout) as LayoutItem[]
-    const normalized = normalizeLayout(parsed)
-    return normalized.length ? normalized : fallbackLayout
-  } catch {
-    return fallbackLayout
-  }
+  return parseLayoutJson(savedLayout, fallbackLayout)
 }
 
 const getNextPosition = (layout: DashboardLayoutItem[]) => {
@@ -162,16 +211,18 @@ const DashboardPage = ({
   const [layout, setLayout] = useState<DashboardLayoutItem[]>(() =>
     getInitialLayout(storageKey, defaultLayout),
   )
+  const [boardType, setBoardType] = useState<DashboardBoardType>('NOTICE')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'local'>('idle')
-  const { execute: saveLayout, loading: saving } = useApi(dashboardApi.saveLayout, {
+
+  const { execute: fetchLayout, loading: loadingLayout } = useApi(dashboardApi.getLayout, {
     immediate: false,
   })
-  const { execute: resetRemoteLayout } = useApi(dashboardApi.resetLayout, {
+  const { execute: saveLayout, loading: saving } = useApi(dashboardApi.saveLayout, {
     immediate: false,
   })
 
   const activeWidgetKeys = useMemo(
-    () => new Set(layout.map((item) => item.i)),
+    () => layout.map((item) => item.i),
     [layout],
   )
   const activeWidgetKeySet = useMemo(
@@ -185,9 +236,40 @@ const DashboardPage = ({
   )
 
   const availableWidgets = useMemo(
-    () => DASHBOARD_WIDGETS.filter((widget) => !activeWidgetKeys.has(widget.key)),
-    [activeWidgetKeys],
+    () => DASHBOARD_WIDGETS.filter((widget) => !activeWidgetKeySet.has(widget.key)),
+    [activeWidgetKeySet],
   )
+
+  useEffect(() => {
+    let ignore = false
+
+    const loadLayout = async () => {
+      try {
+        const response = await fetchLayout()
+        if (ignore) return
+
+        const nextLayout = parseLayoutJson(
+          response.data?.lytJsonCn,
+          defaultLayout,
+        )
+        setLayout(nextLayout)
+        localStorage.setItem(
+          storageKey,
+          JSON.stringify(toServerLayoutJson(nextLayout)),
+        )
+      } catch {
+        if (!ignore) {
+          setLayout(getInitialLayout(storageKey, defaultLayout))
+        }
+      }
+    }
+
+    void loadLayout()
+
+    return () => {
+      ignore = true
+    }
+  }, [defaultLayout, fetchLayout, storageKey])
 
   const handleLayoutChange = (currentLayout: Layout) => {
     setLayout(normalizeLayout(currentLayout))
@@ -214,26 +296,32 @@ const DashboardPage = ({
     setSaveStatus('idle')
   }
 
-  const handleSave = async () => {
-    localStorage.setItem(storageKey, JSON.stringify(layout))
+  const persistLayout = async (nextLayout: DashboardLayoutItem[]) => {
+    const layoutJson = toServerLayoutJson(nextLayout)
+    localStorage.setItem(storageKey, JSON.stringify(layoutJson))
+    await saveLayout({ lytJsonCn: JSON.stringify(layoutJson) })
+  }
 
+  const handleSave = async () => {
     try {
-      await saveLayout({ layoutJson: layout })
+      await persistLayout(layout)
       setSaveStatus('saved')
     } catch {
+      localStorage.setItem(storageKey, JSON.stringify(toServerLayoutJson(layout)))
       setSaveStatus('local')
     }
   }
 
   const handleReset = async () => {
     setLayout(defaultLayout)
-    localStorage.removeItem(storageKey)
     setSaveStatus('idle')
 
     try {
-      await resetRemoteLayout()
+      await persistLayout(defaultLayout)
+      setSaveStatus('saved')
     } catch {
-      return
+      localStorage.setItem(storageKey, JSON.stringify(toServerLayoutJson(defaultLayout)))
+      setSaveStatus('local')
     }
   }
 
@@ -255,6 +343,11 @@ const DashboardPage = ({
           {saveStatus !== 'idle' && (
             <span className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
               {saveStatus === 'saved' ? '저장 완료' : '임시 저장 완료'}
+            </span>
+          )}
+          {loadingLayout && (
+            <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-600">
+              레이아웃 불러오는 중
             </span>
           )}
           <Button
@@ -330,10 +423,12 @@ const DashboardPage = ({
           <div key={item.i} data-grid={item}>
             <DashboardWidgetCard
               widgetKey={item.i}
-              dataMap={dashboardMockData}
+              widgetState={widgetStates[item.i]}
+              boardType={boardType}
               editMode={editMode}
               variant={variant}
               onRemove={handleRemoveWidget}
+              onBoardTypeChange={setBoardType}
             />
           </div>
         ))}

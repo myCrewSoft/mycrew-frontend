@@ -20,6 +20,7 @@ import {
 import { profileApi } from '../../api/profileApi'
 import { projectBoardApi } from '../../api/projectBoardApi'
 import Button from '../../components/common/button/Button'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import EmptyState from '../../components/common/dataDisplay/emptyState/EmptyState'
 import Pagination from '../../components/common/dataDisplay/pagination/Pagination'
@@ -28,6 +29,7 @@ import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
+import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type {
   BoardCommentUpdateRequest,
   BoardCommentVO,
@@ -80,14 +82,10 @@ const isImportant = (board: BoardResponse) =>
 
 const formatCommentAuthor = (
   writerEmployeeId: number | undefined,
-  currentEmployeeId: number | null,
-  currentEmployeeName: string,
+  writerName: string,
 ) => {
-  if (
-    writerEmployeeId === currentEmployeeId &&
-    currentEmployeeName
-  ) {
-    return `${currentEmployeeName}(${writerEmployeeId})`
+  if (writerName) {
+    return `${writerName}(${writerEmployeeId ?? '-'})`
   }
 
   return `사원(${writerEmployeeId ?? '-'})`
@@ -145,6 +143,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
   const boards = useMemo(() => pageData?.content ?? [], [pageData?.content])
   const totalPages = Math.max(pageData?.totalPages ?? 1, 1)
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  const { getEmployeeProfile } = useEmployeeProfileDirectory()
 
   useEffect(() => {
     void fetchBoards({ projectId, page, keyword }).catch(() => undefined)
@@ -556,23 +555,43 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
 
                 <div className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200">
                   {(selectedBoard.commentList ?? []).length > 0 ? (
-                    (selectedBoard.commentList ?? []).map((comment, index) => (
+                    (selectedBoard.commentList ?? []).map((comment, index) => {
+                      const employeeProfile = getEmployeeProfile(
+                        comment.wrterEmpId,
+                      )
+                      const commentAuthorName =
+                        employeeProfile?.name ??
+                        (comment.wrterEmpId === currentEmployeeId
+                          ? currentEmployeeName
+                          : '')
+
+                      return (
                       <div
                         key={comment.commentId ?? index}
-                        className="px-4 py-3"
+                        className="flex gap-3 px-4 py-3"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-bold text-slate-800">
-                            {formatCommentAuthor(
-                              comment.wrterEmpId,
-                              currentEmployeeId,
-                              currentEmployeeName,
-                            )}
-                          </span>
-                          <span className="text-xs text-slate-400">
-                            {formatDateTime(comment.wrteDt)}
-                          </span>
-                        </div>
+                        <ProfileAvatar
+                          fileId={
+                            employeeProfile?.profileFileId ??
+                            (comment.wrterEmpId === currentEmployeeId
+                              ? currentProfile?.prflImgFileId
+                              : null)
+                          }
+                          name={commentAuthorName}
+                          size={32}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-bold text-slate-800">
+                              {formatCommentAuthor(
+                                comment.wrterEmpId,
+                                commentAuthorName,
+                              )}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {formatDateTime(comment.wrteDt)}
+                            </span>
+                          </div>
                         {editingCommentId === comment.commentId &&
                         comment.commentId ? (
                           <form
@@ -644,8 +663,10 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
                               </button>
                             </div>
                           )}
+                        </div>
                       </div>
-                    ))
+                      )
+                    })
                   ) : (
                     <p className="px-4 py-7 text-center text-sm text-slate-400">
                       등록된 댓글이 없습니다.
@@ -714,7 +735,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
         <SearchInput
           value={searchKeyword}
           onChange={(event) => setSearchKeyword(event.target.value)}
-          placeholder="제목 검색"
+          placeholder="제목&내용 검색"
           wrapperClassName="max-w-sm"
         />
         <Button type="submit" variant="outline">

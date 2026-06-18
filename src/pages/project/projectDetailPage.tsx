@@ -1,8 +1,8 @@
 ﻿// src/pages/project/ProjectDetailPage.tsx
 import { projectApi } from '../../api/projectApi'
 import { useApi } from '../../hooks/useApi'
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Share2,
   Plus,
@@ -26,6 +26,7 @@ import ProjectSummaryCard from './ProjectSummaryCard'
 import ProjectUrgentTaskCard from './ProjectUrgentTaskCard'
 import ProjectEditDrawer from './ProjectEditDrawer'
 import { employeeApi } from '../../api/employeeApi'
+import ProjectDriveTab from './ProjectDriveTab'
 
 const STATUS_LABEL: Record<string, string> = {
   '01': '예정',
@@ -43,7 +44,10 @@ const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'warning' | 'succes
 const ProjectDetailPage = () => {
   const navigate = useNavigate()
   const { projId } = useParams<{ projId: string }>()
-  const [tab, setTab] = useState('overview')
+  const [searchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab') === 'tasks' ? 'tasks' : 'overview'
+  const focusTaskId = searchParams.get('taskId')
+  const [tab, setTab] = useState(initialTab)
   const [taskViewMode, setTaskViewMode] = useState<ProjectTaskViewMode>('list')
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
@@ -69,7 +73,7 @@ const ProjectDetailPage = () => {
     { value: 'overview', label: '개요' },
     { value: 'tasks', label: '업무' },
     { value: 'gantt', label: '간트차트' },
-    { value: 'board', label: '보드' },
+    { value: 'board', label: '프로젝트 커뮤니티' },
     { value: 'drive', label: '프로젝트 드라이브' },
   ]
 
@@ -78,6 +82,13 @@ const ProjectDetailPage = () => {
     setTaskCreateStatus(status)
     setTaskCreateModalOpen(true)
   }
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'tasks') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab('tasks')
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -179,6 +190,7 @@ const ProjectDetailPage = () => {
       {tab === 'tasks' && (
         <ProjectTasksTab
           projectId={project.projId}
+          focusTaskId={focusTaskId}
           viewMode={taskViewMode}
           createModalOpen={taskCreateModalOpen}
           createStatus={taskCreateStatus}
@@ -192,8 +204,10 @@ const ProjectDetailPage = () => {
         <ProjectBoardTab projectId={Number(projectId)} />
       )}
 
+      {tab === 'drive' && <ProjectDriveTab projId={project.projId} />}
+
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
-      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && (
+      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && tab !== 'drive' &&(
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">
@@ -202,6 +216,7 @@ const ProjectDetailPage = () => {
         </div>
       )}
 
+      
       {/* 수정 Drawer */}
       <ProjectEditDrawer
         key={project.projId}

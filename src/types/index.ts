@@ -20,7 +20,6 @@ export type BoardCreateRequest = components['schemas']['BoardCreateRequest'];
 export type BoardCommentCreateRequest = components['schemas']['BoardCommentCreateRequest'];
 export type BoardUpdateRequest = components['schemas']['BoardUpdateRequest'];
 export type BoardCommentUpdateRequest = components['schemas']['BoardCommentUpdateRequest'];
-
 export type ApiResponsePageBoardResponse =
   components['schemas']['ApiResponsePageBoardResponse'];
 export type PageBoardResponse = components['schemas']['PageBoardResponse'];
@@ -57,11 +56,17 @@ export type ReservationResponse = Omit<
 > & {
   mtngId: number | null;
 };
+export type RsrvStatsSummary = components['schemas']['RsrvStatsSummary'];
+export type RsrvListItem = components['schemas']['RsrvListItem'];
+export type PopularRmItem = components['schemas']['PopularRmItem'];
+export type RsrvSearchRequest = components['schemas']['RsrvSearchRequest'];
 
 // 회의실
 export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
 export type RoomUpdateRequest = components['schemas']['RoomUpdateRequest'];
 export type RoomResponse = components['schemas']['RoomResponse'];
+export type ConfRmStatsSummary = components['schemas']['ConfRmStatsSummary'];
+export type ConfRmListItem = components['schemas']['ConfRmListItem'];
 
 // 업무
 export type TaskCreateRequest = components['schemas']['TaskCreateRequest'];
@@ -79,3 +84,23 @@ export type VideoTokenResponse = components['schemas']['VideoTokenResponse'];
 export type NotificationResponse = components['schemas']['NotificationResponse'];
 export type NotificationUnreadCountResponse =
   components['schemas']['NotificationUnreadCountResponse'];
+
+// 검색
+export type SearchResponse = components['schemas']['SearchResponse'];
+export type SearchType = NonNullable<SearchResponse['type']>;
+export type SearchHistVO = components['schemas']['SearchHistVO'];
+
+// 사용자 대시보드(위젯)
+export type DashboardLayoutResponse = components['schemas']['DashboardLayoutResponse'];
+export type ApprovalWidgetResponse = components['schemas']['ApprovalWidgetResponse'];
+export type AttendanceWidgetResponse = components['schemas']['AttendanceWidgetResponse'];
+export type BoardWidgetResponse = components['schemas']['BoardWidgetResponse'];
+export type MeetingWidgetResponse = components['schemas']['MeetingWidgetResponse'];
+export type MessengerWidgetResponse = components['schemas']['MessengerWidgetResponse'];
+export type NotificationWidgetResponse = components['schemas']['NotificationWidgetResponse'];
+export type ProjectWidgetResponse = components['schemas']['ProjectWidgetResponse'];
+export type ReservationWidgetResponse = components['schemas']['ReservationWidgetResponse'];
+export type ScheduleWidgetResponse = components['schemas']['ScheduleWidgetResponse'];
+export type TaskWidgetResponse = components['schemas']['TaskWidgetResponse'];
+export type MailWidgetResponse = components['schemas']['MailWidgetResponse'];
+

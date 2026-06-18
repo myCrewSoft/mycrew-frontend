@@ -21,6 +21,8 @@ import { AdminDepartmentsProvider } from './adminDepartmentsContext';
 import { AdminRanksProvider } from './adminRanksContext';
 import { AdminRolesProvider } from './adminRolesContext';
 import type { AdminAccessResponse } from '../../types/admin';
+import RoomManagementPage from './Reservation/RoomAdminPage';
+import ReservationAdminPage from './Reservation/ReservationAdminPage';
 
 export default function AdminAccessGate() {
   const location = useLocation();
@@ -205,6 +207,16 @@ export default function AdminAccessGate() {
       </AdminLayout>
     );
   }
+
+  if (location.pathname.startsWith('/admin/reservations')) {
+    const view = new URLSearchParams(location.search).get('view')
+    return (
+      <AdminLayout access={access}>
+        {view === 'reservations' ? <ReservationAdminPage /> : <RoomManagementPage />}
+      </AdminLayout>
+    );
+  }
+
 
   return (
     <AdminLayout access={access}>

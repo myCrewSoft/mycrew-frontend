@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import ToastEditor from '@toast-ui/editor'
 import '@toast-ui/editor/dist/toastui-editor.css'
 import './BoardWriteForm.css'
-import { X } from 'lucide-react'
+import { AlignCenter, AlignLeft, AlignRight, X } from 'lucide-react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import Button from '../../components/common/button/Button'
 import FileUpload from '../../components/common/form/fileUpload/FileUpload'
 import { boardApi } from '../../api/boardApi'
@@ -28,6 +29,10 @@ interface BoardWriteFormProps {
   onClose?: () => void
   onCreated?: (boardId: number | null) => void
   onUpdated?: (request: BoardMutationRequest) => void
+  onBoardSelectionChange?: (
+    boardType: BoardKind,
+    departmentName?: string,
+  ) => void
 }
 
 interface DepartmentOption {
@@ -101,6 +106,48 @@ const getDepartmentOptions = (boards: BoardSideBarResponse[]): DepartmentOption[
 
 const isYes = (value?: string) => value?.trim().toUpperCase() === 'Y'
 
+type TextAlignment = 'left' | 'center' | 'right'
+
+const getStoredBlockAlignments = (content: string): TextAlignment[] => {
+  const document = new DOMParser().parseFromString(content, 'text/html')
+
+  return Array.from(
+    document.body.querySelectorAll<HTMLElement>('p, h1, h2, h3, h4, h5, h6'),
+  ).map((element) => {
+    const alignment = element.style.textAlign || element.getAttribute('align')
+
+    if (
+      element.classList.contains('board-text-align-center') ||
+      alignment === 'center'
+    ) {
+      return 'center'
+    }
+
+    if (
+      element.classList.contains('board-text-align-right') ||
+      alignment === 'right'
+    ) {
+      return 'right'
+    }
+
+    return 'left'
+  })
+}
+
+const createAlignmentToolbarButton = (
+  label: string,
+  icon: ReactNode,
+) => {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className =
+    'toastui-editor-toolbar-icons board-editor-alignment-button'
+  button.setAttribute('aria-label', label)
+  button.innerHTML = renderToStaticMarkup(icon)
+  button.addEventListener('mousedown', (event) => event.preventDefault())
+  return button
+}
+
 const BoardWriteForm = ({
   mode = 'create',
   boardId,
@@ -116,6 +163,7 @@ const BoardWriteForm = ({
   onClose,
   onCreated,
   onUpdated,
+  onBoardSelectionChange,
 }: BoardWriteFormProps) => {
   const editorHostRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<ToastEditor | null>(null)
@@ -185,6 +233,21 @@ const BoardWriteForm = ({
     }
   }, [boardType])
 
+  useEffect(() => {
+    const departmentName = boardType === 'department'
+      ? departmentOptions.find(
+          (option) => option.code === selectedDepartmentCode,
+        )?.name
+      : undefined
+
+    onBoardSelectionChange?.(boardType, departmentName)
+  }, [
+    boardType,
+    departmentOptions,
+    onBoardSelectionChange,
+    selectedDepartmentCode,
+  ])
+
   useEffect(() => () => {
     if (selectedImagePreviewUrlRef.current) {
       URL.revokeObjectURL(selectedImagePreviewUrlRef.current)
@@ -195,6 +258,19 @@ const BoardWriteForm = ({
     if (!editorHostRef.current) return
 
     const editorHost = editorHostRef.current
+    const storedBlockAlignments = getStoredBlockAlignments(initialContent)
+    const alignLeftButton = createAlignmentToolbarButton(
+      '왼쪽 정렬',
+      <AlignLeft size={18} />,
+    )
+    const alignCenterButton = createAlignmentToolbarButton(
+      '가운데 정렬',
+      <AlignCenter size={18} />,
+    )
+    const alignRightButton = createAlignmentToolbarButton(
+      '오른쪽 정렬',
+      <AlignRight size={18} />,
+    )
     const editor = new ToastEditor({
       el: editorHost,
       initialValue: initialContent,
@@ -212,12 +288,17 @@ const BoardWriteForm = ({
         ['heading', 'bold', 'italic', 'strike'],
         ['hr', 'quote'],
         ['ul', 'ol', 'task', 'indent', 'outdent'],
+        [
+          { name: 'alignLeft', tooltip: '왼쪽 정렬', el: alignLeftButton },
+          { name: 'alignCenter', tooltip: '가운데 정렬', el: alignCenterButton },
+          { name: 'alignRight', tooltip: '오른쪽 정렬', el: alignRightButton },
+        ],
         ['table', 'link'],
         ['code'],
       ],
       events: {
         change: () => {
-          setContent(editor.getMarkdown())
+          setContent(editor.getHTML())
           setValidationMessage(null)
         },
       },
@@ -226,6 +307,131 @@ const BoardWriteForm = ({
     editor.changeMode('wysiwyg', true)
     editorRef.current = editor
 
+    const addAlignmentCommand = (
+      commandName: string,
+      alignment: 'left' | 'center' | 'right',
+    ) => {
+      editor.addCommand(
+        'wysiwyg',
+        commandName,
+        (_payload, state, dispatch, view) => {
+          const { from, to, $from } = state.selection
+          const targetPositions = new Set<number>()
+
+          state.doc.nodesBetween(
+            from,
+            Math.min(Math.max(to, from + 1), state.doc.content.size),
+            (node, position) => {
+              if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+                targetPositions.add(position)
+              }
+            },
+          )
+
+          for (let depth = $from.depth; depth > 0; depth -= 1) {
+            const node = $from.node(depth)
+
+            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+              targetPositions.add($from.before(depth))
+              break
+            }
+          }
+
+          if (targetPositions.size === 0) return false
+
+          let transaction = state.tr
+
+          targetPositions.forEach((position) => {
+            const node = state.doc.nodeAt(position)
+            if (!node) return
+
+            const nextClassNames = (node.attrs.classNames ?? []).filter(
+              (className: string) =>
+                !className.startsWith('board-text-align-'),
+            )
+
+            if (alignment !== 'left') {
+              nextClassNames.push(`board-text-align-${alignment}`)
+            }
+
+            transaction = transaction.setNodeMarkup(
+              position,
+              undefined,
+              {
+                ...node.attrs,
+                classNames:
+                  nextClassNames.length > 0 ? nextClassNames : null,
+              },
+            )
+          })
+
+          dispatch(transaction.scrollIntoView())
+          view.focus()
+          return true
+        },
+      )
+    }
+
+    addAlignmentCommand('alignLeft', 'left')
+    addAlignmentCommand('alignCenter', 'center')
+    addAlignmentCommand('alignRight', 'right')
+
+    if (storedBlockAlignments.some((alignment) => alignment !== 'left')) {
+      editor.addCommand(
+        'wysiwyg',
+        'restoreStoredAlignments',
+        (_payload, state, dispatch) => {
+          const blockPositions: number[] = []
+
+          state.doc.descendants((node, position) => {
+            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+              blockPositions.push(position)
+            }
+          })
+
+          let transaction = state.tr
+          let hasChanges = false
+
+          blockPositions.forEach((position, index) => {
+            const alignment = storedBlockAlignments[index]
+            const node = state.doc.nodeAt(position)
+            if (!alignment || !node) return
+
+            const nextClassNames = (node.attrs.classNames ?? []).filter(
+              (className: string) =>
+                !className.startsWith('board-text-align-'),
+            )
+
+            if (alignment !== 'left') {
+              nextClassNames.push(`board-text-align-${alignment}`)
+            }
+
+            transaction = transaction.setNodeMarkup(
+              position,
+              undefined,
+              {
+                ...node.attrs,
+                classNames:
+                  nextClassNames.length > 0 ? nextClassNames : null,
+              },
+            )
+            hasChanges = true
+          })
+
+          if (!hasChanges) return false
+
+          dispatch(transaction)
+          return true
+        },
+      )
+      editor.exec('restoreStoredAlignments')
+      setContent(editor.getHTML())
+    }
+
+    alignLeftButton.addEventListener('click', () => editor.exec('alignLeft'))
+    alignCenterButton.addEventListener('click', () => editor.exec('alignCenter'))
+    alignRightButton.addEventListener('click', () => editor.exec('alignRight'))
+
     const handleEmptyTableDelete = (event: KeyboardEvent) => {
       if (event.key !== 'Backspace' && event.key !== 'Delete') return
 
@@ -233,7 +439,14 @@ const BoardWriteForm = ({
       const selectionElement = selectionNode instanceof Element
         ? selectionNode
         : selectionNode?.parentElement
+      const selectedHeading = selectionElement?.closest('h1, h2')
       const selectedTable = selectionElement?.closest('table')
+
+      if (selectedHeading && !selectedHeading.textContent?.trim()) {
+        event.preventDefault()
+        editor.exec('heading', { level: 0 })
+        return
+      }
 
       // Toast UI는 새 표를 만들 때 내용이 없는 머리글 행도 함께 생성합니다.
       // 빈 표 안에서 Delete/Backspace를 누르면 셀이 아니라 표 전체를 삭제합니다.
@@ -243,10 +456,30 @@ const BoardWriteForm = ({
       editor.exec('removeTable')
     }
 
+    const handleActiveListToggle = (event: MouseEvent) => {
+      const target = event.target
+      const button = target instanceof Element
+        ? target.closest<HTMLButtonElement>(
+            '.toastui-editor-toolbar-icons.bullet-list.active, ' +
+            '.toastui-editor-toolbar-icons.ordered-list.active, ' +
+            '.toastui-editor-toolbar-icons.task-list.active',
+          )
+        : null
+
+      if (!button) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      editor.exec('outdent')
+    }
+
     editorHost.addEventListener('keydown', handleEmptyTableDelete)
+    editorHost.addEventListener('click', handleActiveListToggle, true)
 
     return () => {
       editorHost.removeEventListener('keydown', handleEmptyTableDelete)
+      editorHost.removeEventListener('click', handleActiveListToggle, true)
       editor.destroy()
       editorRef.current = null
     }
@@ -254,15 +487,19 @@ const BoardWriteForm = ({
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim()
-    const latestContent = editorRef.current?.getMarkdown() ?? content
+    const latestContent = editorRef.current?.getHTML() ?? content
     const trimmedContent = latestContent.trim()
+    const plainTextContent = new DOMParser()
+      .parseFromString(trimmedContent, 'text/html')
+      .body.textContent
+      ?.trim() ?? ''
 
     if (!trimmedTitle) {
       setValidationMessage('제목을 입력해주세요.')
       return
     }
 
-    if (!trimmedContent) {
+    if (!plainTextContent) {
       setValidationMessage('내용을 입력해주세요.')
       return
     }
@@ -450,11 +687,13 @@ const BoardWriteForm = ({
             />
 
             {selectedImagePreviewUrl && (
-              <img
-                src={selectedImagePreviewUrl}
-                alt="첨부 이미지 미리보기"
-                className="max-h-72 max-w-full rounded-md border border-slate-200 object-contain"
-              />
+              <div className="flex justify-center">
+                <img
+                  src={selectedImagePreviewUrl}
+                  alt="첨부 이미지 미리보기"
+                  className="h-auto max-h-96 max-w-full rounded-md border border-slate-200 object-contain"
+                />
+              </div>
             )}
 
             {initialAttachmentFileId ? (

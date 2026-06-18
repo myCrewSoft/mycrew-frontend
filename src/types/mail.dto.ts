@@ -1,6 +1,14 @@
 import type { PageInfo } from '../api/axiosInstance';
 
-export type MailboxType = 'inbox' | 'sent' | 'all' | 'self' | 'tome';
+export type MailboxType =
+  | 'inbox'
+  | 'sent'
+  | 'all'
+  | 'self'
+  | 'tome'
+  | 'important'
+  | 'unread'
+  | 'draft';
 
 export type MailRouteBox = MailboxType | 'trash';
 
@@ -51,6 +59,7 @@ export interface MailDetailResponse {
   threadId: string;
   subject: string;
   content: string | null;
+  contentRenderMode?: 'SANDBOX_IFRAME' | string | null;
   snippet: string | null;
   fromEmail: string | null;
   participants: MailParticipantResponse[];
@@ -67,6 +76,40 @@ export interface MailSendRequest {
   bcc?: string[];
   subject: string;
   content: string;
+  inReplyToMailId?: number;
+}
+
+export interface MailBulkRequest {
+  action: 'read' | 'unread' | 'trash' | 'important';
+  mailIds: number[];
+  important?: boolean;
+}
+
+export interface MailBulkResponse {
+  processed: number;
+  failed: number;
+}
+
+export interface MailDraftRequest {
+  mailId?: number;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject?: string;
+  content?: string;
+}
+
+export interface MailUnreadCountResponse {
+  count: number;
+}
+
+export interface MailLabelResponse {
+  labelId: number;
+  name: string;
+}
+
+export interface MailLabelRequest {
+  name: string;
 }
 
 export interface MailSendResponse {

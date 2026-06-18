@@ -10,9 +10,12 @@ export const timelineHours = Array.from(
 
 // 날짜 문자열에서 시간을 분 단위로 바꿉니다.
 export const getMinutesFromDateTime = (dateTime: string) => {
-  const date = new Date(dateTime)
+  const timePart = dateTime.includes('T')
+    ? dateTime.split('T')[1]
+    : dateTime.split(' ')[1]
+  const [hour = '0', minute = '0'] = (timePart ?? '').split(':')
 
-  return date.getHours() * 60 + date.getMinutes()
+  return Number(hour) * 60 + Number(minute)
 }
 
 // 예약 시작 시간을 왼쪽 위치(px)로 변환합니다.
@@ -39,9 +42,13 @@ export const getReservationWidth = (
 export const getReservationLeftPercent = (startDateTime: string) => {
   const startMinutes = getMinutesFromDateTime(startDateTime)
   const baseMinutes = TIMELINE_START_HOUR * 60
-  const totalMinutes = (TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1) * 60
+  const totalMinutes = (TIMELINE_END_HOUR - TIMELINE_START_HOUR) * 60
+  const clampedStartMinutes = Math.max(
+    baseMinutes,
+    Math.min(TIMELINE_END_HOUR * 60, startMinutes),
+  )
 
-  return ((startMinutes - baseMinutes) / totalMinutes) * 100
+  return ((clampedStartMinutes - baseMinutes) / totalMinutes) * 100
 }
 
 // 예약 시간을 타임라인 전체 너비 기준의 퍼센트 너비로 바꿉니다.
@@ -51,9 +58,21 @@ export const getReservationWidthPercent = (
 ) => {
   const startMinutes = getMinutesFromDateTime(startDateTime)
   const endMinutes = getMinutesFromDateTime(endDateTime)
-  const totalMinutes = (TIMELINE_END_HOUR - TIMELINE_START_HOUR + 1) * 60
+  const baseMinutes = TIMELINE_START_HOUR * 60
+  const endBaseMinutes = TIMELINE_END_HOUR * 60
+  const totalMinutes = endBaseMinutes - baseMinutes
+  const clampedStartMinutes = Math.max(
+    baseMinutes,
+    Math.min(endBaseMinutes, startMinutes),
+  )
+  const clampedEndMinutes = Math.max(
+    baseMinutes,
+    Math.min(endBaseMinutes, endMinutes),
+  )
 
-  return ((endMinutes - startMinutes) / totalMinutes) * 100
+  return (
+    (Math.max(0, clampedEndMinutes - clampedStartMinutes) / totalMinutes) * 100
+  )
 }
 
 // 빈 영역 클릭 위치를 예약 시작 시간으로 바꿉니다.

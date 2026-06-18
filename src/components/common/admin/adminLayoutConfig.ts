@@ -2,8 +2,9 @@ import type { ComponentType } from 'react';
 import {
   Building2,
   CalendarClock,
-  CalendarDays,
+  CalendarDays,  
   ClipboardList,
+  DoorOpen,
   FileText,
   FolderKanban,
   IdCard,
@@ -35,6 +36,8 @@ export const adminNavItems: AdminNavItem[] = [
   { label: '조직도', path: '/admin/org', icon: Network },
   { label: '근태', path: '/admin/attendance', icon: CalendarClock },
   { label: '일정', path: '/admin/schedules', icon: CalendarDays },
+  { label: '회의', path: '/admin/meeting', icon: Users },
+  { label: '회의실예약', path: '/admin/reservations', icon: DoorOpen },
 ];
 
 export const employeeFilterItems: EmployeeFilterItem[] = [

@@ -4,6 +4,74 @@
   display: none !important;
 }
 
+.board-toast-editor .toastui-editor-ww-container .ProseMirror {
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.board-toast-editor .toastui-editor-contents p,
+.board-toast-editor .toastui-editor-contents li {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.board-toast-editor .toastui-editor-contents h1,
+.board-toast-editor .toastui-editor-contents h2 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.board-editor-alignment-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-image: none !important;
+  vertical-align: middle;
+}
+
+.board-editor-alignment-button svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  color: #475569;
+}
+
+.board-toast-editor .toastui-editor-defaultUI-toolbar,
+.board-toast-editor .toastui-editor-toolbar {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  background-color: #f7f9fc !important;
+}
+
+.board-toast-editor .toastui-editor-toolbar {
+  display: block !important;
+  height: 46px !important;
+}
+
+.board-toast-editor .toastui-editor-defaultUI-toolbar {
+  display: flex !important;
+  align-items: center;
+  height: 45px !important;
+  flex: none !important;
+}
+
+.board-toast-editor .toastui-editor-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  height: 45px;
+}
+
+.board-toast-editor .toastui-editor-toolbar-icons {
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
 .toastui-editor-contents table th {
   background-color: #ffffff !important; /* 배경색: 흰색 고정 */
   color: #0f172a !important;   

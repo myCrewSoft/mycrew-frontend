@@ -108,7 +108,7 @@ const HeaderProfileStatusMenu = () => {
           />
         </div>
 
-        <div className="hidden min-w-0 text-left md:block">
+        <div className="min-w-0 text-left">
           <p className="max-w-36 truncate text-sm font-bold leading-tight text-slate-800">
             {formatCode(profile?.empNm, '사용자')}
           </p>

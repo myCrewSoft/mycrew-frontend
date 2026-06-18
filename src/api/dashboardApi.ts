@@ -9,19 +9,20 @@ import type {
   AdminProjectStatusWidgetResponseDto,
   ApprovalWidgetResponseDto,
   AttendanceWidgetResponseDto,
+  BoardWidgetResponseDto,
+  DashboardBoardType,
   DashboardLayoutRequestDto,
   DashboardLayoutResponseDto,
-  DepartmentBoardWidgetResponseDto,
-  MeetingScheduleWidgetResponseDto,
+  DashboardWidgetData,
+  DashboardWidgetKey,
+  MailWidgetResponseDto,
+  MeetingWidgetResponseDto,
   MessengerWidgetResponseDto,
-  NoticeWidgetResponseDto,
   ProjectProgressWidgetResponseDto,
-  QuickLinksWidgetResponseDto,
-  RecentDriveWidgetResponseDto,
-  ReservationStatusWidgetResponseDto,
+  NotificationWidgetResponseDto,
+  ReservationWidgetResponseDto,
+  TaskWidgetResponseDto,
   TodayScheduleWidgetResponseDto,
-  UnreadNotificationWidgetResponseDto,
-  AiSummaryWidgetResponseDto,
 } from '../types/dashboard'
 
 export const dashboardApi = {
@@ -31,48 +32,48 @@ export const dashboardApi = {
 
   saveLayout: (
     payload: DashboardLayoutRequestDto,
-  ): Promise<AxiosResponse<ApiResponse<DashboardLayoutResponseDto>>> => {
+  ): Promise<AxiosResponse<ApiResponse<void>>> => {
     return axiosInstance.put('/api/dashboard/layout', payload)
   },
 
-  resetLayout: (): Promise<AxiosResponse<ApiResponse<null>>> => {
-    return axiosInstance.delete('/api/dashboard/layout')
-  },
-
   getTodaySchedule: (): Promise<AxiosResponse<ApiResponse<TodayScheduleWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/today-schedule')
+    return axiosInstance.get('/api/dashboard/widgets/schedule')
   },
 
-  getMeetingSchedule: (): Promise<AxiosResponse<ApiResponse<MeetingScheduleWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/meeting-schedule')
+  getMeeting: (): Promise<AxiosResponse<ApiResponse<MeetingWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/meeting')
   },
 
-  getReservationStatus: (): Promise<AxiosResponse<ApiResponse<ReservationStatusWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/reservation-status')
+  getReservation: (): Promise<AxiosResponse<ApiResponse<ReservationWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/reservation')
   },
 
-  getNotice: (): Promise<AxiosResponse<ApiResponse<NoticeWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/notice')
+  getTask: (): Promise<AxiosResponse<ApiResponse<TaskWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/task')
   },
 
-  getDepartmentBoard: (): Promise<AxiosResponse<ApiResponse<DepartmentBoardWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/department-board')
+  getBoard: (
+    boardTypeCd: DashboardBoardType,
+  ): Promise<AxiosResponse<ApiResponse<BoardWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/board', {
+      params: { boardTypeCd },
+    })
   },
 
-  getUnreadNotification: (): Promise<AxiosResponse<ApiResponse<UnreadNotificationWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/unread-notification')
+  getNotification: (): Promise<AxiosResponse<ApiResponse<NotificationWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/notification')
   },
 
   getMessenger: (): Promise<AxiosResponse<ApiResponse<MessengerWidgetResponseDto>>> => {
     return axiosInstance.get('/api/dashboard/widgets/messenger')
   },
 
-  getAttendance: (): Promise<AxiosResponse<ApiResponse<AttendanceWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/attendance')
+  getMail: (): Promise<AxiosResponse<ApiResponse<MailWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/mail')
   },
 
-  getQuickLinks: (): Promise<AxiosResponse<ApiResponse<QuickLinksWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/quick-links')
+  getAttendance: (): Promise<AxiosResponse<ApiResponse<AttendanceWidgetResponseDto>>> => {
+    return axiosInstance.get('/api/dashboard/widgets/attendance')
   },
 
   getApproval: (): Promise<AxiosResponse<ApiResponse<ApprovalWidgetResponseDto>>> => {
@@ -80,15 +81,39 @@ export const dashboardApi = {
   },
 
   getProjectProgress: (): Promise<AxiosResponse<ApiResponse<ProjectProgressWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/project-progress')
+    return axiosInstance.get('/api/dashboard/widgets/project')
   },
 
-  getRecentDrive: (): Promise<AxiosResponse<ApiResponse<RecentDriveWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/recent-drive')
-  },
-
-  getAiSummary: (): Promise<AxiosResponse<ApiResponse<AiSummaryWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/ai-summary')
+  getWidget: (
+    widgetKey: DashboardWidgetKey,
+    boardTypeCd: DashboardBoardType = 'NOTICE',
+  ): Promise<AxiosResponse<ApiResponse<DashboardWidgetData>>> => {
+    switch (widgetKey) {
+      case 'attendance':
+        return dashboardApi.getAttendance()
+      case 'approval':
+        return dashboardApi.getApproval()
+      case 'todaySchedule':
+        return dashboardApi.getTodaySchedule()
+      case 'meeting':
+        return dashboardApi.getMeeting()
+      case 'reservation':
+        return dashboardApi.getReservation()
+      case 'task':
+        return dashboardApi.getTask()
+      case 'projectProgress':
+        return dashboardApi.getProjectProgress()
+      case 'board':
+        return dashboardApi.getBoard(boardTypeCd)
+      case 'mail':
+        return dashboardApi.getMail()
+      case 'messenger':
+        return dashboardApi.getMessenger()
+      case 'notification':
+        return dashboardApi.getNotification()
+      default:
+        throw new Error(`Unknown dashboard widget: ${widgetKey}`)
+    }
   },
 
   // ===== 관리자 대시보드 위젯 (조직 전체 현황) =====

@@ -1,8 +1,8 @@
 import {
   Bell,
   ChevronRight,
-  ExternalLink,
   GripVertical,
+  Mail,
   MessageSquare,
   MoreHorizontal,
   Search,
@@ -20,12 +20,14 @@ import type {
   DashboardVariant,
   DashboardWidgetKey,
   DashboardWidgetResponseMap,
+  DashboardWidgetStateMap,
 } from '../../types/dashboard'
 import { DASHBOARD_WIDGET_CONFIG_MAP } from './dashboard.config'
 
 interface DashboardWidgetCardProps {
   widgetKey: DashboardWidgetKey
-  dataMap: DashboardWidgetResponseMap
+  widgetState?: DashboardWidgetStateMap[DashboardWidgetKey]
+  boardType: DashboardBoardType
   editMode: boolean
   variant?: DashboardVariant
   onRemove: (widgetKey: DashboardWidgetKey) => void
@@ -52,16 +54,24 @@ interface ListRowProps {
   meta?: string
   badge?: string
   badgeTone?: 'blue' | 'green' | 'amber' | 'red' | 'slate'
-  leading?: 'dot' | 'checkbox' | 'file'
+  leading?: 'dot' | 'checkbox'
   trailing?: string
 }
 
-const statusLabel: Record<AttendanceWidgetResponseDto['status'], string> = {
+const statusLabel: Record<string, string> = {
   beforeWork: '출근 전',
   working: '근무 중',
   afterWork: '퇴근',
   vacation: '휴가',
+  off: '퇴근',
+  absent: '미출근',
 }
+
+const boardTabs: { value: DashboardBoardType; label: string }[] = [
+  { value: 'NOTICE', label: '공지' },
+  { value: 'DEPT', label: '부서' },
+  { value: 'PROJ', label: '프로젝트' },
+]
 
 const badgeToneStyle: Record<NonNullable<ListRowProps['badgeTone']>, string> = {
   blue: 'bg-blue-50 text-blue-700 ring-blue-100',
@@ -77,6 +87,18 @@ const formatMinutes = (minutes = 0) => {
   return `${hour}시간 ${String(minute).padStart(2, '0')}분`
 }
 
+const getAttendanceStatus = (status: AttendanceWidgetResponseDto['status']) =>
+  statusLabel[status] ?? status ?? '-'
+
+const getScheduleTarget = (
+  schedule: DashboardWidgetResponseMap['todaySchedule']['schedules'][number],
+) => {
+  if (schedule.scheduleTypeCode === 'C004') return schedule.deptNm
+  if (schedule.scheduleTypeCode === 'C005') return schedule.projNm
+  if (schedule.scheduleTypeCode === 'C006') return schedule.taskNm
+  return ''
+}
+
 const ListRow = ({
   title,
   meta,
@@ -90,18 +112,13 @@ const ListRow = ({
       {leading === 'checkbox' && (
         <span className="h-4 w-4 flex-shrink-0 rounded border border-slate-300 bg-white" />
       )}
-      {leading === 'file' && (
-        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-orange-50 text-orange-600">
-          <ExternalLink size={14} />
-        </span>
-      )}
       {leading === 'dot' && (
         <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)]" />
       )}
 
       <div className="min-w-0">
         <p className="truncate text-[14px] font-bold leading-5 text-slate-900">
-          {title}
+          {title || '-'}
         </p>
         {meta && (
           <p className="mt-0.5 truncate text-[12px] font-medium leading-5 text-slate-500">
@@ -140,12 +157,53 @@ const WidgetFooter = ({ label }: { label: string }) => (
   </div>
 )
 
+const Metric = ({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+}) => (
+  <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
+    <p className="text-[11px] font-bold text-slate-500">{label}</p>
+    <p
+      className={`mt-1 truncate text-[14px] font-black ${
+        accent ? 'text-blue-700' : 'text-slate-900'
+      }`}
+    >
+      {value}
+    </p>
+  </div>
+)
+
+const EmptyState = ({ label = '표시할 데이터가 없습니다.' }: { label?: string }) => (
+  <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-lg bg-slate-50 text-sm font-semibold text-slate-400">
+    {label}
+  </div>
+)
+
+const LoadingState = () => (
+  <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-lg bg-slate-50 text-sm font-semibold text-slate-500">
+    불러오는 중
+  </div>
+)
+
+const ErrorState = ({ message }: { message: string }) => (
+  <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-lg bg-rose-50 px-4 text-center text-sm font-bold text-rose-600">
+    {message}
+  </div>
+)
+
 const DashboardWidgetCard = ({
   widgetKey,
-  dataMap,
+  widgetState,
+  boardType,
   editMode,
   variant = 'user',
   onRemove,
+  onBoardTypeChange,
 }: DashboardWidgetCardProps) => {
   const config = DASHBOARD_WIDGET_CONFIG_MAP[widgetKey]
   const Icon = config.icon
@@ -157,7 +215,7 @@ const DashboardWidgetCard = ({
       <header className="dashboard-widget-drag-handle flex h-[54px] items-center justify-between gap-3 border-b border-slate-100 px-4">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-7 w-5 flex-shrink-0 items-center justify-center text-slate-400">
-            {editMode ? <GripVertical size={16} /> : <GripVertical size={15} />}
+            <GripVertical size={editMode ? 16 : 15} />
           </span>
           <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700 ring-1 ring-blue-100">
             <Icon size={15} />
@@ -233,6 +291,10 @@ const renderAdminWidgetBody = (
   widgetKey: DashboardWidgetKey,
   data: NonNullable<DashboardWidgetStateMap[DashboardWidgetKey]>['data'],
 ) => {
+  if (widgetState?.loading && !widgetState.data) return <LoadingState />
+  if (widgetState?.error && !widgetState.data) return <ErrorState message={widgetState.error} />
+  if (!widgetState?.data) return <EmptyState />
+
   switch (widgetKey) {
     case 'attendance': {
       const adminData = data as unknown as AdminAttendanceWidgetResponseDto
@@ -434,44 +496,82 @@ const renderAdminWidgetBody = (
       const data = widgetState.data as DashboardWidgetResponseMap['todaySchedule']
       return data.schedules.length ? (
         <>
+          <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
+            <span className="text-[13px] font-black text-amber-800">대기 문서</span>
+            <strong className="text-2xl font-black text-amber-700">
+              {data.pendingCount}
+            </strong>
+          </div>
+          {data.documents.length ? (
+            <ul className="space-y-1">
+              {data.documents.map((document) => (
+                <ListRow
+                  key={document.id}
+                  title={document.title}
+                  meta={`${document.requesterName} · ${document.requestedAt}`}
+                  badge={document.dday}
+                  badgeTone={document.dday === 'D-Day' ? 'red' : 'amber'}
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState label="대기 중인 문서가 없습니다." />
+          )}
+        </>
+      )
+    }
+
+    case 'todaySchedule': {
+      const data = widgetState.data as DashboardWidgetResponseMap['todaySchedule']
+      return data.schedules.length ? (
+        <>
           <ul className="space-y-1">
-            {dataMap.todaySchedule.schedules.map((schedule) => (
-              <ListRow
-                key={schedule.id}
-                title={schedule.title}
-                meta={`${schedule.startAt} - ${schedule.endAt}${schedule.location ? ` · ${schedule.location}` : ''}`}
-                badge="오늘"
-                badgeTone="blue"
-              />
-            ))}
+            {data.schedules.map((schedule) => {
+              const target = getScheduleTarget(schedule)
+              return (
+                <ListRow
+                  key={schedule.id}
+                  title={schedule.title}
+                  meta={`${schedule.startAt} - ${schedule.endAt}${target ? ` · ${target}` : ''}`}
+                  badge="오늘"
+                  badgeTone="blue"
+                />
+              )
+            })}
           </ul>
           <WidgetFooter label="전체 일정 보기" />
         </>
+      ) : (
+        <EmptyState label="오늘 일정이 없습니다." />
       )
+    }
 
-    case 'meetingSchedule':
-      return (
+    case 'meeting': {
+      const data = widgetState.data as DashboardWidgetResponseMap['meeting']
+      return data.meetings.length ? (
         <>
           <ul className="space-y-1">
-            {dataMap.meetingSchedule.meetings.map((meeting, index) => (
+            {data.meetings.map((meeting) => (
               <ListRow
                 key={meeting.id}
                 title={meeting.title}
                 meta={`${meeting.startAt} - ${meeting.endAt}${meeting.location ? ` · ${meeting.location}` : ''}`}
-                badge={`+${index + 2}`}
-                badgeTone="slate"
               />
             ))}
           </ul>
-          <WidgetFooter label="전체 회의 일정 보기" />
+          <WidgetFooter label="전체 회의 보기" />
         </>
+      ) : (
+        <EmptyState label="오늘 회의가 없습니다." />
       )
+    }
 
-    case 'reservationStatus':
-      return (
+    case 'reservation': {
+      const data = widgetState.data as DashboardWidgetResponseMap['reservation']
+      return data.reservations.length ? (
         <>
           <ul className="space-y-1">
-            {dataMap.reservationStatus.reservations.map((reservation) => (
+            {data.reservations.map((reservation) => (
               <ListRow
                 key={reservation.id}
                 title={reservation.resourceName}
@@ -483,168 +583,36 @@ const renderAdminWidgetBody = (
           </ul>
           <WidgetFooter label="전체 예약 보기" />
         </>
+      ) : (
+        <EmptyState label="오늘 예약이 없습니다." />
       )
+    }
 
-    case 'notice':
-      return (
-        <>
-          <ul className="space-y-1">
-            {dataMap.notice.notices.map((notice) => (
-              <ListRow
-                key={notice.id}
-                title={notice.title}
-                meta={`${notice.writerName} · ${notice.createdAt}`}
-                badge={notice.isNew ? 'NEW' : undefined}
-                badgeTone="blue"
-              />
-            ))}
-          </ul>
-          <WidgetFooter label="공지사항 전체 보기" />
-        </>
-      )
-
-    case 'departmentBoard':
-      return (
-        <>
-          <ul className="space-y-1">
-            {dataMap.departmentBoard.posts.map((post) => (
-              <ListRow
-                key={post.id}
-                title={post.title}
-                meta={`${post.writerName} · ${post.createdAt}`}
-                badge={post.isNew ? 'NEW' : undefined}
-                badgeTone="blue"
-              />
-            ))}
-          </ul>
-          <WidgetFooter label="부서 게시글 전체 보기" />
-        </>
-      )
-
-    case 'unreadNotification':
-      return (
-        <>
-          <div className="mb-2 flex items-center justify-between rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 px-4 py-3 ring-1 ring-blue-100">
-            <span className="inline-flex items-center gap-2 text-[13px] font-black text-blue-800">
-              <Bell size={15} />
-              미확인 알림
-            </span>
-            <strong className="text-2xl font-black tracking-tight text-blue-700">
-              {dataMap.unreadNotification.count}
-            </strong>
-          </div>
-          <ul className="space-y-1">
-            {dataMap.unreadNotification.notifications.map((notification) => (
-              <ListRow
-                key={notification.id}
-                title={notification.title}
-                meta={`${notification.content} · ${notification.createdAt}`}
-              />
-            ))}
-          </ul>
-        </>
-      )
-
-    case 'messenger':
-      return (
-        <>
-          <div className="mb-2 flex items-center justify-between">
-            <span className="inline-flex items-center gap-2 text-[13px] font-black text-slate-700">
-              <MessageSquare size={15} />
-              안 읽은 메시지
-            </span>
-            <strong className="rounded-full bg-blue-50 px-2.5 py-1 text-[13px] font-black text-blue-700 ring-1 ring-blue-100">
-              {dataMap.messenger.unreadCount}
-            </strong>
-          </div>
-          <ul className="space-y-1">
-            {dataMap.messenger.rooms.map((room) => (
-              <ListRow
-                key={room.roomId}
-                title={room.roomName}
-                meta={room.lastMessage}
-                trailing={room.lastMessageAt}
-                badge={room.unreadCount ? String(room.unreadCount) : undefined}
-                badgeTone="blue"
-              />
-            ))}
-          </ul>
-          <WidgetFooter label="메신저 열기" />
-        </>
-      )
-
-    case 'attendance':
-      return (
-        <>
-          <div className="flex flex-1 flex-col justify-between gap-4">
-            <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
-              <div>
-                <p className="text-[12px] font-black text-emerald-700">현재 상태</p>
-                <strong className="mt-1 block text-2xl font-black tracking-tight text-emerald-700">
-                  {statusLabel[dataMap.attendance.status]}
-                </strong>
-              </div>
-              <button
-                type="button"
-                className="dashboard-widget-action rounded-md bg-blue-600 px-3 py-2 text-[13px] font-black text-white shadow-sm transition-colors hover:bg-blue-700"
-              >
-                퇴근 처리
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <Metric label="출근" value={dataMap.attendance.checkInAt ?? '-'} />
-              <Metric
-                label="총 근무시간"
-                value={formatMinutes(dataMap.attendance.workDurationMinutes)}
-                accent
-              />
-              <Metric label="휴가 사용" value="0일" />
-            </div>
-          </div>
-        </>
-      )
-
-    case 'quickLinks':
-      return (
-        <div className="grid grid-cols-2 gap-2">
-          {dataMap.quickLinks.links.map((link) => (
-            <a
-              key={link.id}
-              href={link.path}
-              className="dashboard-widget-action flex min-h-[70px] flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 text-[13px] font-black text-slate-700 no-underline transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-            >
-              <ExternalLink size={17} />
-              {link.label}
-            </a>
+    case 'task': {
+      const data = widgetState.data as DashboardWidgetResponseMap['task']
+      return data.tasks.length ? (
+        <ul className="space-y-1">
+          {data.tasks.map((task) => (
+            <ListRow
+              key={task.id}
+              title={task.title}
+              meta={`마감일 ${task.dueDate}`}
+              badge={task.status}
+              badgeTone="slate"
+              leading="checkbox"
+            />
           ))}
-        </div>
+        </ul>
+      ) : (
+        <EmptyState label="표시할 업무가 없습니다." />
       )
+    }
 
-    case 'approval':
-      return (
-        <>
-          <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
-            <span className="text-[13px] font-black text-amber-800">대기 문서</span>
-            <strong className="text-2xl font-black text-amber-700">
-              {dataMap.approval.pendingCount}
-            </strong>
-          </div>
-          <ul className="space-y-1">
-            {dataMap.approval.documents.map((document) => (
-              <ListRow
-                key={document.id}
-                title={document.title}
-                meta={`${document.requesterName} · ${document.requestedAt}`}
-              />
-            ))}
-          </ul>
-        </>
-      )
-
-    case 'projectProgress':
-      return (
+    case 'projectProgress': {
+      const data = widgetState.data as DashboardWidgetResponseMap['projectProgress']
+      return data.projects.length ? (
         <ul className="space-y-3">
-          {dataMap.projectProgress.projects.map((project) => (
+          {data.projects.map((project) => (
             <li key={project.id} className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-[14px] font-black text-slate-900">
@@ -657,79 +625,161 @@ const renderAdminWidgetBody = (
               <div className="mt-2 h-2 rounded-full bg-slate-200">
                 <div
                   className="h-2 rounded-full bg-blue-600"
-                  style={{ width: `${project.progressRate}%` }}
+                  style={{ width: `${Math.min(project.progressRate, 100)}%` }}
                 />
               </div>
+              <p className="mt-1 text-[12px] font-semibold text-slate-500">
+                마감일 {project.dueDate}
+              </p>
             </li>
           ))}
         </ul>
+      ) : (
+        <EmptyState label="진행 중인 프로젝트가 없습니다." />
       )
+    }
 
-    case 'recentDrive':
+    case 'board': {
+      const data = widgetState.data as DashboardWidgetResponseMap['board']
       return (
         <>
-          <ul className="space-y-1">
-            {dataMap.recentDrive.files.map((file) => (
-              <ListRow
-                key={file.id}
-                title={file.fileName}
-                meta={`${file.ownerName} · ${file.updatedAt}`}
-                leading="file"
-              />
-            ))}
-          </ul>
-          <WidgetFooter label="드라이브 열기" />
-        </>
-      )
-
-    case 'aiSummary':
-      return (
-        <div className="flex flex-1 flex-col justify-between gap-4">
-          <p className="rounded-lg bg-violet-50 p-4 text-[14px] font-semibold leading-6 text-slate-700 ring-1 ring-violet-100">
-            {dataMap.aiSummary.summary}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {dataMap.aiSummary.keywords.map((keyword) => (
-              <span
-                key={keyword}
-                className="rounded-full bg-white px-3 py-1 text-[12px] font-black text-violet-700 ring-1 ring-violet-100"
+          <div className="mb-2 grid grid-cols-3 rounded-md bg-slate-100 p-1">
+            {boardTabs.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => onBoardTypeChange(tab.value)}
+                className={`dashboard-widget-action h-8 rounded text-[12px] font-black transition-colors ${
+                  boardType === tab.value
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
               >
-                {keyword}
-              </span>
+                {tab.label}
+              </button>
             ))}
           </div>
-        </div>
+          {data.posts.length ? (
+            <ul className="space-y-1">
+              {data.posts.map((post) => (
+                <ListRow
+                  key={post.id}
+                  title={post.title}
+                  meta={`${post.writerName} · ${post.createdAt}`}
+                  badge={post.new ? 'NEW' : undefined}
+                  badgeTone="blue"
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState label="게시글이 없습니다." />
+          )}
+        </>
       )
+    }
+
+    case 'mail': {
+      const data = widgetState.data as DashboardWidgetResponseMap['mail']
+      return (
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="inline-flex items-center gap-2 text-[13px] font-black text-slate-700">
+              <Mail size={15} />
+              안 읽은 메일
+            </span>
+            <strong className="rounded-full bg-blue-50 px-2.5 py-1 text-[13px] font-black text-blue-700 ring-1 ring-blue-100">
+              {data.unreadCount}
+            </strong>
+          </div>
+          {data.mails.length ? (
+            <ul className="space-y-1">
+              {data.mails.map((mail) => (
+                <ListRow
+                  key={mail.id}
+                  title={mail.subject}
+                  meta={`${mail.senderName} · ${mail.receivedAt}`}
+                  badge={mail.read ? undefined : '미읽음'}
+                  badgeTone="blue"
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState label="최근 메일이 없습니다." />
+          )}
+          <WidgetFooter label="메일함 열기" />
+        </>
+      )
+    }
+
+    case 'messenger': {
+      const data = widgetState.data as DashboardWidgetResponseMap['messenger']
+      return (
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <span className="inline-flex items-center gap-2 text-[13px] font-black text-slate-700">
+              <MessageSquare size={15} />
+              안 읽은 메시지
+            </span>
+            <strong className="rounded-full bg-blue-50 px-2.5 py-1 text-[13px] font-black text-blue-700 ring-1 ring-blue-100">
+              {data.unreadCount}
+            </strong>
+          </div>
+          {data.rooms.length ? (
+            <ul className="space-y-1">
+              {data.rooms.map((room) => (
+                <ListRow
+                  key={room.roomId}
+                  title={room.roomName}
+                  meta={room.lastMessage}
+                  trailing={room.lastMessageAt}
+                  badge={room.unreadCount ? String(room.unreadCount) : undefined}
+                  badgeTone="blue"
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState label="채팅방이 없습니다." />
+          )}
+          <WidgetFooter label="메신저 열기" />
+        </>
+      )
+    }
+
+    case 'notification': {
+      const data = widgetState.data as DashboardWidgetResponseMap['notification']
+      return (
+        <>
+          <div className="mb-2 flex items-center justify-between rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 px-4 py-3 ring-1 ring-blue-100">
+            <span className="inline-flex items-center gap-2 text-[13px] font-black text-blue-800">
+              <Bell size={15} />
+              미확인 알림
+            </span>
+            <strong className="text-2xl font-black tracking-tight text-blue-700">
+              {data.count}
+            </strong>
+          </div>
+          {data.notifications.length ? (
+            <ul className="space-y-1">
+              {data.notifications.map((notification) => (
+                <ListRow
+                  key={notification.id}
+                  title={notification.title}
+                  meta={`${notification.content} · ${notification.createdAt}`}
+                  badge={notification.type}
+                  badgeTone="slate"
+                />
+              ))}
+            </ul>
+          ) : (
+            <EmptyState label="알림이 없습니다." />
+          )}
+        </>
+      )
+    }
 
     default:
-      return (
-        <div className="flex h-full items-center justify-center text-sm text-slate-400">
-          <Bell size={16} className="mr-2" />
-          위젯 데이터가 없습니다.
-        </div>
-      )
+      return <EmptyState />
   }
 }
-
-const Metric = ({
-  label,
-  value,
-  accent = false,
-}: {
-  label: string
-  value: string
-  accent?: boolean
-}) => (
-  <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
-    <p className="text-[11px] font-bold text-slate-500">{label}</p>
-    <p
-      className={`mt-1 truncate text-[14px] font-black ${
-        accent ? 'text-blue-700' : 'text-slate-900'
-      }`}
-    >
-      {value}
-    </p>
-  </div>
-)
 
 export default DashboardWidgetCard

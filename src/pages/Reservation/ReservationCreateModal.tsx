@@ -4,11 +4,12 @@ import Checkbox from '../../components/common/form/checkbox/Checkbox'
 import FormField from '../../components/common/form/formField/FormField'
 import Select from '../../components/common/form/select/Select'
 import Modal from '../../components/common/overlay/modal/Modal'
-import type { ReservationCreateRequest, RoomResponse } from '../../types'
+import type { ReservationCreateRequest, ReservationResponse, RoomResponse } from '../../types'
 
 interface ReservationCreateModalProps {
   open: boolean
   rooms: RoomResponse[]
+  reservations: ReservationResponse[]
   formValues: ReservationCreateRequest
   loading: boolean
   onChange: (values: ReservationCreateRequest) => void
@@ -39,6 +40,7 @@ const fromEndDateInputValue = (date: string) => {
 const ReservationCreateModal = ({
   open,
   rooms,
+  reservations,
   formValues,
   loading,
   onChange,
@@ -77,8 +79,19 @@ const ReservationCreateModal = ({
         : '종료 시간은 시작 시간보다 늦어야 합니다.'
     }
 
+    const hasConflict = reservations.some((r) => {
+      if (r.roomId !== formValues.roomId) return false
+      const existingStart = new Date(r.startDateTime)
+      const existingEnd = new Date(r.endDateTime)
+      return start < existingEnd && end > existingStart
+    })
+
+    if (hasConflict) {
+      return '선택하신 시간대에 이미 예약이 있습니다. 다른 시간을 선택해주세요.'
+    }
+
     return ''
-  }, [allDay, formValues, rooms.length])
+  }, [allDay, formValues, reservations, rooms.length])
 
   const handleSubmit = () => {
     if (validationMessage) return

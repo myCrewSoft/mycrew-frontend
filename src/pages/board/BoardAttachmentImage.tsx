@@ -14,11 +14,11 @@ const BoardAttachmentImage = ({
   if (!imageSrc) return null
 
   return (
-    <figure className="pb-6">
+    <figure className="flex justify-center pb-6">
       <img
         src={imageSrc}
         alt={alt}
-        className="max-h-[640px] max-w-full rounded-md border border-slate-200 object-contain"
+        className="h-auto max-h-[640px] max-w-full rounded-md border border-slate-200 object-contain"
       />
     </figure>
   )

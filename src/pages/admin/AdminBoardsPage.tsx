@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Eye,
-  FileText,
-  FolderKanban,
-  Megaphone,
   MessageSquare,
   Paperclip,
   Pencil,
@@ -11,13 +9,11 @@ import {
   RefreshCw,
   Send,
   ShieldAlert,
-  ShieldQuestion,
   Sparkles,
   Square,
   ThumbsUp,
   Trash2,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { adminApi } from '../../api/adminApi'
 import { boardApi } from '../../api/boardApi'
 import {
@@ -32,6 +28,7 @@ import {
   type ProjectBoardListParams,
 } from '../../api/projectBoardApi'
 import Button from '../../components/common/button/Button'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import DataTable from '../../components/common/dataDisplay/dataTable/DataTable'
@@ -42,6 +39,7 @@ import Textarea from '../../components/common/form/textarea/Textarea'
 import Modal from '../../components/common/overlay/modal/Modal'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
+import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind, BoardListParams } from '../../types/board'
 import type {
   BoardCommentUpdateRequest,
@@ -54,13 +52,20 @@ import BoardAttachmentImage from '../board/BoardAttachmentImage'
 import BoardContentViewer from '../board/BoardContentViewer'
 import BoardWriteForm from '../board/BoardWriteForm'
 
-interface BoardTypeOption {
-  value: AdminBoardKind
-  label: string
-  icon: typeof Megaphone
-}
-
 type AdminBoardKind = BoardKind | 'project'
+
+const adminBoardKinds: AdminBoardKind[] = [
+  'notice',
+  'department',
+  'free',
+  'anonymous',
+  'project',
+]
+
+const getAdminBoardKindFromParam = (value: string | null): AdminBoardKind =>
+  adminBoardKinds.includes(value as AdminBoardKind)
+    ? (value as AdminBoardKind)
+    : 'notice'
 
 type DepartmentBoardOption = BoardSideBarResponse & {
   deptCd?: string
@@ -146,14 +151,6 @@ const getAdminBoardDetail = ({
   })
 }
 
-const boardTypeOptions: BoardTypeOption[] = [
-  { value: 'notice', label: '공지사항', icon: Megaphone },
-  { value: 'department', label: '부서게시판', icon: FileText },
-  { value: 'free', label: '자유게시판', icon: MessageSquare },
-  { value: 'anonymous', label: '익명게시판', icon: ShieldQuestion },
-  { value: 'project', label: '프로젝트 게시판', icon: FolderKanban },
-]
-
 const boardLabelByType: Record<AdminBoardKind, string> = {
   notice: '공지사항',
   department: '부서게시판',
@@ -183,13 +180,12 @@ const formatAuthor = (board: BoardResponse, type: AdminBoardKind) => {
 const formatCommentAuthor = (
   employeeId: number | undefined,
   type: AdminBoardKind,
-  currentEmployeeId: number | null,
-  currentEmployeeName: string,
+  employeeName: string,
 ) => {
   if (type === 'anonymous') return '익명'
 
-  if (employeeId === currentEmployeeId && currentEmployeeName) {
-    return `${currentEmployeeName}(${employeeId})`
+  if (employeeName) {
+    return `${employeeName}(${employeeId ?? '-'})`
   }
 
   return `사원(${employeeId ?? '-'})`
@@ -221,18 +217,26 @@ const parseBoardLikeState = (
 }
 
 const AdminBoardsPage = () => {
-  const navigate = useNavigate()
   const { showToast } = useToast()
-  const [boardType, setBoardType] = useState<AdminBoardKind>('notice')
+  const [searchParams] = useSearchParams()
+  const selectedBoardTypeParam = searchParams.get('boardType')
+  const boardType = useMemo(
+    () => getAdminBoardKindFromParam(selectedBoardTypeParam),
+    [selectedBoardTypeParam],
+  )
   const [departmentCode, setDepartmentCode] = useState('')
   const [projectId, setProjectId] = useState(0)
   const [page, setPage] = useState(1)
   const [searchText, setSearchText] = useState('')
   const [keyword, setKeyword] = useState('')
   const [detailTarget, setDetailTarget] = useState<BoardResponse | null>(null)
+  const [creatingBoard, setCreatingBoard] = useState(false)
+  const [creatingBoardTitle, setCreatingBoardTitle] = useState('공지사항')
   const [editTarget, setEditTarget] = useState<BoardResponse | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<BoardResponse | null>(null)
   const [commentContent, setCommentContent] = useState('')
+  const [replyTargetId, setReplyTargetId] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState('')
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentContent, setEditingCommentContent] = useState('')
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
@@ -322,6 +326,9 @@ const AdminBoardsPage = () => {
 
   const currentEmployeeId = getCurrentEmployeeId()
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
+  const { getEmployeeProfile } = useEmployeeProfileDirectory(
+    boardType !== 'anonymous',
+  )
   // 다른 게시글의 좋아요 상태가 잠깐 표시되지 않도록 boardId가 같은지 확인합니다.
   const currentLikeState = detailTarget && likeState.boardId === detailTarget.boardId
     ? likeState
@@ -388,13 +395,6 @@ const AdminBoardsPage = () => {
     (board) => Boolean(board.boardAtchFileId),
   ).length
 
-  const changeBoardType = (nextType: AdminBoardKind) => {
-    setBoardType(nextType)
-    setPage(1)
-    setKeyword('')
-    setSearchText('')
-  }
-
   const submitSearch = () => {
     setPage(1)
     setKeyword(searchText.trim())
@@ -432,6 +432,8 @@ const AdminBoardsPage = () => {
     setEditingCommentContent('')
     setDeletingCommentId(null)
     setCommentContent('')
+    setReplyTargetId(null)
+    setReplyContent('')
     setLikeState({
       boardId: board.boardId,
       isLiked: board.isLiked ?? false,
@@ -498,6 +500,8 @@ const AdminBoardsPage = () => {
     setRiskAnalysis(null)
     setDetailTarget(null)
     setCommentContent('')
+    setReplyTargetId(null)
+    setReplyContent('')
     setEditingCommentId(null)
     setEditingCommentContent('')
   }
@@ -628,6 +632,23 @@ const AdminBoardsPage = () => {
 
     setEditingCommentId(commentId)
     setEditingCommentContent(commentContent ?? '')
+    setReplyTargetId(null)
+    setReplyContent('')
+  }
+
+  const toggleReply = (commentId: number | undefined) => {
+    if (!commentId) return
+
+    if (replyTargetId === commentId) {
+      setReplyTargetId(null)
+      setReplyContent('')
+      return
+    }
+
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setReplyTargetId(commentId)
+    setReplyContent('')
   }
 
   const submitComment = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -682,6 +703,87 @@ const AdminBoardsPage = () => {
     } catch (commentError) {
       showToast({
         title: '댓글을 등록하지 못했습니다.',
+        description: commentError instanceof ApiError
+          ? commentError.message
+          : '잠시 후 다시 시도해주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const submitReply = async (
+    event: React.FormEvent<HTMLFormElement>,
+    parentCommentId: number,
+  ) => {
+    event.preventDefault()
+
+    const trimmedContent = replyContent.trim()
+    if (
+      !detailTarget ||
+      !trimmedContent ||
+      creatingComment ||
+      detailTarget.cmntUseYn?.toUpperCase() === 'N'
+    ) {
+      return
+    }
+
+    const siblingReplies = (detailTarget.commentList ?? []).filter(
+      (comment) => comment.commentPrtId === parentCommentId,
+    )
+    const nextReplyOrder = siblingReplies.length + 1
+
+    try {
+      const response = await createBoardComment({
+        boardId: detailTarget.boardId,
+        commentCn: trimmedContent,
+        commentPrtId: parentCommentId,
+        commentDepth: 1,
+        commentOrder: nextReplyOrder,
+      })
+
+      setDetailTarget((currentDetail) => {
+        if (!currentDetail) return currentDetail
+
+        const nextCommentList = [...(currentDetail.commentList ?? [])]
+        const parentIndex = nextCommentList.findIndex(
+          (comment) => comment.commentId === parentCommentId,
+        )
+        let insertIndex = parentIndex >= 0
+          ? parentIndex + 1
+          : nextCommentList.length
+
+        while (
+          insertIndex < nextCommentList.length &&
+          nextCommentList[insertIndex].commentPrtId === parentCommentId
+        ) {
+          insertIndex += 1
+        }
+
+        nextCommentList.splice(insertIndex, 0, {
+          commentId: response.data,
+          boardId: currentDetail.boardId,
+          commentCn: trimmedContent,
+          wrterEmpId: currentEmployeeId ?? undefined,
+          wrteDt: new Date().toISOString(),
+          commentPrtId: parentCommentId,
+          commentDepth: 1,
+          commentOrder: nextReplyOrder,
+        })
+
+        return {
+          ...currentDetail,
+          commentList: nextCommentList,
+        }
+      })
+      setReplyTargetId(null)
+      setReplyContent('')
+      showToast({
+        title: '답글을 등록했습니다.',
+        variant: 'success',
+      })
+    } catch (commentError) {
+      showToast({
+        title: '답글을 등록하지 못했습니다.',
         description: commentError instanceof ApiError
           ? commentError.message
           : '잠시 후 다시 시도해주세요.',
@@ -751,6 +853,14 @@ const AdminBoardsPage = () => {
             ),
           }
         : currentDetail)
+      if (replyTargetId === commentId) {
+        setReplyTargetId(null)
+        setReplyContent('')
+      }
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null)
+        setEditingCommentContent('')
+      }
       showToast({
         title: '댓글을 삭제했습니다.',
         variant: 'success',
@@ -788,6 +898,55 @@ const AdminBoardsPage = () => {
         variant: 'danger',
       })
     }
+  }
+
+  if (creatingBoard) {
+    return (
+      <section className="flex min-h-[calc(100vh-7rem)] w-full flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Badge variant="outline">ADMIN BOARD CREATE</Badge>
+            <h2 className="mt-2 text-2xl font-bold text-slate-950">
+              관리자 {creatingBoardTitle} 작성
+            </h2>
+          </div>
+          <Button variant="outline" onClick={() => setCreatingBoard(false)}>
+            목록으로
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex-1">
+          <BoardWriteForm
+            mode="create"
+            initialBoardType={boardType === 'project' ? 'notice' : boardType}
+            initialBoardTypeCd={boardType === 'project' ? 'PROJ' : ''}
+            departmentCode={selectedDepartmentCode}
+            projectId={boardType === 'project' ? selectedProjectId : undefined}
+            onBoardSelectionChange={(selectedType, departmentName) => {
+              if (boardType === 'project') {
+                setCreatingBoardTitle(boardLabelByType.project)
+                return
+              }
+
+              const selectedLabel = boardLabelByType[selectedType]
+              setCreatingBoardTitle(
+                departmentName
+                  ? `${selectedLabel} ${departmentName}`
+                  : selectedLabel,
+              )
+            }}
+            onClose={() => setCreatingBoard(false)}
+            onCreated={() => {
+              showToast({
+                title: `${creatingBoardTitle} 게시글이 등록되었습니다.`,
+                variant: 'success',
+              })
+              refreshBoards()
+            }}
+          />
+        </div>
+      </section>
+    )
   }
 
   if (editTarget) {
@@ -854,34 +1013,21 @@ const AdminBoardsPage = () => {
           </Button>
           <Button
             leftIcon={<Plus size={16} />}
-            onClick={() => navigate('/boards/notices?mode=create')}
+            onClick={() => {
+              setPage(1)
+              setSearchText('')
+              setKeyword('')
+              setCreatingBoardTitle(boardLabelByType[boardType])
+              setCreatingBoard(true)
+            }}
+            disabled={
+              (boardType === 'department' && !selectedDepartmentCode) ||
+              (boardType === 'project' && !selectedProjectId)
+            }
           >
-            공지 작성
+            {boardLabelByType[boardType]} 작성
           </Button>
         </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {boardTypeOptions.map((option) => {
-          const Icon = option.icon
-          const active = boardType === option.value
-
-          return (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => changeBoardType(option.value)}
-              className={`flex h-14 items-center gap-3 rounded-lg border px-4 text-left transition ${
-                active
-                  ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                  : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300'
-              }`}
-            >
-              <Icon size={19} />
-              <span className="text-sm font-bold">{option.label}</span>
-            </button>
-          )
-        })}
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
@@ -952,7 +1098,7 @@ const AdminBoardsPage = () => {
             <SearchInput
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
-              placeholder="게시글 제목 검색"
+              placeholder="게시글 제목&내용 검색"
             />
             <Button type="submit" className="shrink-0">
               검색
@@ -1304,29 +1450,53 @@ const AdminBoardsPage = () => {
 
               {(detailTarget.commentList?.length ?? 0) > 0 ? (
                 <div className="divide-y divide-slate-200 rounded-md border border-slate-200">
-                  {detailTarget.commentList?.map((comment, index) => (
+                  {detailTarget.commentList?.map((comment, index) => {
+                    const employeeProfile = getEmployeeProfile(
+                      comment.wrterEmpId,
+                    )
+                    const commentAuthorName =
+                      boardType === 'anonymous'
+                        ? '익명'
+                        : employeeProfile?.name ??
+                          (comment.wrterEmpId === currentEmployeeId
+                            ? currentEmployeeName
+                            : '')
+
+                    return (
                     <div
                       key={comment.commentId ?? index}
-                      className={`px-4 py-3 ${
+                      className={`flex gap-3 px-4 py-3 ${
                         comment.commentDepth ? 'bg-slate-50 pl-10' : 'bg-white'
                       }`}
                     >
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="font-bold text-slate-800">
-                          {formatCommentAuthor(
-                            comment.wrterEmpId,
-                            boardType,
-                            currentEmployeeId,
-                            currentEmployeeName,
+                      <ProfileAvatar
+                        fileId={
+                          boardType === 'anonymous'
+                            ? null
+                            : employeeProfile?.profileFileId ??
+                              (comment.wrterEmpId === currentEmployeeId
+                                ? currentProfile?.prflImgFileId
+                                : null)
+                        }
+                        name={commentAuthorName}
+                        size={32}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="font-bold text-slate-800">
+                            {formatCommentAuthor(
+                              comment.wrterEmpId,
+                              boardType,
+                              commentAuthorName,
+                            )}
+                          </span>
+                          {Boolean(comment.commentDepth) && (
+                            <Badge variant="neutral">답글</Badge>
                           )}
-                        </span>
-                        {Boolean(comment.commentDepth) && (
-                          <Badge variant="neutral">답글</Badge>
-                        )}
-                        <span className="text-slate-400">
-                          {formatDate(comment.wrteDt)}
-                        </span>
-                      </div>
+                          <span className="text-slate-400">
+                            {formatDate(comment.wrteDt)}
+                          </span>
+                        </div>
                       {editingCommentId === comment.commentId &&
                       comment.commentId ? (
                         <form
@@ -1378,40 +1548,89 @@ const AdminBoardsPage = () => {
                           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
                             {comment.commentCn}
                           </p>
-                          {comment.wrterEmpId === currentEmployeeId &&
-                            comment.commentId && (
-                            <div className="mt-2 flex items-center gap-3">
-                              <button
-                                type="button"
-                                className="text-xs font-semibold text-slate-500 hover:text-blue-600"
-                                onClick={() =>
-                                  toggleCommentEdit(
-                                    comment.commentId,
-                                    comment.commentCn,
-                                  )
-                                }
-                              >
-                                수정
-                              </button>
-                              <button
-                                type="button"
-                                disabled={deletingComment}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                onClick={() =>
-                                  void removeComment(comment.commentId as number)
-                                }
-                              >
-                                <Trash2 size={12} />
-                                {deletingCommentId === comment.commentId
-                                  ? '삭제 중'
-                                  : '삭제'}
-                              </button>
-                            </div>
-                          )}
+                     <div className="mt-2 inline-flex items-center gap-3 align-middle">
+  {/* 1. 답글 버튼 조건부 렌더링 */}
+  {!comment.commentDepth && comment.commentId && (
+    <button
+      type="button"
+      className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+      onClick={() => toggleReply(comment.commentId)}
+    >
+      {replyTargetId === comment.commentId ? '취소' : '답글'}
+    </button>
+  )}
+
+  {/* 2. 수정 버튼 조건부 렌더링 (내가 쓴 글일 때만 보임) */}
+  {comment.wrterEmpId === currentEmployeeId && comment.commentId && (
+    <button
+      type="button"
+      className="text-xs font-semibold text-slate-500 hover:text-blue-600"
+      onClick={() =>
+        toggleCommentEdit(
+          comment.commentId,
+          comment.commentCn,
+        )
+      }
+    >
+      수정
+    </button>
+  )}
+
+  {/* 3. 삭제 버튼 조건부 렌더링 (내가 쓴 글일 때만 보임) */}
+  {comment.wrterEmpId === currentEmployeeId && comment.commentId && (
+    <button
+      type="button"
+      disabled={deletingComment}
+      className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+      onClick={() =>
+        void removeComment(comment.commentId as number)
+      }
+    >
+      <Trash2 size={12} />
+      {deletingCommentId === comment.commentId ? '삭제 중' : '삭제'}
+    </button>
+  )}
+</div>
+                          
                         </>
                       )}
+                      {!comment.commentDepth &&
+                        replyTargetId === comment.commentId &&
+                        comment.commentId && (
+                          <form
+                            className="mt-3 rounded-md border border-slate-200 bg-white p-3"
+                            onSubmit={(event) =>
+                              void submitReply(event, comment.commentId as number)
+                            }
+                          >
+                            <Textarea
+                              value={replyContent}
+                              onChange={(event) => setReplyContent(event.target.value)}
+                              placeholder="답글을 입력하세요."
+                              maxLength={1000}
+                              autoFocus
+                              className="min-h-20 resize-none rounded-md"
+                            />
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                              <span className="text-xs font-medium text-slate-400">
+                                {replyContent.length}/1000
+                              </span>
+                              <Button
+                                type="submit"
+                                size="sm"
+                                leftIcon={<Send size={14} />}
+                                loading={creatingComment}
+                                disabled={!replyContent.trim()}
+                              >
+                                답글 등록
+                              </Button>
+                            </div>
+                          </form>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed border-slate-200 px-4 py-8 text-center text-sm font-medium text-slate-400">

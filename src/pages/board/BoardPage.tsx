@@ -372,7 +372,7 @@ const BoardPage = () => {
 
         <div className="w-[320px]">
           <SearchInput
-            placeholder="제목 검색"
+            placeholder="제목&내용 검색"
             value={keyword}
             onChange={(event) => {
               const nextKeyword = event.target.value
