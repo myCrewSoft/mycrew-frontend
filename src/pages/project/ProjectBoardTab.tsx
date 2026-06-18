@@ -100,6 +100,8 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
   const [selectedBoard, setSelectedBoard] = useState<BoardResponse | null>(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [commentContent, setCommentContent] = useState('')
+  const [replyTargetId, setReplyTargetId] = useState<number | null>(null)
+  const [replyContent, setReplyContent] = useState('')
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null)
   const [editingCommentContent, setEditingCommentContent] = useState('')
   const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null)
@@ -172,6 +174,10 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
       const response = await fetchBoardDetail(board.boardId)
       setSelectedBoard(response.data ?? board)
       setCommentContent('')
+      setReplyTargetId(null)
+      setReplyContent('')
+      setEditingCommentId(null)
+      setEditingCommentContent('')
       setView('detail')
       void fetchBoards({ projectId, page, keyword }).catch(() => undefined)
     } catch (detailError) {
@@ -284,6 +290,92 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
     }
   }
 
+  const toggleReply = (comment: BoardCommentVO) => {
+    if (!comment.commentId) return
+
+    if (replyTargetId === comment.commentId) {
+      setReplyTargetId(null)
+      setReplyContent('')
+      return
+    }
+
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setReplyTargetId(comment.commentId)
+    setReplyContent('')
+  }
+
+  const handleReplySubmit = async (
+    event: FormEvent<HTMLFormElement>,
+    parentCommentId: number,
+  ) => {
+    event.preventDefault()
+
+    const nextContent = replyContent.trim()
+
+    if (!selectedBoard || !nextContent) return
+
+    const siblingReplies = (selectedBoard.commentList ?? []).filter(
+      (comment) => comment.commentPrtId === parentCommentId,
+    )
+    const nextReplyOrder = siblingReplies.length + 1
+
+    const request: BoardCommentMutationRequest = {
+      boardId: selectedBoard.boardId,
+      commentCn: nextContent,
+      commentPrtId: parentCommentId,
+      commentDepth: 1,
+      commentOrder: nextReplyOrder,
+    }
+
+    try {
+      const response = await createComment(request)
+      const nextCommentList = [...(selectedBoard.commentList ?? [])]
+      const parentIndex = nextCommentList.findIndex(
+        (comment) => comment.commentId === parentCommentId,
+      )
+      let insertIndex = parentIndex >= 0
+        ? parentIndex + 1
+        : nextCommentList.length
+
+      while (
+        insertIndex < nextCommentList.length &&
+        nextCommentList[insertIndex].commentPrtId === parentCommentId
+      ) {
+        insertIndex += 1
+      }
+
+      const newReply: BoardCommentVO = {
+        commentId: response.data,
+        boardId: selectedBoard.boardId,
+        commentCn: request.commentCn,
+        wrterEmpId: currentEmployeeId ?? undefined,
+        wrteDt: new Date().toISOString(),
+        commentPrtId: parentCommentId,
+        commentDepth: 1,
+        commentOrder: nextReplyOrder,
+      }
+
+      nextCommentList.splice(insertIndex, 0, newReply)
+
+      setSelectedBoard({
+        ...selectedBoard,
+        commentList: nextCommentList,
+      })
+      setReplyTargetId(null)
+      setReplyContent('')
+      showToast({ title: '답글이 등록되었습니다.', variant: 'success' })
+    } catch (replyError) {
+      showToast({
+        title:
+          replyError instanceof Error
+            ? replyError.message
+            : '답글 등록에 실패했습니다.',
+        variant: 'danger',
+      })
+    }
+  }
+
   const toggleCommentEdit = (comment: BoardCommentVO) => {
     if (!comment.commentId) return
 
@@ -293,6 +385,8 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
       return
     }
 
+    setReplyTargetId(null)
+    setReplyContent('')
     setEditingCommentId(comment.commentId)
     setEditingCommentContent(comment.commentCn ?? '')
   }
@@ -361,6 +455,11 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
       if (editingCommentId === comment.commentId) {
         setEditingCommentId(null)
         setEditingCommentContent('')
+      }
+
+      if (replyTargetId === comment.commentId) {
+        setReplyTargetId(null)
+        setReplyContent('')
       }
 
       showToast({ title: '댓글이 삭제되었습니다.', variant: 'success' })
@@ -566,105 +665,171 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
                           : '')
 
                       return (
-                      <div
-                        key={comment.commentId ?? index}
-                        className="flex gap-3 px-4 py-3"
-                      >
-                        <ProfileAvatar
-                          fileId={
-                            employeeProfile?.profileFileId ??
-                            (comment.wrterEmpId === currentEmployeeId
-                              ? currentProfile?.prflImgFileId
-                              : null)
-                          }
-                          name={commentAuthorName}
-                          size={32}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-sm font-bold text-slate-800">
-                              {formatCommentAuthor(
-                                comment.wrterEmpId,
-                                commentAuthorName,
-                              )}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              {formatDateTime(comment.wrteDt)}
-                            </span>
-                          </div>
-                        {editingCommentId === comment.commentId &&
-                        comment.commentId ? (
-                          <form
-                            onSubmit={(event) =>
-                              handleCommentUpdate(event, comment.commentId as number)
+                        <div
+                          key={comment.commentId ?? index}
+                          className={`flex gap-3 px-4 py-3 ${
+                            comment.commentDepth ? 'bg-slate-50 pl-10' : ''
+                          }`}
+                        >
+                          <ProfileAvatar
+                            fileId={
+                              employeeProfile?.profileFileId ??
+                              (comment.wrterEmpId === currentEmployeeId
+                                ? currentProfile?.prflImgFileId
+                                : null)
                             }
-                            className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3"
-                          >
-                            <Textarea
-                              value={editingCommentContent}
-                              onChange={(event) =>
-                                setEditingCommentContent(event.target.value)
-                              }
-                              maxLength={1000}
-                              autoFocus
-                              className="min-h-20 resize-none bg-white"
-                            />
-                            <div className="mt-2 flex items-center justify-between gap-3">
-                              <span className="text-xs text-slate-400">
-                                {editingCommentContent.length}/1000
-                              </span>
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => toggleCommentEdit(comment)}
-                                  disabled={updatingComment}
-                                >
-                                  취소
-                                </Button>
-                                <Button
-                                  type="submit"
-                                  size="sm"
-                                  loading={updatingComment}
-                                  disabled={!editingCommentContent.trim()}
-                                >
-                                  수정 완료
-                                </Button>
+                            name={commentAuthorName}
+                            size={32}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-sm font-bold text-slate-800">
+                                  {formatCommentAuthor(
+                                    comment.wrterEmpId,
+                                    commentAuthorName,
+                                  )}
+                                </span>
+                                {Boolean(comment.commentDepth) && (
+                                  <Badge variant="neutral">답글</Badge>
+                                )}
                               </div>
+                              <span className="shrink-0 text-xs text-slate-400">
+                                {formatDateTime(comment.wrteDt)}
+                              </span>
                             </div>
-                          </form>
-                        ) : (
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
-                            {comment.commentCn}
-                          </p>
-                        )}
 
-                        {comment.wrterEmpId === currentEmployeeId &&
-                          editingCommentId !== comment.commentId && (
-                            <div className="mt-2 flex items-center gap-3 text-xs font-semibold">
-                              <button
-                                type="button"
-                                onClick={() => toggleCommentEdit(comment)}
-                                className="text-slate-500 hover:text-blue-600"
+                            {editingCommentId === comment.commentId &&
+                            comment.commentId ? (
+                              <form
+                                onSubmit={(event) =>
+                                  handleCommentUpdate(
+                                    event,
+                                    comment.commentId as number,
+                                  )
+                                }
+                                className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3"
                               >
-                                수정
-                              </button>
-                              <button
-                                type="button"
-                                disabled={deletingComment}
-                                onClick={() => void handleCommentDelete(comment)}
-                                className="inline-flex items-center gap-1 text-slate-500 hover:text-red-600 disabled:opacity-50"
-                              >
-                                <Trash2 size={12} />
-                                {deletingCommentId === comment.commentId
-                                  ? '삭제 중'
-                                  : '삭제'}
-                              </button>
-                            </div>
-                          )}
+                                <Textarea
+                                  value={editingCommentContent}
+                                  onChange={(event) =>
+                                    setEditingCommentContent(event.target.value)
+                                  }
+                                  maxLength={1000}
+                                  autoFocus
+                                  className="min-h-20 resize-none bg-white"
+                                />
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                  <span className="text-xs text-slate-400">
+                                    {editingCommentContent.length}/1000
+                                  </span>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => toggleCommentEdit(comment)}
+                                      disabled={updatingComment}
+                                    >
+                                      취소
+                                    </Button>
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      loading={updatingComment}
+                                      disabled={!editingCommentContent.trim()}
+                                    >
+                                      수정 완료
+                                    </Button>
+                                  </div>
+                                </div>
+                              </form>
+                            ) : (
+                              <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                                {comment.commentCn}
+                              </p>
+                            )}
+
+                            {editingCommentId !== comment.commentId && (
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-semibold">
+                                {!comment.commentDepth && comment.commentId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleReply(comment)}
+                                    className="text-slate-500 hover:text-blue-600"
+                                  >
+                                    {replyTargetId === comment.commentId
+                                      ? '취소'
+                                      : '답글'}
+                                  </button>
+                                )}
+
+                                {comment.wrterEmpId === currentEmployeeId &&
+                                  comment.commentId && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleCommentEdit(comment)}
+                                        className="text-slate-500 hover:text-blue-600"
+                                      >
+                                        수정
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={deletingComment}
+                                        onClick={() => void handleCommentDelete(comment)}
+                                        className="inline-flex items-center gap-1 text-slate-500 hover:text-red-600 disabled:opacity-50"
+                                      >
+                                        <Trash2 size={12} />
+                                        {deletingCommentId === comment.commentId
+                                          ? '삭제 중'
+                                          : '삭제'}
+                                      </button>
+                                    </>
+                                  )}
+                              </div>
+                            )}
+
+                            {!comment.commentDepth &&
+                              replyTargetId === comment.commentId &&
+                              comment.commentId && (
+                                <form
+                                  onSubmit={(event) =>
+                                    handleReplySubmit(
+                                      event,
+                                      comment.commentId as number,
+                                    )
+                                  }
+                                  className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3"
+                                >
+                                  <Textarea
+                                    value={replyContent}
+                                    onChange={(event) =>
+                                      setReplyContent(event.target.value)
+                                    }
+                                    placeholder="답글을 입력하세요."
+                                    maxLength={1000}
+                                    autoFocus
+                                    className="min-h-20 resize-none bg-white"
+                                  />
+                                  <div className="mt-2 flex items-center justify-between gap-3">
+                                    <span className="text-xs text-slate-400">
+                                      {replyContent.length}/1000
+                                    </span>
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      leftIcon={<Send size={15} />}
+                                      loading={creatingComment}
+                                      disabled={!replyContent.trim()}
+                                    >
+                                      답글 등록
+                                    </Button>
+                                  </div>
+                                </form>
+                              )}
+                          </div>
                         </div>
-                      </div>
                       )
                     })
                   ) : (
