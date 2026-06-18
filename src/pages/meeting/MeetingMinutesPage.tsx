@@ -8,6 +8,7 @@ import {
   History,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Send,
   Trash2,
@@ -175,6 +176,10 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
   const { execute: requestReview } = useApi(meetingApi.requestMomApproval, {
     immediate: false,
   })
+  const { loading: regenerateLoading, execute: execRegenerateAiDraft } = useApi(
+    meetingApi.regenerateAiDraft,
+    { immediate: false },
+  )
 
   useEffect(() => {
     void fetchMom(meeting.mtngId)
@@ -272,14 +277,42 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
     }
   }
 
-  const handleDownloadRecording = () => {
+  const handleRegenerateAiDraft = async () => {
+    try {
+      await execRegenerateAiDraft(meeting.mtngId)
+      showToast({
+        title: 'AI 초안 재생성을 요청했습니다.',
+        description: '완료되면 회의록 페이지를 새로고침해 확인하세요.',
+        variant: 'success',
+      })
+    } catch {
+      showToast({
+        title: 'AI 초안 재생성에 실패했습니다.',
+        description: '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
+  const handleDownloadRecording = async () => {
     if (meeting.vconfId === null || !meeting.rcrdgAtchFileId) return
-    window.location.assign(
-      meetingApi.getRcrdgDownloadUrl(
-        meeting.vconfId,
-        meeting.rcrdgAtchFileId,
-      ),
-    )
+    try {
+      const response = await meetingApi.downloadRcrdg(meeting.vconfId, meeting.rcrdgAtchFileId)
+      const url = URL.createObjectURL(new Blob([response.data as BlobPart]))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recording_${meeting.vconfId}.webm`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      showToast({
+        title: '녹취록을 다운로드하지 못했습니다.',
+        description: '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
   }
 
   return (
@@ -587,11 +620,22 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
               >
                 결재 요청 발송
               </Button>
+              {meeting.vconfId !== null && (
+                <Button
+                  variant="outline"
+                  disabled={approvalStarted}
+                  loading={regenerateLoading}
+                  leftIcon={<RefreshCw size={16} />}
+                  onClick={() => void handleRegenerateAiDraft()}
+                >
+                  AI 초안 재생성
+                </Button>
+              )}
               {meeting.vconfId !== null && meeting.rcrdgAtchFileId && (
                 <Button
                   variant="outline"
                   leftIcon={<Download size={16} />}
-                  onClick={handleDownloadRecording}
+                  onClick={() => void handleDownloadRecording()}
                 >
                   녹취록 다운로드
                 </Button>

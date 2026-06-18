@@ -9,6 +9,7 @@ import AdminRolesSubSidebar from './AdminRolesSubSidebar';
 import AdminAttendanceSubSidebar from './AdminAttendanceSubSidebar';
 import { subSidebarClass } from './adminLayoutStyles';
 import AdminReservationSubSidebar from './AdminReservationSubSidebar';
+import AdminMtngSubSidebar from './AdminMtngSubSidebar';
 
 export default function AdminSubSidebar() {
   const location = useLocation();
@@ -42,6 +43,8 @@ export default function AdminSubSidebar() {
     content = <AdminBoardsSubSidebar selectedBoardType={selectedBoardType} />;
   } else if (pathname.startsWith('/admin/attendance')) {
     content = <AdminAttendanceSubSidebar />;
+  } else if (pathname.startsWith('/admin/meeting')) {
+    content = <AdminMtngSubSidebar />
   } else if (pathname.startsWith('/admin/reservations')) {
     const selectedType = searchParams.get('view') ?? 'rooms'
     content = <AdminReservationSubSidebar selectedType={selectedType} />

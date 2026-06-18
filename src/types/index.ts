@@ -66,7 +66,14 @@ export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];
 export type RoomUpdateRequest = components['schemas']['RoomUpdateRequest'];
 export type RoomResponse = components['schemas']['RoomResponse'];
 export type ConfRmStatsSummary = components['schemas']['ConfRmStatsSummary'];
-export type ConfRmListItem = components['schemas']['ConfRmListItem'];
+export type AdminMtngListRequest = components['schemas']['AdminMtngListRequest'];
+export type AdminMtngListResponse = components['schemas']['AdminMtngListResponse'];
+export type AdminMtngListPageResponse = components['schemas']['AdminMtngListPageResponse'];
+export type AdminMtngPtcptResponse = components['schemas']['AdminMtngPtcptResponse'];
+export type AdminMtngDetailResponse = components['schemas']['AdminMtngDetailResponse'];
+export type AdminMtngStatsResponse = components['schemas']['AdminMtngStatsResponse'];
+export type AdminMtngAnalyticsItemResponse = components['schemas']['AdminMtngAnalyticsItemResponse'];
+export type AdminMtngAnalyticsResponse = components['schemas']['AdminMtngAnalyticsResponse'];
 
 // 업무
 export type TaskCreateRequest = components['schemas']['TaskCreateRequest'];
