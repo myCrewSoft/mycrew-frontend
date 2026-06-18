@@ -59,6 +59,22 @@ export const boardApi = {
   },
 
   /**
+   * 내 게시글 목록 조회 (현재 사용자가 작성한 글, 페이징·검색 포함)
+   */
+  getMyPosts: (
+    page = 1,
+    keyword = '',
+  ): Promise<AxiosResponse<ApiResponse<PageBoardResponse>>> => {
+    return axiosInstance.get('/api/boards/mine', {
+      params: {
+        page: Math.max(page - 1, 0),
+        size: 10,
+        keyword: keyword.trim() || undefined,
+      },
+    })
+  },
+
+  /**
    * 게시글 등록
    */
   createBoard: (
