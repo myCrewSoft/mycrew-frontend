@@ -4,10 +4,9 @@ import {
   GripVertical,
   Mail,
   MessageSquare,
-  MoreHorizontal,
-  Search,
   Trash2,
 } from 'lucide-react'
+import { useNavigate, type NavigateFunction } from 'react-router-dom'
 import type {
   AdminAttendanceWidgetItem,
   AdminAttendanceWidgetResponseDto,
@@ -61,6 +60,7 @@ interface ListRowProps {
   badgeTone?: 'blue' | 'green' | 'amber' | 'red' | 'slate'
   leading?: 'dot' | 'checkbox'
   trailing?: string
+  onClick?: () => void
 }
 
 interface ApprovalWidgetDocumentItem {
@@ -72,6 +72,8 @@ interface ApprovalWidgetDocumentItem {
 }
 
 type ScheduleWidgetItem = ScheduleWidgetResponse['schedules'][number]
+type NotificationWidgetItem =
+  DashboardWidgetResponseMap['notification']['notifications'][number]
 
 const statusLabel: Record<string, string> = {
   beforeWork: '출근 전',
@@ -96,6 +98,22 @@ const badgeToneStyle: Record<NonNullable<ListRowProps['badgeTone']>, string> = {
   slate: 'bg-slate-100 text-slate-600 ring-slate-200',
 }
 
+const widgetHeaderBadgeToneStyle: Record<NonNullable<ListRowProps['badgeTone']>, string> = {
+  blue: 'bg-blue-50 text-blue-700 ring-blue-100',
+  green: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+  amber: 'bg-amber-50 text-amber-700 ring-amber-100',
+  red: 'bg-rose-50 text-rose-600 ring-rose-100',
+  slate: 'bg-slate-50 text-slate-600 ring-slate-200',
+}
+
+interface WidgetHeaderBadgeData {
+  label: string
+  value: number
+  tone?: NonNullable<ListRowProps['badgeTone']>
+}
+
+const isAdminDashboard = (variant: DashboardVariant): boolean => variant === 'admin'
+
 const formatMinutes = (minutes = 0) => {
   const hour = Math.floor(minutes / 60)
   const minute = minutes % 60
@@ -114,6 +132,179 @@ const getScheduleTarget = (
   return ''
 }
 
+const WidgetHeaderBadge = ({
+  label,
+  value,
+  tone = 'blue',
+}: WidgetHeaderBadgeData) => (
+  <span
+    className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-black ring-1 ${widgetHeaderBadgeToneStyle[tone]}`}
+  >
+    <span>{label}</span>
+    <strong className="tabular-nums">{value}</strong>
+  </span>
+)
+
+const getWidgetHeaderBadge = (
+  widgetKey: DashboardWidgetKey,
+  widgetState: DashboardWidgetStateMap[DashboardWidgetKey] | undefined,
+  variant: DashboardVariant,
+): WidgetHeaderBadgeData | null => {
+  const data = widgetState?.data
+  if (!data) return null
+  if (isAdminDashboard(variant)) return null
+
+  if (variant === 'admin') {
+    switch (widgetKey) {
+      case 'attendance': {
+        const adminData = data as unknown as AdminAttendanceWidgetResponseDto
+        return { label: '특이', value: adminData.count, tone: 'amber' }
+      }
+      case 'todaySchedule': {
+        const adminData = data as unknown as AdminImportantScheduleWidgetResponseDto
+        return { label: '일정', value: adminData.schedules.length, tone: 'green' }
+      }
+      case 'projectProgress': {
+        const adminData = data as unknown as AdminProjectStatusWidgetResponseDto
+        return { label: '전체', value: adminData.totalCount, tone: 'blue' }
+      }
+      case 'board': {
+        const adminData = data as unknown as AdminNoticeWidgetResponseDto
+        return { label: '공지', value: adminData.notices.length, tone: 'blue' }
+      }
+      default:
+        break
+    }
+  }
+
+  switch (widgetKey) {
+    case 'approval': {
+      const approvalData = data as DashboardWidgetResponseMap['approval']
+      return { label: '대기', value: approvalData.pendingCount, tone: 'amber' }
+    }
+    case 'todaySchedule': {
+      const scheduleData = data as DashboardWidgetResponseMap['todaySchedule']
+      return { label: '일정', value: scheduleData.schedules.length, tone: 'green' }
+    }
+    case 'meeting': {
+      const meetingData = data as DashboardWidgetResponseMap['meeting']
+      return { label: '회의', value: meetingData.meetings.length, tone: 'green' }
+    }
+    case 'reservation': {
+      const reservationData = data as DashboardWidgetResponseMap['reservation']
+      return { label: '예약', value: reservationData.reservations.length, tone: 'green' }
+    }
+    case 'task': {
+      const taskData = data as DashboardWidgetResponseMap['task']
+      return { label: '업무', value: taskData.tasks.length, tone: 'slate' }
+    }
+    case 'mail': {
+      const mailData = data as DashboardWidgetResponseMap['mail']
+      return { label: '미확인', value: mailData.unreadCount, tone: 'blue' }
+    }
+    case 'messenger': {
+      const messengerData = data as DashboardWidgetResponseMap['messenger']
+      return { label: '미확인', value: messengerData.unreadCount, tone: 'blue' }
+    }
+    case 'notification': {
+      const notificationData = data as DashboardWidgetResponseMap['notification']
+      return { label: '미확인', value: notificationData.count, tone: 'red' }
+    }
+    default:
+      return null
+  }
+}
+
+const isUnreadNotification = (notification: NotificationWidgetItem) => {
+  const record = notification as NotificationWidgetItem & Record<string, unknown>
+  if (typeof record.read === 'boolean') return !record.read
+  if (typeof record.isRead === 'boolean') return !record.isRead
+  if (typeof record.readYn === 'string') return record.readYn !== 'Y'
+  if (typeof record.unreadYn === 'string') return record.unreadYn === 'Y'
+  if (typeof record.readAt === 'string' || record.readAt === null) return !record.readAt
+  return true
+}
+
+const hasWidgetItems = (data: unknown, key: string) => {
+  const value = (data as Record<string, unknown>)[key]
+  return Array.isArray(value) && value.length > 0
+}
+
+const isWidgetBodyEmpty = (
+  widgetKey: DashboardWidgetKey,
+  widgetState: DashboardWidgetStateMap[DashboardWidgetKey] | undefined,
+  variant: DashboardVariant,
+) => {
+  if (!widgetState || widgetState.loading || widgetState.error) return false
+  const data = widgetState.data
+  if (isAdminDashboard(variant)) return false
+  if (!data) return true
+
+  if (variant === 'admin') {
+    switch (widgetKey) {
+      case 'attendance':
+        return !hasWidgetItems(data, 'employees')
+      case 'todaySchedule':
+        return !hasWidgetItems(data, 'schedules')
+      case 'projectProgress':
+        return !hasWidgetItems(data, 'statusCounts')
+      case 'board':
+        return !hasWidgetItems(data, 'notices')
+      default:
+        break
+    }
+  }
+
+  switch (widgetKey) {
+    case 'approval':
+      return !hasWidgetItems(data, 'documents')
+    case 'todaySchedule':
+      return !hasWidgetItems(data, 'schedules')
+    case 'meeting':
+      return !hasWidgetItems(data, 'meetings')
+    case 'reservation':
+      return !hasWidgetItems(data, 'reservations')
+    case 'task':
+      return !hasWidgetItems(data, 'tasks')
+    case 'projectProgress':
+      return !hasWidgetItems(data, 'projects')
+    case 'board':
+      return !hasWidgetItems(data, 'posts')
+    case 'mail':
+      return !hasWidgetItems(data, 'mails')
+    case 'messenger':
+      return !hasWidgetItems(data, 'rooms')
+    case 'notification': {
+      const notificationData = data as DashboardWidgetResponseMap['notification']
+      return (
+        notificationData.count <= 0 ||
+        !notificationData.notifications.filter(isUnreadNotification).length
+      )
+    }
+    default:
+      return false
+  }
+}
+
+const getBoardPostPath = (boardType: DashboardBoardType, postId: number) => {
+  if (boardType === 'DEPT') return `/boards/departments/${postId}`
+  if (boardType === 'PROJ') return '/project'
+  return `/boards/notices/${postId}`
+}
+
+const getNotificationPath = (type: string) => {
+  const normalizedType = type.toLowerCase()
+  if (normalizedType.includes('approval')) return '/approval/received/requests'
+  if (normalizedType.includes('schedule')) return '/calendar'
+  if (normalizedType.includes('meeting')) return '/meeting/scheduled'
+  if (normalizedType.includes('reservation')) return '/reservations'
+  if (normalizedType.includes('mail')) return '/mail/inbox'
+  if (normalizedType.includes('board') || normalizedType.includes('notice')) {
+    return '/boards/notices'
+  }
+  return '/dashboard'
+}
+
 const ListRow = ({
   title,
   meta,
@@ -121,8 +312,26 @@ const ListRow = ({
   badgeTone = 'blue',
   leading = 'dot',
   trailing,
+  onClick,
 }: ListRowProps) => (
-  <li className="group flex min-w-0 items-center justify-between gap-3 rounded-md px-1.5 py-2 transition-colors hover:bg-slate-50">
+  <li
+    className={`group flex min-w-0 items-center justify-between gap-3 rounded-md px-1.5 py-2 transition-colors hover:bg-slate-50 ${
+      onClick ? 'cursor-pointer focus-within:bg-slate-50' : ''
+    }`}
+    onClick={onClick}
+    role={onClick ? 'button' : undefined}
+    tabIndex={onClick ? 0 : undefined}
+    onKeyDown={
+      onClick
+        ? (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick()
+            }
+          }
+        : undefined
+    }
+  >
     <div className="flex min-w-0 items-center gap-3">
       {leading === 'checkbox' && (
         <span className="h-4 w-4 flex-shrink-0 rounded border border-slate-300 bg-white" />
@@ -160,11 +369,12 @@ const ListRow = ({
   </li>
 )
 
-const WidgetFooter = ({ label }: { label: string }) => (
+const WidgetFooter = ({ label, onClick }: { label: string; onClick?: () => void }) => (
   <div className="mt-auto border-t border-slate-100 px-4 py-3">
     <button
       type="button"
       className="dashboard-widget-action flex w-full items-center justify-between text-[13px] font-bold text-slate-500 transition-colors hover:text-blue-700"
+      onClick={onClick}
     >
       {label}
       <ChevronRight size={16} />
@@ -220,15 +430,18 @@ const DashboardWidgetCard = ({
   onRemove,
   onBoardTypeChange,
 }: DashboardWidgetCardProps) => {
+  const navigate = useNavigate()
   const config = DASHBOARD_WIDGET_CONFIG_MAP[widgetKey]
   const Icon = config.icon
   const title =
     variant === 'admin' ? adminWidgetTitle[widgetKey] ?? config.title : config.title
+  const headerBadge = getWidgetHeaderBadge(widgetKey, widgetState, variant)
+  const bodyEmpty = isWidgetBodyEmpty(widgetKey, widgetState, variant)
 
   return (
     <section className="dashboard-widget-card flex h-full flex-col overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-white/70">
       <header className="dashboard-widget-drag-handle flex h-[54px] items-center justify-between gap-3 border-b border-slate-100 px-4">
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="flex h-7 w-5 flex-shrink-0 items-center justify-center text-slate-400">
             <GripVertical size={editMode ? 16 : 15} />
           </span>
@@ -240,19 +453,16 @@ const DashboardWidgetCard = ({
           </h2>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-1">
-          {widgetKey === 'messenger' && !editMode && (
-            <button
-              type="button"
-              title="검색"
-              aria-label="메신저 검색"
-              className="dashboard-widget-action flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-700"
-            >
-              <Search size={16} />
-            </button>
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          {headerBadge && (
+            <WidgetHeaderBadge
+              label={headerBadge.label}
+              value={headerBadge.value}
+              tone={headerBadge.tone}
+            />
           )}
 
-          {editMode ? (
+          {editMode && (
             <button
               type="button"
               title="위젯 삭제"
@@ -262,22 +472,22 @@ const DashboardWidgetCard = ({
             >
               <Trash2 size={16} />
             </button>
-          ) : (
-            <button
-              type="button"
-              title="더보기"
-              aria-label={`${config.title} 더보기`}
-              className="dashboard-widget-action flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-700"
-            >
-              <MoreHorizontal size={16} />
-            </button>
           )}
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
-        {renderWidgetBody(widgetKey, widgetState, boardType, onBoardTypeChange, variant)}
-      </div>
+      {!bodyEmpty && (
+        <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
+          {renderWidgetBody(
+            widgetKey,
+            widgetState,
+            boardType,
+            onBoardTypeChange,
+            variant,
+            navigate,
+          )}
+        </div>
+      )}
     </section>
   )
 }
@@ -417,6 +627,7 @@ const renderWidgetBody = (
   boardType: DashboardBoardType,
   onBoardTypeChange: (boardType: DashboardBoardType) => void,
   variant: DashboardVariant,
+  navigate: NavigateFunction,
 ) => {
   if (widgetState?.loading && !widgetState.data) return <LoadingState />
   if (widgetState?.error && !widgetState.data) return <ErrorState message={widgetState.error} />
@@ -459,7 +670,7 @@ const renderWidgetBody = (
       const documents = data.documents as ApprovalWidgetDocumentItem[]
       return (
         <>
-          <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
+          <div className="hidden">
             <span className="text-[13px] font-black text-amber-800">대기 문서</span>
             <strong className="text-2xl font-black text-amber-700">
               {data.pendingCount}
@@ -474,6 +685,7 @@ const renderWidgetBody = (
                   meta={`${document.requesterName} · ${document.requestedAt}`}
                   badge={document.dday}
                   badgeTone={document.dday === 'D-Day' ? 'red' : 'amber'}
+                  onClick={() => navigate('/approval/received/requests')}
                 />
               ))}
             </ul>
@@ -498,11 +710,12 @@ const renderWidgetBody = (
                   meta={`${schedule.startAt} - ${schedule.endAt}${target ? ` · ${target}` : ''}`}
                   badge="오늘"
                   badgeTone="blue"
+                  onClick={() => navigate('/calendar')}
                 />
               )
             })}
           </ul>
-          <WidgetFooter label="전체 일정 보기" />
+          <WidgetFooter label="전체 일정 보기" onClick={() => navigate('/calendar')} />
         </>
       ) : (
         <EmptyState label="오늘 일정이 없습니다." />
@@ -519,10 +732,11 @@ const renderWidgetBody = (
                 key={meeting.id}
                 title={meeting.title}
                 meta={`${meeting.startAt} - ${meeting.endAt}${meeting.location ? ` · ${meeting.location}` : ''}`}
+                onClick={() => navigate(`/meeting/scheduled?detailMeetingId=${meeting.id}`)}
               />
             ))}
           </ul>
-          <WidgetFooter label="전체 회의 보기" />
+          <WidgetFooter label="전체 회의 보기" onClick={() => navigate('/meeting/scheduled')} />
         </>
       ) : (
         <EmptyState label="오늘 회의가 없습니다." />
@@ -541,10 +755,11 @@ const renderWidgetBody = (
                 meta={`${reservation.startAt} - ${reservation.endAt}`}
                 badge={reservation.status === 'confirmed' ? '확정' : '대기'}
                 badgeTone={reservation.status === 'confirmed' ? 'green' : 'amber'}
+                onClick={() => navigate('/reservations')}
               />
             ))}
           </ul>
-          <WidgetFooter label="전체 예약 보기" />
+          <WidgetFooter label="전체 예약 보기" onClick={() => navigate('/reservations')} />
         </>
       ) : (
         <EmptyState label="오늘 예약이 없습니다." />
@@ -563,6 +778,7 @@ const renderWidgetBody = (
               badge={task.status}
               badgeTone="slate"
               leading="checkbox"
+              onClick={() => navigate('/project')}
             />
           ))}
         </ul>
@@ -576,7 +792,19 @@ const renderWidgetBody = (
       return data.projects.length ? (
         <ul className="space-y-3">
           {data.projects.map((project) => (
-            <li key={project.id} className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100">
+            <li
+              key={project.id}
+              className="cursor-pointer rounded-lg bg-slate-50 p-3 ring-1 ring-slate-100 transition-colors hover:bg-slate-100"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/project/${project.id}`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  navigate(`/project/${project.id}`)
+                }
+              }}
+            >
               <div className="flex items-center justify-between gap-3">
                 <p className="truncate text-[14px] font-black text-slate-900">
                   {project.name}
@@ -631,6 +859,7 @@ const renderWidgetBody = (
                   meta={`${post.writerName} · ${post.createdAt}`}
                   badge={post.new ? 'NEW' : undefined}
                   badgeTone="blue"
+                  onClick={() => navigate(getBoardPostPath(boardType, post.id))}
                 />
               ))}
             </ul>
@@ -645,7 +874,7 @@ const renderWidgetBody = (
       const data = widgetState.data as DashboardWidgetResponseMap['mail']
       return (
         <>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="hidden">
             <span className="inline-flex items-center gap-2 text-[13px] font-black text-slate-700">
               <Mail size={15} />
               안 읽은 메일
@@ -663,13 +892,14 @@ const renderWidgetBody = (
                   meta={`${mail.senderName} · ${mail.receivedAt}`}
                   badge={mail.read ? undefined : '미읽음'}
                   badgeTone="blue"
+                  onClick={() => navigate(`/mail/inbox?mailId=${mail.id}`)}
                 />
               ))}
             </ul>
           ) : (
             <EmptyState label="최근 메일이 없습니다." />
           )}
-          <WidgetFooter label="메일함 열기" />
+          <WidgetFooter label="메일함 열기" onClick={() => navigate('/mail/inbox')} />
         </>
       )
     }
@@ -678,7 +908,7 @@ const renderWidgetBody = (
       const data = widgetState.data as DashboardWidgetResponseMap['messenger']
       return (
         <>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="hidden">
             <span className="inline-flex items-center gap-2 text-[13px] font-black text-slate-700">
               <MessageSquare size={15} />
               안 읽은 메시지
@@ -703,16 +933,16 @@ const renderWidgetBody = (
           ) : (
             <EmptyState label="채팅방이 없습니다." />
           )}
-          <WidgetFooter label="메신저 열기" />
         </>
       )
     }
 
     case 'notification': {
       const data = widgetState.data as DashboardWidgetResponseMap['notification']
+      const unreadNotifications = data.notifications.filter(isUnreadNotification)
       return (
         <>
-          <div className="mb-2 flex items-center justify-between rounded-lg bg-gradient-to-r from-blue-50 to-sky-50 px-4 py-3 ring-1 ring-blue-100">
+          <div className="hidden">
             <span className="inline-flex items-center gap-2 text-[13px] font-black text-blue-800">
               <Bell size={15} />
               미확인 알림
@@ -721,15 +951,16 @@ const renderWidgetBody = (
               {data.count}
             </strong>
           </div>
-          {data.notifications.length ? (
+          {unreadNotifications.length ? (
             <ul className="space-y-1">
-              {data.notifications.map((notification) => (
+              {unreadNotifications.map((notification) => (
                 <ListRow
                   key={notification.id}
                   title={notification.title}
                   meta={`${notification.content} · ${notification.createdAt}`}
                   badge={notification.type}
                   badgeTone="slate"
+                  onClick={() => navigate(getNotificationPath(notification.type))}
                 />
               ))}
             </ul>
