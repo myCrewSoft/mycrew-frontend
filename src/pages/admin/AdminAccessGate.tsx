@@ -25,6 +25,7 @@ import RoomManagementPage from './Reservation/RoomAdminPage';
 import ReservationAdminPage from './Reservation/ReservationAdminPage';
 import AdminMtngStatsPage from './Meeting/AdminMtngStatsPage';
 import AdminMtngPage from './Meeting/AdminMtngPage';
+import AdminProjectsPage from './Project/AdminProjectsPage';
 
 export default function AdminAccessGate() {
   const location = useLocation();
@@ -227,6 +228,13 @@ export default function AdminAccessGate() {
     );
   }
 
+  if (location.pathname.startsWith('/admin/projects')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminProjectsPage />
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout access={access}>
