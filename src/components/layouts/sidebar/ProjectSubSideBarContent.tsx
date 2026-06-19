@@ -1,7 +1,3 @@
-// src/components/layouts/sidebar/ProjectSubSidebarContent.tsx
-// sidebar.config.ts의 customSidebarContentMap에 아래처럼 등록하세요:
-// project: ProjectSubSidebarContent
-
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {

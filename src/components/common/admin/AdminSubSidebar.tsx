@@ -25,7 +25,8 @@ export default function AdminSubSidebar() {
     pathname === '/admin/' ||
     pathname.startsWith('/admin/dashboard') ||
     pathname.startsWith('/admin/org') ||
-    pathname.startsWith('/admin/templates')
+    pathname.startsWith('/admin/templates') ||
+    pathname.startsWith('/admin/projects')
   ) {
     return null;
   }

@@ -1,6 +1,8 @@
 //프로젝트 API 함수 모음
 
-import { type ProjectListResponseDto, type ProjectCreateRequestDto, type ProjectDetailResponseDto, type ProjectUpdateRequestDto, type ProjectMemberAddRequest } from "../types/project";
+import { type TaskDashboardResponse } from "../types";
+import { type ProjectListResponseDto, type ProjectCreateRequestDto, type ProjectDetailResponseDto, type ProjectUpdateRequestDto,
+     type ProjectMemberAddRequest, type AdminProjectListResponseDto } from "../types/project";
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
 
@@ -27,5 +29,13 @@ export const projectApi = {
 
     //프로젝트 참여자 단건 퇴출
     removeProjMember : (projId:number, empId:number) =>
-        axiosInstance.put<ApiResponse<string>>(`/api/projects/${projId}/ptcpts`, empId)
+        axiosInstance.put<ApiResponse<string>>(`/api/projects/${projId}/ptcpts`, empId),
+
+    //프로젝트 개요 탭 업무 api 연동
+    getTaskDashboard : (projId: number) =>
+        axiosInstance.get<ApiResponse<TaskDashboardResponse>>(`/api/projects/${projId}/tasks/dashboard`),
+
+    //프로젝트 관리자 페이지 전체 목록 및 각 프로젝트 참여자 목록 조회
+    getAdminProjectList: () =>
+        axiosInstance.get<ApiResponse<AdminProjectListResponseDto[]>>('/api/admin/projects'),
 }
