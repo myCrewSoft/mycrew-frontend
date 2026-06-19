@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
-import {
-  ReactGridLayout,
-  WidthProvider,
+import ReactGridLayout, {
+  useContainerWidth,
   type Layout,
   type LayoutItem,
-} from 'react-grid-layout/legacy'
+} from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import Button from '../../components/common/button/Button'
@@ -17,10 +16,12 @@ import type {
   DashboardLayoutJson,
   DashboardServerLayoutItem,
   DashboardVariant,
-  DashboardWidgetData,
   DashboardWidgetKey,
-  DashboardWidgetStateMap,
 } from '../../types/dashboard'
+import type {
+  DashboardWidgetData,
+  DashboardWidgetStateMap,
+} from '../../types/dashboard-widget'
 import {
   DASHBOARD_WIDGET_CONFIG_MAP,
   DASHBOARD_WIDGETS,
@@ -30,7 +31,12 @@ import DashboardWidgetCard from './DashboardWidgetCard'
 import './dashboard.css'
 
 const DEFAULT_STORAGE_KEY = 'mycrew.dashboard.layout'
-const GridLayout = WidthProvider(ReactGridLayout)
+const DASHBOARD_GRID_MARGIN = [16, 16] as const
+const DASHBOARD_GRID_CONTAINER_PADDING = [0, 0] as const
+const DASHBOARD_GRID_RESIZE_HANDLES = ['se'] as const
+const DASHBOARD_GRID_DRAG_CANCEL =
+  '.dashboard-widget-action, a, button, input, textarea, select'
+const EMPTY_WIDGET_MIN_HEIGHT = 1
 
 interface DashboardPageProps {
   defaultLayout?: DashboardLayoutItem[]
@@ -48,12 +54,15 @@ const withWidgetConstraints = (
   item: Omit<DashboardLayoutItem, 'minW' | 'minH' | 'maxW' | 'maxH'>,
 ): DashboardLayoutItem => {
   const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
+  const { minW, minH, maxW, maxH } = config.defaultSize
   return {
     ...item,
-    minW: config.defaultSize.minW,
-    minH: config.defaultSize.minH,
-    maxW: config.defaultSize.maxW,
-    maxH: config.defaultSize.maxH,
+    w: Math.max(item.w, minW),
+    h: Math.max(item.h, minH),
+    minW,
+    minH,
+    maxW,
+    maxH,
   }
 }
 
@@ -140,6 +149,106 @@ const getNextPosition = (layout: DashboardLayoutItem[]) => {
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '위젯 데이터를 불러오지 못했습니다.'
 
+const isAdminDashboard = (variant: DashboardVariant): boolean => variant === 'admin'
+
+const hasItems = (data: DashboardWidgetData, key: string) => {
+  const value = (data as unknown as Record<string, unknown>)[key]
+  return Array.isArray(value) && value.length > 0
+}
+
+const isWidgetDataEmpty = (
+  widgetKey: DashboardWidgetKey,
+  data: DashboardWidgetData | null | undefined,
+  variant: DashboardVariant,
+) => {
+  if (isAdminDashboard(variant)) return false
+  if (!data) return true
+
+  if (variant === 'admin') {
+    switch (widgetKey) {
+      case 'attendance':
+        return !hasItems(data, 'employees')
+      case 'todaySchedule':
+        return !hasItems(data, 'schedules')
+      case 'projectProgress':
+        return !hasItems(data, 'statusCounts')
+      case 'board':
+        return !hasItems(data, 'notices')
+      default:
+        break
+    }
+  }
+
+  switch (widgetKey) {
+    case 'approval':
+      return !hasItems(data, 'documents')
+    case 'todaySchedule':
+      return !hasItems(data, 'schedules')
+    case 'meeting':
+      return !hasItems(data, 'meetings')
+    case 'reservation':
+      return !hasItems(data, 'reservations')
+    case 'task':
+      return !hasItems(data, 'tasks')
+    case 'projectProgress':
+      return !hasItems(data, 'projects')
+    case 'board':
+      return !hasItems(data, 'posts')
+    case 'mail':
+      return !hasItems(data, 'mails')
+    case 'messenger':
+      return !hasItems(data, 'rooms')
+    case 'notification': {
+      const notificationData = data as DashboardWidgetData & { count?: number }
+      return !hasItems(data, 'notifications') || (notificationData.count ?? 0) <= 0
+    }
+    default:
+      return false
+  }
+}
+
+const getResolvedLayoutItem = (
+  item: DashboardLayoutItem,
+  widgetStates: DashboardWidgetStateMap,
+  variant: DashboardVariant,
+  collapseEmpty: boolean,
+): DashboardLayoutItem => {
+  const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
+  const widgetState = widgetStates[item.i]
+
+  if (!widgetState || widgetState.error) {
+    return withWidgetConstraints(item)
+  }
+
+  if (widgetState.data && isWidgetDataEmpty(item.i, widgetState.data, variant)) {
+    return {
+      ...item,
+      h: collapseEmpty ? EMPTY_WIDGET_MIN_HEIGHT : Math.max(item.h, EMPTY_WIDGET_MIN_HEIGHT),
+      minH: EMPTY_WIDGET_MIN_HEIGHT,
+      minW: config.defaultSize.minW,
+      maxW: config.defaultSize.maxW,
+      maxH: config.defaultSize.maxH,
+    }
+  }
+
+  if (widgetState.loading) {
+    return withWidgetConstraints(item)
+  }
+
+  if (!widgetState.data) {
+    return {
+      ...item,
+      h: collapseEmpty ? EMPTY_WIDGET_MIN_HEIGHT : Math.max(item.h, EMPTY_WIDGET_MIN_HEIGHT),
+      minH: EMPTY_WIDGET_MIN_HEIGHT,
+      minW: config.defaultSize.minW,
+      maxW: config.defaultSize.maxW,
+      maxH: config.defaultSize.maxH,
+    }
+  }
+
+  return withWidgetConstraints(item)
+}
+
 const useDashboardWidgetData = (
   activeWidgetKeys: DashboardWidgetKey[],
   boardType: DashboardBoardType,
@@ -213,6 +322,11 @@ const DashboardPage = ({
   )
   const [boardType, setBoardType] = useState<DashboardBoardType>('NOTICE')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'local'>('idle')
+  const {
+    width: gridWidth,
+    containerRef: gridContainerRef,
+    mounted: gridMounted,
+  } = useContainerWidth({ initialWidth: 1280 })
 
   const { execute: fetchLayout, loading: loadingLayout } = useApi(dashboardApi.getLayout, {
     immediate: false,
@@ -233,6 +347,13 @@ const DashboardPage = ({
     activeWidgetKeys,
     boardType,
     variant,
+  )
+  const displayLayout = useMemo(
+    () =>
+      layout.map((item) =>
+        getResolvedLayoutItem(item, widgetStates, variant, !editMode),
+      ),
+    [editMode, layout, widgetStates, variant],
   )
 
   const availableWidgets = useMemo(
@@ -272,7 +393,36 @@ const DashboardPage = ({
   }, [defaultLayout, fetchLayout, storageKey])
 
   const handleLayoutChange = (currentLayout: Layout) => {
-    setLayout(normalizeLayout(currentLayout))
+    if (!editMode) return
+
+    setLayout(
+      currentLayout.flatMap((item) => {
+        if (!isDashboardWidgetKey(item.i)) return []
+
+        const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
+        const widgetState = widgetStates[item.i]
+        const emptyWidget =
+          widgetState &&
+          !widgetState.loading &&
+          !widgetState.error &&
+          isWidgetDataEmpty(item.i, widgetState.data, variant)
+        const minH = emptyWidget ? EMPTY_WIDGET_MIN_HEIGHT : config.defaultSize.minH
+
+        return [
+          {
+            i: item.i,
+            x: item.x,
+            y: item.y,
+            w: Math.max(item.w, config.defaultSize.minW),
+            h: Math.max(item.h, minH),
+            minW: config.defaultSize.minW,
+            minH,
+            maxW: config.defaultSize.maxW,
+            maxH: config.defaultSize.maxH,
+          },
+        ]
+      }),
+    )
     setSaveStatus('idle')
   }
 
@@ -324,10 +474,10 @@ const DashboardPage = ({
       setSaveStatus('local')
     }
   }
-
+  
   return (
     <div
-      className={`dashboard-page mx-auto flex max-w-[1440px] flex-col gap-5 ${
+      className={`dashboard-page flex w-full max-w-none flex-col gap-5 ${
         editMode ? 'dashboard-editing' : ''
       }`}
     >
@@ -406,33 +556,46 @@ const DashboardPage = ({
         </section>
       )}
 
-      <GridLayout
-        className="layout"
-        layout={layout}
-        cols={12}
-        rowHeight={76}
-        margin={[16, 16]}
-        containerPadding={[0, 0]}
-        isDraggable={editMode}
-        isResizable={editMode}
-        draggableCancel=".dashboard-widget-action, a, button, input, textarea, select"
-        resizeHandles={['se']}
-        onLayoutChange={handleLayoutChange}
-      >
-        {layout.map((item) => (
-          <div key={item.i} data-grid={item}>
-            <DashboardWidgetCard
-              widgetKey={item.i}
-              widgetState={widgetStates[item.i]}
-              boardType={boardType}
-              editMode={editMode}
-              variant={variant}
-              onRemove={handleRemoveWidget}
-              onBoardTypeChange={setBoardType}
-            />
-          </div>
-        ))}
-      </GridLayout>
+      <div ref={gridContainerRef}>
+        {gridMounted && (
+          <ReactGridLayout
+            className="layout"
+            width={gridWidth}
+            layout={displayLayout}
+            gridConfig={{
+              cols: 12,
+              rowHeight: 76,
+              margin: DASHBOARD_GRID_MARGIN,
+              containerPadding: DASHBOARD_GRID_CONTAINER_PADDING,
+            }}
+            dragConfig={{
+              enabled: editMode,
+              handle: '.dashboard-widget-drag-handle',
+              cancel: DASHBOARD_GRID_DRAG_CANCEL,
+              threshold: 0,
+            }}
+            resizeConfig={{
+              enabled: editMode,
+              handles: DASHBOARD_GRID_RESIZE_HANDLES,
+            }}
+            onLayoutChange={handleLayoutChange}
+          >
+            {displayLayout.map((item) => (
+              <div key={item.i} data-grid={item}>
+                <DashboardWidgetCard
+                  widgetKey={item.i}
+                  widgetState={widgetStates[item.i]}
+                  boardType={boardType}
+                  editMode={editMode}
+                  variant={variant}
+                  onRemove={handleRemoveWidget}
+                  onBoardTypeChange={setBoardType}
+                />
+              </div>
+            ))}
+          </ReactGridLayout>
+        )}
+      </div>
     </div>
   )
 }
