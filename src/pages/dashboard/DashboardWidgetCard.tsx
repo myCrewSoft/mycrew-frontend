@@ -15,14 +15,19 @@ import type {
   AdminImportantScheduleWidgetResponseDto,
   AdminNoticeWidgetResponseDto,
   AdminProjectStatusWidgetResponseDto,
-  AttendanceWidgetResponseDto,
   DashboardBoardType,
   DashboardVariant,
   DashboardWidgetKey,
-  DashboardWidgetResponseMap,
-  DashboardWidgetStateMap,
 } from '../../types/dashboard'
 import { DASHBOARD_WIDGET_CONFIG_MAP } from './dashboard.config'
+import type {
+  AttendanceWidgetResponse as AttendanceWidgetResponseDto,
+  ScheduleWidgetResponse,
+} from '../../types'
+import type {
+  DashboardWidgetResponseMap,
+  DashboardWidgetStateMap,
+} from '../../types/dashboard-widget'
 
 interface DashboardWidgetCardProps {
   widgetKey: DashboardWidgetKey
@@ -57,6 +62,16 @@ interface ListRowProps {
   leading?: 'dot' | 'checkbox'
   trailing?: string
 }
+
+interface ApprovalWidgetDocumentItem {
+  id: number
+  title: string
+  requesterName: string
+  requestedAt: string
+  dday: string
+}
+
+type ScheduleWidgetItem = ScheduleWidgetResponse['schedules'][number]
 
 const statusLabel: Record<string, string> = {
   beforeWork: '출근 전',
@@ -441,6 +456,7 @@ const renderWidgetBody = (
 
     case 'approval': {
       const data = widgetState.data as DashboardWidgetResponseMap['approval']
+      const documents = data.documents as ApprovalWidgetDocumentItem[]
       return (
         <>
           <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
@@ -449,9 +465,9 @@ const renderWidgetBody = (
               {data.pendingCount}
             </strong>
           </div>
-          {data.documents.length ? (
+          {documents.length ? (
             <ul className="space-y-1">
-              {data.documents.map((document) => (
+              {documents.map((document) => (
                 <ListRow
                   key={document.id}
                   title={document.title}
@@ -473,7 +489,7 @@ const renderWidgetBody = (
       return data.schedules.length ? (
         <>
           <ul className="space-y-1">
-            {data.schedules.map((schedule) => {
+            {data.schedules.map((schedule: ScheduleWidgetItem) => {
               const target = getScheduleTarget(schedule)
               return (
                 <ListRow

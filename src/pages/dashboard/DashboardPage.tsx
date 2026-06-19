@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, RotateCcw, Save, SlidersHorizontal } from 'lucide-react'
-import {
-  ReactGridLayout,
-  WidthProvider,
+import ReactGridLayout, {
+  useContainerWidth,
   type Layout,
   type LayoutItem,
-} from 'react-grid-layout/legacy'
+} from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import Button from '../../components/common/button/Button'
@@ -17,10 +16,12 @@ import type {
   DashboardLayoutJson,
   DashboardServerLayoutItem,
   DashboardVariant,
-  DashboardWidgetData,
   DashboardWidgetKey,
-  DashboardWidgetStateMap,
 } from '../../types/dashboard'
+import type {
+  DashboardWidgetData,
+  DashboardWidgetStateMap,
+} from '../../types/dashboard-widget'
 import {
   DASHBOARD_WIDGET_CONFIG_MAP,
   DASHBOARD_WIDGETS,
@@ -30,7 +31,11 @@ import DashboardWidgetCard from './DashboardWidgetCard'
 import './dashboard.css'
 
 const DEFAULT_STORAGE_KEY = 'mycrew.dashboard.layout'
-const GridLayout = WidthProvider(ReactGridLayout)
+const DASHBOARD_GRID_MARGIN = [16, 16] as const
+const DASHBOARD_GRID_CONTAINER_PADDING = [0, 0] as const
+const DASHBOARD_GRID_RESIZE_HANDLES = ['se'] as const
+const DASHBOARD_GRID_DRAG_CANCEL =
+  '.dashboard-widget-action, a, button, input, textarea, select'
 
 interface DashboardPageProps {
   defaultLayout?: DashboardLayoutItem[]
@@ -213,6 +218,11 @@ const DashboardPage = ({
   )
   const [boardType, setBoardType] = useState<DashboardBoardType>('NOTICE')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'local'>('idle')
+  const {
+    width: gridWidth,
+    containerRef: gridContainerRef,
+    mounted: gridMounted,
+  } = useContainerWidth({ initialWidth: 1280 })
 
   const { execute: fetchLayout, loading: loadingLayout } = useApi(dashboardApi.getLayout, {
     immediate: false,
@@ -324,7 +334,7 @@ const DashboardPage = ({
       setSaveStatus('local')
     }
   }
-
+  
   return (
     <div
       className={`dashboard-page mx-auto flex max-w-[1440px] flex-col gap-5 ${
@@ -406,33 +416,46 @@ const DashboardPage = ({
         </section>
       )}
 
-      <GridLayout
-        className="layout"
-        layout={layout}
-        cols={12}
-        rowHeight={76}
-        margin={[16, 16]}
-        containerPadding={[0, 0]}
-        isDraggable={editMode}
-        isResizable={editMode}
-        draggableCancel=".dashboard-widget-action, a, button, input, textarea, select"
-        resizeHandles={['se']}
-        onLayoutChange={handleLayoutChange}
-      >
-        {layout.map((item) => (
-          <div key={item.i} data-grid={item}>
-            <DashboardWidgetCard
-              widgetKey={item.i}
-              widgetState={widgetStates[item.i]}
-              boardType={boardType}
-              editMode={editMode}
-              variant={variant}
-              onRemove={handleRemoveWidget}
-              onBoardTypeChange={setBoardType}
-            />
-          </div>
-        ))}
-      </GridLayout>
+      <div ref={gridContainerRef}>
+        {gridMounted && (
+          <ReactGridLayout
+            className="layout"
+            width={gridWidth}
+            layout={layout}
+            gridConfig={{
+              cols: 12,
+              rowHeight: 76,
+              margin: DASHBOARD_GRID_MARGIN,
+              containerPadding: DASHBOARD_GRID_CONTAINER_PADDING,
+            }}
+            dragConfig={{
+              enabled: editMode,
+              handle: '.dashboard-widget-drag-handle',
+              cancel: DASHBOARD_GRID_DRAG_CANCEL,
+              threshold: 0,
+            }}
+            resizeConfig={{
+              enabled: editMode,
+              handles: DASHBOARD_GRID_RESIZE_HANDLES,
+            }}
+            onLayoutChange={handleLayoutChange}
+          >
+            {layout.map((item) => (
+              <div key={item.i} data-grid={item}>
+                <DashboardWidgetCard
+                  widgetKey={item.i}
+                  widgetState={widgetStates[item.i]}
+                  boardType={boardType}
+                  editMode={editMode}
+                  variant={variant}
+                  onRemove={handleRemoveWidget}
+                  onBoardTypeChange={setBoardType}
+                />
+              </div>
+            ))}
+          </ReactGridLayout>
+        )}
+      </div>
     </div>
   )
 }

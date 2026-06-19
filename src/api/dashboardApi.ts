@@ -2,28 +2,30 @@ import type { AxiosResponse } from 'axios'
 import axiosInstance from './axiosInstance'
 import type { ApiResponse } from './axiosInstance'
 import type {
+  DashboardBoardType,
+  DashboardWidgetKey,
   AdminAttendanceWidgetResponseDto,
   AdminDashboardWidgetData,
   AdminImportantScheduleWidgetResponseDto,
   AdminNoticeWidgetResponseDto,
   AdminProjectStatusWidgetResponseDto,
-  ApprovalWidgetResponseDto,
-  AttendanceWidgetResponseDto,
-  BoardWidgetResponseDto,
-  DashboardBoardType,
-  DashboardLayoutRequestDto,
-  DashboardLayoutResponseDto,
-  DashboardWidgetData,
-  DashboardWidgetKey,
-  MailWidgetResponseDto,
-  MeetingWidgetResponseDto,
-  MessengerWidgetResponseDto,
-  ProjectProgressWidgetResponseDto,
-  NotificationWidgetResponseDto,
-  ReservationWidgetResponseDto,
-  TaskWidgetResponseDto,
-  TodayScheduleWidgetResponseDto,
 } from '../types/dashboard'
+import type {
+  ApprovalWidgetResponse as ApprovalWidgetResponseDto,
+  AttendanceWidgetResponse as AttendanceWidgetResponseDto,
+  BoardWidgetResponse as BoardWidgetResponseDto,
+  DashboardLayoutRequest as DashboardLayoutRequestDto,
+  DashboardLayoutResponse as DashboardLayoutResponseDto,
+  MailWidgetResponse as MailWidgetResponseDto,
+  MeetingWidgetResponse as MeetingWidgetResponseDto,
+  MessengerWidgetResponse as MessengerWidgetResponseDto,
+  NotificationWidgetResponse as NotificationWidgetResponseDto,
+  ProjectWidgetResponse as ProjectProgressWidgetResponseDto,
+  ReservationWidgetResponse as ReservationWidgetResponseDto,
+  ScheduleWidgetResponse as TodayScheduleWidgetResponseDto,
+  TaskWidgetResponse as TaskWidgetResponseDto,
+} from '../types'
+import type { DashboardWidgetData } from '../types/dashboard-widget'
 
 export const dashboardApi = {
   getLayout: (): Promise<AxiosResponse<ApiResponse<DashboardLayoutResponseDto>>> => {

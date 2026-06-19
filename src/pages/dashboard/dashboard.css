@@ -10,6 +10,9 @@
 
 .dashboard-page .react-resizable-handle {
   opacity: 0;
+  z-index: 10;
+  width: 28px;
+  height: 28px;
   transition: opacity 160ms ease;
 }
 
@@ -18,14 +21,35 @@
   opacity: 1;
 }
 
+.dashboard-page:not(.dashboard-editing) .react-resizable-handle {
+  pointer-events: none;
+}
+
+.dashboard-page.dashboard-editing .react-grid-item {
+  touch-action: none;
+}
+
+.dashboard-page.dashboard-editing .react-resizable-handle::after {
+  right: 6px;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-right-color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
 .dashboard-widget-card {
   overflow: hidden;
 }
 
 .dashboard-editing .dashboard-widget-card {
-  cursor: grab;
   outline: 1px dashed #cbd5e1;
   outline-offset: -1px;
+}
+
+.dashboard-editing .dashboard-widget-drag-handle {
+  cursor: grab;
+  user-select: none;
 }
 
 .dashboard-editing .react-draggable-dragging .dashboard-widget-card {
