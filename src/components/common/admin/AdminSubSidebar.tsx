@@ -10,6 +10,7 @@ import AdminAttendanceSubSidebar from './AdminAttendanceSubSidebar';
 import { subSidebarClass } from './adminLayoutStyles';
 import AdminReservationSubSidebar from './AdminReservationSubSidebar';
 import AdminMtngSubSidebar from './AdminMtngSubSidebar';
+import AdminScheduleSubSidebar from './AdminScheduleSubSidebar';
 
 export default function AdminSubSidebar() {
   const location = useLocation();
@@ -43,6 +44,8 @@ export default function AdminSubSidebar() {
     content = <AdminBoardsSubSidebar selectedBoardType={selectedBoardType} />;
   } else if (pathname.startsWith('/admin/attendance')) {
     content = <AdminAttendanceSubSidebar />;
+  } else if (pathname.startsWith('/admin/schedule')) {
+    content = <AdminScheduleSubSidebar />
   } else if (pathname.startsWith('/admin/meeting')) {
     content = <AdminMtngSubSidebar />
   } else if (pathname.startsWith('/admin/reservations')) {

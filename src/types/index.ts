@@ -30,6 +30,11 @@ export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = components['schemas']['ScheduleTargetResponseDto'];
+export type AdminSchdRequest = components['schemas']['AdminSchdRequest'];
+export type AdminSchdListResponse = components['schemas']['AdminSchdListResponse'];
+export type AdminSchdResponse = components['schemas']['AdminSchdResponse'];
+export type HolidayManualRequest = components['schemas']['HolidayManualRequest'];
+export type HolidayResponse = components['schemas']['HolidayResponse'];
 
 // 메신저
 export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
