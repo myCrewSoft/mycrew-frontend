@@ -117,7 +117,7 @@ export default function AdminAccessGate() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  window.location.href = '/components';
+                  window.location.href = '/dashboard';
                 }}
               >
                 사용자 화면으로 이동

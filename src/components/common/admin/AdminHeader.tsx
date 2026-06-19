@@ -23,7 +23,7 @@ export default function AdminHeader({ access, onLogout }: AdminHeaderProps) {
 
       <div className="flex items-center gap-3">
         <Link
-          to="/components"
+          to="/dashboard"
           className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 no-underline transition hover:bg-slate-50"
         >
           <ArrowLeft size={15} />
