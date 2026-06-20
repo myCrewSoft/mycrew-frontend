@@ -3,42 +3,35 @@
 import { AlertCircle } from 'lucide-react'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
-
-interface UrgentTask {
-  taskId: number
-  taskNm: string
-  assigneeNm: string
-  taskEndYmd: string
-  prirtCd: string
-  dDay: number
-}
+import type { TaskUpcomingResponse } from '../../types'
 
 interface ProjectUrgentTaskCardProps {
-  taskList?: UrgentTask[]
+  taskList: TaskUpcomingResponse[]
 }
 
-const PriorityBadge = ({ prirtCd }: { prirtCd: string }) => {
-  if (prirtCd === '04') return <Badge variant="danger">긴급</Badge>
-  if (prirtCd === '03') return <Badge variant="warning">높음</Badge>
-  if (prirtCd === '02') return <Badge variant="primary">보통</Badge>
-  return <Badge variant="neutral">낮음</Badge>
+// 업무우선순위코드: 01-높음 / 02-중간 / 03-낮음
+const PriorityBadge = ({ taskPriorityCd }: { taskPriorityCd?: string }) => {
+  if (taskPriorityCd === '01') return <Badge variant="danger">높음</Badge>
+  if (taskPriorityCd === '02') return <Badge variant="warning">중간</Badge>
+  if (taskPriorityCd === '03') return <Badge variant="neutral">낮음</Badge>
+  return <Badge variant="neutral">-</Badge>
 }
 
-const DDayBadge = ({ dDay }: { dDay: number }) => {
-  if (dDay < 0)  return <Badge variant="danger">D+{Math.abs(dDay)}</Badge>
-  if (dDay === 0) return <Badge variant="danger">D-Day</Badge>
-  if (dDay <= 3)  return <Badge variant="warning">D-{dDay}</Badge>
-  return <Badge variant="neutral">D-{dDay}</Badge>
+const DDayBadge = ({ dDay }: { dDay?: string }) => {
+  if (!dDay) return <Badge variant="neutral">-</Badge>
+
+  // dDay는 백엔드(DateUtil.dDay)에서 "D-1", "D-Day", "D+2" 형태 문자열로 내려옴
+  if (dDay === 'D-Day') return <Badge variant="danger">D-Day</Badge>
+  if (dDay.startsWith('D+')) return <Badge variant="danger">{dDay}</Badge>
+
+  const remaining = Number(dDay.replace('D-', ''))
+  if (!Number.isNaN(remaining) && remaining <= 3) {
+    return <Badge variant="warning">{dDay}</Badge>
+  }
+  return <Badge variant="neutral">{dDay}</Badge>
 }
 
-const DUMMY_TASKS: UrgentTask[] = [
-  { taskId: 1, taskNm: '결제 API 인증 모듈 구현', assigneeNm: '이지혜', taskEndYmd: '2026-06-11', prirtCd: '04', dDay: 1 },
-  { taskId: 2, taskNm: '정산 배치 스케줄러 설계', assigneeNm: '이지혜', taskEndYmd: '2026-06-12', prirtCd: '03', dDay: 2 },
-  { taskId: 3, taskNm: 'CI/CD 파이프라인 구성', assigneeNm: '정진호', taskEndYmd: '2026-06-14', prirtCd: '02', dDay: 4 },
-  { taskId: 4, taskNm: '환율 계산 엔진 단위 테스트', assigneeNm: '김철수', taskEndYmd: '2026-06-16', prirtCd: '01', dDay: 6 },
-]
-
-const ProjectUrgentTaskCard = ({ taskList = DUMMY_TASKS }: ProjectUrgentTaskCardProps) => {
+const ProjectUrgentTaskCard = ({ taskList }: ProjectUrgentTaskCardProps) => {
   return (
     <ContentCard
       title="마감 임박 업무"
@@ -71,13 +64,13 @@ const ProjectUrgentTaskCard = ({ taskList = DUMMY_TASKS }: ProjectUrgentTaskCard
                     <span className="font-semibold text-slate-800">{task.taskNm}</span>
                   </td>
                   <td className="py-3 pr-4">
-                    <span className="text-slate-500">{task.assigneeNm}</span>
+                    <span className="text-slate-500">{task.taskMngrNm}</span>
                   </td>
                   <td className="py-3 pr-4">
-                    <span className="text-slate-500">{task.taskEndYmd}</span>
+                    <span className="text-slate-500">{task.taskEndDt}</span>
                   </td>
                   <td className="py-3 pr-4">
-                    <PriorityBadge prirtCd={task.prirtCd} />
+                    <PriorityBadge taskPriorityCd={task.taskPriorityCd} />
                   </td>
                   <td className="py-3 text-right">
                     <DDayBadge dDay={task.dDay} />

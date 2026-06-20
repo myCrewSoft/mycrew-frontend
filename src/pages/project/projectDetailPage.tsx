@@ -27,6 +27,7 @@ import ProjectUrgentTaskCard from './ProjectUrgentTaskCard'
 import ProjectEditDrawer from './ProjectEditDrawer'
 import { employeeApi } from '../../api/employeeApi'
 import ProjectDriveTab from './ProjectDriveTab'
+import ProjectGanttTab from './ProjectGanttTab'
 
 const STATUS_LABEL: Record<string, string> = {
   '01': '예정',
@@ -52,7 +53,6 @@ const ProjectDetailPage = () => {
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
-
   const projectId = Number(projId)
 
   const { data: project, loading, execute: refetchProject } = useApi(
@@ -64,6 +64,13 @@ const ProjectDetailPage = () => {
     employeeApi.lookupEmployees,
     { immediateArgs: [{}] }
   )
+
+  const {data: taskDashboard} = useApi(
+    projectApi.getTaskDashboard,
+    {immediateArgs: [projectId]}
+  )
+  const summary = taskDashboard?.summary
+  const upcomingTasks = taskDashboard?.upcomingTasks ?? []
 
   // ✅ employees, departments 변환
   const employees = employeeList ?? []
@@ -158,13 +165,13 @@ const ProjectDetailPage = () => {
         <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1fr_320px]">
           <div className="flex flex-col gap-5">
             <ProjectSummaryCard
-              cmplTaskCnt={23}
-              inProgTaskCnt={10}
+              cmplTaskCnt={summary?.completedCount ?? 0}
+              inProgTaskCnt={summary?.inProgressCount ?? 0}
               projPrgrsRt={project.projPrgrsRt}
-              stopTaskCnt={2}
-              totTaskCnt={30}
+              stopTaskCnt={summary?.stopCount ?? 0}
+              totTaskCnt={summary?.totalCount ?? 0}
             />
-            <ProjectUrgentTaskCard />
+            <ProjectUrgentTaskCard taskList={upcomingTasks}/>
           </div>
 
           <div className="flex flex-col gap-5">
@@ -174,7 +181,7 @@ const ProjectDetailPage = () => {
               projEndYmd={project.projEndYmd}
               projLdrNm={project.projLdrNm}
             />
-            {/* ✅ props 올바르게 전달 */}
+
             <ProjectMemberCard
               projId={project.projId}
               projLdrEmpId={project.projLdrEmpId}
@@ -206,8 +213,10 @@ const ProjectDetailPage = () => {
 
       {tab === 'drive' && <ProjectDriveTab projId={project.projId} />}
 
+      {tab === 'gantt' && <ProjectGanttTab projectId={project.projId}/>}
+
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
-      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && tab !== 'drive' &&(
+      {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && tab !== 'drive' && tab !== 'gantt' &&(
         <div className="mt-5 flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white text-slate-400">
           <FileText size={36} className="mb-3 text-slate-300" />
           <p className="text-sm font-semibold">

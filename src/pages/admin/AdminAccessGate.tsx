@@ -25,6 +25,7 @@ import RoomManagementPage from './Reservation/RoomAdminPage';
 import ReservationAdminPage from './Reservation/ReservationAdminPage';
 import AdminMtngStatsPage from './Meeting/AdminMtngStatsPage';
 import AdminMtngPage from './Meeting/AdminMtngPage';
+import AdminProjectsPage from './Project/AdminProjectsPage';
 import AutoSchedulePage from './Schedule/AutoSchedulePage';
 import HolidayApiPage from './Schedule/HolidayApiPage';
 import ScheduleCategoryPage from './Schedule/ScheduleCategoryPage';
@@ -246,6 +247,13 @@ export default function AdminAccessGate() {
     );
   }
 
+  if (location.pathname.startsWith('/admin/projects')) {
+    return (
+      <AdminLayout access={access}>
+        <AdminProjectsPage />
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout access={access}>
