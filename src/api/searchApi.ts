@@ -10,11 +10,11 @@ import type { SearchResponseDto, SearchType } from '../types/search.dto'
  * GET /search
  * query parameters:
  * - keyword: search keyword
- * - type: board | document | schedule | project | task
+ * - type: PROJECT | TASK | SCHEDULE | MEETING | EDUCATION | MAIL
  */
 export const searchApi = {
   /**
-   * Search boards, documents, and schedules.
+   * Search every domain the current user is allowed to access.
    *
    * Pass only keyword for all results.
    * Pass type when the UI needs one specific category.
@@ -23,7 +23,7 @@ export const searchApi = {
     keyword: string,
     type?: SearchType,
   ): Promise<AxiosResponse<ApiResponse<SearchResponseDto[]>>> => {
-    return axiosInstance.get('/search', {
+    return axiosInstance.get('api/search', {
       params: {
         keyword,
         type,
