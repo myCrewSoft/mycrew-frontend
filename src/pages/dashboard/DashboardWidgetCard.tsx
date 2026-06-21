@@ -577,7 +577,13 @@ const renderAdminWidgetBody = (
             </strong>
           </div>
           {adminData.statusCounts.length ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div
+              className="grid min-h-0 flex-1 gap-2 overflow-y-auto"
+              style={{
+                gridTemplateColumns: 'repeat(auto-fit, minmax(6.5rem, 1fr))',
+                gridAutoRows: 'min-content',
+              }}
+            >
               {adminData.statusCounts.map((status) => (
                 <Metric
                   key={status.statusCode}
