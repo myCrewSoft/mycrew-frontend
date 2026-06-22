@@ -1,4 +1,5 @@
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 import {
   getTaskPriorityConfig,
   getTaskStatusConfig,
@@ -49,15 +50,18 @@ export const ProjectTaskTypeBadge = ({ typeCd }: { typeCd: string }) => {
   )
 }
 
-export const ProjectTaskManagerAvatar = ({ name }: { name: string }) => {
+export const ProjectTaskManagerAvatar = ({
+  name,
+  fileId,
+}: {
+  name: string
+  fileId?: number | null
+}) => {
   const resolvedName = name || '미정'
-  const label = resolvedName.trim().slice(0, 2) || '미정'
 
   return (
     <div className="flex items-center gap-2">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-blue-600">
-        {label}
-      </span>
+      <ProfileAvatar fileId={fileId} name={resolvedName} size={28} />
       <span className="text-xs font-bold text-slate-700">{resolvedName}</span>
     </div>
   )
