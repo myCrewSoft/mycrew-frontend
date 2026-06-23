@@ -5,6 +5,7 @@ import { departmentApi } from '../../../api/departmentApi'
 import { employeeApi } from '../../../api/employeeApi'
 import type { EmployeeLookupParams } from '../../../api/employeeApi'
 import { useApi } from '../../../hooks/useApi'
+import ProfileAvatar from '../avatar/ProfileAvatar'
 import SearchInput from '../form/searchInput/SearchInput'
 import Select from '../form/select/Select'
 
@@ -16,6 +17,7 @@ export interface EmployeeSearchItem {
   department: string
   position: string
   profileImageUrl?: string | null
+  profileImageFileId?: number | null
   genderCd?: string | null
   avatarColor?: string
 }
@@ -68,10 +70,21 @@ const EmployeeAvatar = ({
 }) => {
   const [imageFailed, setImageFailed] = useState(false)
   const sizeClassName = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10'
+  const avatarSize = size === 'sm' ? 32 : 40
   const src =
     hasUsableProfileImageUrl(employee.profileImageUrl) && !imageFailed && employee.profileImageUrl
       ? employee.profileImageUrl
       : '/avatar-default.svg'
+
+  if (employee.profileImageFileId) {
+    return (
+      <ProfileAvatar
+        fileId={employee.profileImageFileId}
+        name={employee.name}
+        size={avatarSize}
+      />
+    )
+  }
 
   return (
     <img

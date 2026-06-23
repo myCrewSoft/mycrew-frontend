@@ -7,8 +7,14 @@ import { taskColumns, taskStatusConfig } from './task.config'
 import ProjectTaskBoard from './ProjectTaskBoard'
 import ProjectTaskCreateModal from './ProjectTaskCreateModal'
 import ProjectTaskDetailModal from './ProjectTaskDetailModal'
+import ProjectTaskEditModal from './ProjectTaskEditModal'
 import ProjectTaskList from './ProjectTaskList'
-import type { ProjectTask, ProjectTaskStatusCode, ProjectTaskViewMode } from './task.types'
+import type {
+  ProjectTask,
+  ProjectTaskDetail,
+  ProjectTaskStatusCode,
+  ProjectTaskViewMode,
+} from './task.types'
 
 interface ProjectTasksTabProps {
   projectId: string | number
@@ -34,6 +40,7 @@ const ProjectTasksTab = ({
   const [query, setQuery] = useState('')
   const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null)
+  const [editingTask, setEditingTask] = useState<ProjectTaskDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -220,7 +227,20 @@ const ProjectTasksTab = ({
         projectId={projectId}
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
+        onEdit={(task) => {
+          setSelectedTask(null)
+          setEditingTask(task)
+        }}
       />
+      {editingTask && (
+        <ProjectTaskEditModal
+          key={editingTask.taskId}
+          projectId={projectId}
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onUpdated={fetchTasks}
+        />
+      )}
     </div>
   )
 }

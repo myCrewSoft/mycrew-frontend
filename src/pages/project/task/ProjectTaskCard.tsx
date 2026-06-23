@@ -54,7 +54,10 @@ const ProjectTaskCard = ({ task, onOpenTask }: ProjectTaskCardProps) => {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
-        <ProjectTaskManagerAvatar name={task.taskMngrNm} />
+        <ProjectTaskManagerAvatar
+          name={task.taskMngrNm}
+          fileId={task.prflImgFileId}
+        />
         <ProjectTaskPriorityIndicator priority={task.taskPriorityCd} />
       </div>
     </article>

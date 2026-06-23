@@ -41,6 +41,7 @@ import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
 import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind, BoardListParams } from '../../types/board'
+import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
 import type {
   BoardCommentUpdateRequest,
   BoardResponse,
@@ -1136,7 +1137,12 @@ const AdminBoardsPage = () => {
                     header: '번호',
                     className: 'w-20 text-center',
                     headerClassName: '!text-center',
-                    render: (board) => board.boardId,
+                    render: (board) => getBoardDisplayNumber({
+                      totalElements: totalElements || boards.length,
+                      page,
+                      pageSize: activePageData?.size ?? 10,
+                      rowIndex: boards.indexOf(board),
+                    }),
                   },
                   {
                     key: 'title',

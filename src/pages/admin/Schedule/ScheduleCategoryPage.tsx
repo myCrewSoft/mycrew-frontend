@@ -34,8 +34,7 @@ export default function ScheduleCategoryPage() {
   const previewColor = previewCode ? scheduleTypeColorTokenMap[previewCode] : null
 
   return (
-    <div className="bg-[#f7f9fb] min-h-screen p-6 font-sans text-[#191c1e]">
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
         <div>
           <p className="text-xs text-[#717785] mb-1">관리자 &gt; 일정 관리</p>
@@ -282,7 +281,6 @@ export default function ScheduleCategoryPage() {
           </p>
         </div>
 
-      </div>
-    </div>
+    </section>
   )
 }

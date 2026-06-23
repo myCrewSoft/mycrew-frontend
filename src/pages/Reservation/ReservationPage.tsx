@@ -422,7 +422,7 @@ const ReservationPage = () => {
             <div>
               <dt className="font-bold text-slate-500">예약 유형</dt>
               <dd className="mt-1 font-semibold text-slate-950">
-                {selectedReservation.intgRsrvYn === 'Y' ? '종일 예약' : '시간 예약'}
+                {selectedReservation.allDayYn === 'Y' ? '종일 예약' : '시간 예약'}
               </dd>
             </div>
 

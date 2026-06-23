@@ -71,8 +71,7 @@ export default function AutoSchedulePage() {
   }
 
   return (
-    <div className="bg-[#f7f9fb] min-h-screen p-6 font-sans text-[#191c1e]">
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
         <div>
           <p className="text-xs text-[#717785] mb-1">관리자 &gt; 일정 관리</p>
@@ -269,7 +268,6 @@ export default function AutoSchedulePage() {
           <p>자동 생성 일정은 프로젝트, 업무, 회의 등 원본 데이터에서 생성된 일정입니다. 일정 정보의 불일치를 방지하기 위해 수정은 원본 화면에서 진행합니다.</p>
         </div>
 
-      </div>
-    </div>
+    </section>
   )
 }

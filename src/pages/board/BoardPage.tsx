@@ -18,6 +18,7 @@ import { boardApi } from '../../api/boardApi'
 import { ApiError } from '../../api/axiosInstance'
 import type { BoardKind, BoardMeta } from '../../types/board'
 import type { BoardResponse } from '../../types'
+import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
 
 export type BoardVo = BoardResponse
 
@@ -173,6 +174,8 @@ const BoardPage = () => {
 
   const [page, setPage] = useState(() => getPageFromSearchParams(searchParams))
   const [totalPages, setTotalPages] = useState(1)
+  const [totalElements, setTotalElements] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
   const [keyword, setKeyword] = useState(() => searchParams.get('keyword') ?? '')
   const [boardList, setBoardList] = useState<BoardVo[]>([])
   const [loading, setLoading] = useState(false)
@@ -240,6 +243,7 @@ const BoardPage = () => {
       if (boardType === 'department' && !deptCd) {
         setBoardList([])
         setTotalPages(1)
+        setTotalElements(0)
         setErrorMsg(null)
         setLoading(false)
         return
@@ -260,6 +264,8 @@ const BoardPage = () => {
           const pageData = response.data.data
           const content = pageData?.content ?? []
           const calculatedTotalPages = getBoardTotalPages(pageData, response.data.pagination)
+          setTotalElements(pageData?.totalElements ?? response.data.pagination?.totalElements ?? content.length)
+          setPageSize(pageData?.size ?? response.data.pagination?.size ?? 10)
           const verifiedNoticeTotalPages = boardType === 'notice' && !lastPageOverride
             ? await getVerifiedNoticeTotalPages(calculatedTotalPages, keyword)
             : calculatedTotalPages
@@ -447,7 +453,7 @@ const BoardPage = () => {
                 : `repeat(${boardList.length}, 64px)`,
             }}
           >
-            {boardList.map((board) => (
+            {boardList.map((board, rowIndex) => (
               <div
                 key={board.boardId}
                 role="button"
@@ -461,7 +467,12 @@ const BoardPage = () => {
                 className="grid min-h-16 cursor-pointer grid-cols-[80px_minmax(280px,1fr)_220px_150px_110px_110px] items-center gap-x-6 border-b border-slate-100 px-6 text-[15px] transition-colors hover:bg-slate-50"
               >
                 <div className="text-center font-medium text-slate-600">
-                  {board.boardId}
+                  {getBoardDisplayNumber({
+                    totalElements,
+                    page,
+                    pageSize,
+                    rowIndex,
+                  })}
                 </div>
                 <div className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-slate-800">
                   {isImportantBoard(board) && (

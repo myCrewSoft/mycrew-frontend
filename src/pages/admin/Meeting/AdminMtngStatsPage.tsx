@@ -42,11 +42,10 @@ export default function AdminMtngStatsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-[#f7f9fb] p-6 font-sans text-[#191c1e]">
-      <div className="mx-auto max-w-7xl">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
         {/* 헤더 */}
-        <div className="mb-6">
+        <div>
           <h1 className="text-2xl font-bold tracking-tight">회의 운영관리</h1>
           <p className="mt-1 text-sm text-[#414753]">
             전체 회의의 운영 상태와 회의록/녹취록 현황을 관리합니다.
@@ -54,7 +53,7 @@ export default function AdminMtngStatsPage() {
         </div>
 
         {/* 탭 */}
-        <div className="mb-6 flex gap-6 border-b border-[#c0c6d5]">
+        <div className="flex gap-6 border-b border-[#c0c6d5]">
           <button
             onClick={() => navigate('/admin/meeting')}
             className="pb-3 text-sm font-medium text-[#717785] hover:text-[#414753]"
@@ -190,7 +189,6 @@ export default function AdminMtngStatsPage() {
           </div>
 
         </div>
-      </div>
-    </div>
+    </section>
   )
 }
