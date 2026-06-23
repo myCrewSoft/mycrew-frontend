@@ -38,7 +38,6 @@ const SEARCH_TYPE_ORDER: SearchType[] = [
   'TASK',
   'SCHEDULE',
   'MEETING',
-  'EDUCATION',
   'MAIL',
 ]
 
@@ -167,7 +166,6 @@ const getFallbackPath = (item: SearchResponseDto) => {
 
   if (item.type === 'SCHEDULE') return `/calendar?scheduleId=${id}`
   if (item.type === 'MEETING') return '/meeting/scheduled'
-  if (item.type === 'EDUCATION') return `/education/${id}`
   if (item.type === 'MAIL') return '/mail'
 
   return '/dashboard'
@@ -305,20 +303,7 @@ const SearchPreviewDetails = ({ item }: { item: SearchResponseDto }) => {
   }
 
   if (item.type === 'EDUCATION') {
-    const details = item.details
-
-    return (
-      <>
-        <PreviewField
-          label="기간"
-          value={formatRange(details.startDate, details.endDate)}
-        />
-        <PreviewField label="강사" value={details.instructorName} />
-        <PreviewField label="상태" value={details.statusName} />
-        <PreviewField label="교육 방식" value={details.deliveryMethod} />
-        <PreviewField label="장소" value={details.location} />
-      </>
-    )
+    return null
   }
 
   const details = item.details
@@ -414,7 +399,9 @@ const GlobalSearchPaletteContent = ({
 
       void search(trimmedKeyword)
         .then((response) => {
-          setResults(response.data ?? [])
+          setResults(
+            (response.data ?? []).filter((item) => item.type !== 'EDUCATION'),
+          )
           setActiveIndex(0)
         })
         .catch(() => {
@@ -521,7 +508,7 @@ const GlobalSearchPaletteContent = ({
                   검색어를 입력해 주세요.
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  프로젝트, 업무, 일정, 회의, 교육, 메일을 한 번에 찾을 수 있습니다.
+                  프로젝트, 업무, 일정, 회의, 메일을 한 번에 찾을 수 있습니다.
                 </p>
               </div>
             )}
