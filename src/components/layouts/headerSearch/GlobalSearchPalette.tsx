@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   CalendarDays,
   CheckSquare,
   FolderKanban,
@@ -33,48 +32,53 @@ interface GlobalSearchPaletteContentProps {
   onClose: () => void
 }
 
-const SEARCH_TYPE_ORDER: SearchType[] = [
+type DisplayedSearchType = Exclude<SearchType, 'EDUCATION'>
+type DisplayedSearchResponseDto = Extract<
+  SearchResponseDto,
+  { type: DisplayedSearchType }
+>
+
+const isDisplayedSearchResult = (
+  item: SearchResponseDto,
+): item is DisplayedSearchResponseDto => item.type !== 'EDUCATION'
+
+const SEARCH_TYPE_ORDER: DisplayedSearchType[] = [
   'PROJECT',
   'TASK',
   'SCHEDULE',
   'MEETING',
-  'EDUCATION',
   'MAIL',
 ]
 
-const SEARCH_TYPE_LABEL: Record<SearchType, string> = {
+const SEARCH_TYPE_LABEL: Record<DisplayedSearchType, string> = {
   PROJECT: '프로젝트',
   TASK: '업무',
   SCHEDULE: '일정',
   MEETING: '회의',
-  EDUCATION: '교육',
   MAIL: '메일',
 }
 
-const SEARCH_BADGE_STYLE: Record<SearchType, string> = {
+const SEARCH_BADGE_STYLE: Record<DisplayedSearchType, string> = {
   PROJECT: 'border-blue-200 bg-blue-50 text-blue-700',
   TASK: 'border-amber-200 bg-amber-50 text-amber-700',
   SCHEDULE: 'border-violet-200 bg-violet-50 text-violet-700',
   MEETING: 'border-cyan-200 bg-cyan-50 text-cyan-700',
-  EDUCATION: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   MAIL: 'border-sky-200 bg-sky-50 text-sky-700',
 }
 
-const SEARCH_TYPE_HEADER_STYLE: Record<SearchType, string> = {
+const SEARCH_TYPE_HEADER_STYLE: Record<DisplayedSearchType, string> = {
   PROJECT: 'text-blue-600',
   TASK: 'text-amber-600',
   SCHEDULE: 'text-violet-600',
   MEETING: 'text-cyan-600',
-  EDUCATION: 'text-emerald-600',
   MAIL: 'text-indigo-600',
 }
 
-const SEARCH_TYPE_ICON_STYLE: Record<SearchType, string> = {
+const SEARCH_TYPE_ICON_STYLE: Record<DisplayedSearchType, string> = {
   PROJECT: 'bg-blue-50 text-blue-600',
   TASK: 'bg-amber-50 text-amber-600',
   SCHEDULE: 'bg-violet-50 text-violet-600',
   MEETING: 'bg-cyan-50 text-cyan-600',
-  EDUCATION: 'bg-emerald-50 text-emerald-600',
   MAIL: 'bg-indigo-50 text-indigo-600',
 }
 
@@ -127,7 +131,7 @@ const formatRange = (
   return formattedStart || formattedEnd
 }
 
-const getResultMeta = (item: SearchResponseDto) => {
+const getResultMeta = (item: DisplayedSearchResponseDto) => {
   if (item.type === 'PROJECT') return item.details?.statusName ?? ''
   if (item.type === 'TASK') return formatDate(item.details?.dueDate)
   if (item.type === 'SCHEDULE') {
@@ -136,20 +140,18 @@ const getResultMeta = (item: SearchResponseDto) => {
   if (item.type === 'MEETING') {
     return item.details?.statusName ?? formatDateTime(item.details?.startDateTime)
   }
-  if (item.type === 'EDUCATION') return formatDate(item.details?.startDate)
   return formatDateTime(item.details?.receivedAt)
 }
 
-const getTypeIcon = (type?: SearchType) => {
+const getTypeIcon = (type?: DisplayedSearchType) => {
   if (type === 'PROJECT') return FolderKanban
   if (type === 'TASK') return CheckSquare
   if (type === 'SCHEDULE') return CalendarDays
   if (type === 'MEETING') return Video
-  if (type === 'EDUCATION') return BookOpen
   return Mail
 }
 
-const getFallbackPath = (item: SearchResponseDto) => {
+const getFallbackPath = (item: DisplayedSearchResponseDto) => {
   const id = item.id
 
   if (item.type === 'PROJECT') return `/project/${id}`
@@ -167,13 +169,12 @@ const getFallbackPath = (item: SearchResponseDto) => {
 
   if (item.type === 'SCHEDULE') return `/calendar?scheduleId=${id}`
   if (item.type === 'MEETING') return '/meeting/scheduled'
-  if (item.type === 'EDUCATION') return `/education/${id}`
   if (item.type === 'MAIL') return '/mail'
 
   return '/dashboard'
 }
 
-const getResultKey = (item: SearchResponseDto, index: number) =>
+const getResultKey = (item: DisplayedSearchResponseDto, index: number) =>
   `${item.type ?? 'UNKNOWN'}-${item.parentId ?? 'root'}-${item.id ?? index}`
 
 interface PreviewFieldProps {
@@ -196,7 +197,7 @@ const PreviewField = ({ label, value }: PreviewFieldProps) => {
   )
 }
 
-const SearchPreviewDetails = ({ item }: { item: SearchResponseDto }) => {
+const SearchPreviewDetails = ({ item }: { item: DisplayedSearchResponseDto }) => {
   if (!item.details) return null
 
   if (item.type === 'PROJECT') {
@@ -304,23 +305,6 @@ const SearchPreviewDetails = ({ item }: { item: SearchResponseDto }) => {
     )
   }
 
-  if (item.type === 'EDUCATION') {
-    const details = item.details
-
-    return (
-      <>
-        <PreviewField
-          label="기간"
-          value={formatRange(details.startDate, details.endDate)}
-        />
-        <PreviewField label="강사" value={details.instructorName} />
-        <PreviewField label="상태" value={details.statusName} />
-        <PreviewField label="교육 방식" value={details.deliveryMethod} />
-        <PreviewField label="장소" value={details.location} />
-      </>
-    )
-  }
-
   const details = item.details
   const sender = [details.senderName, details.senderAddress]
     .filter(Boolean)
@@ -369,7 +353,7 @@ const GlobalSearchPaletteContent = ({
   const navigate = useNavigate()
 
   const [keyword, setKeyword] = useState('')
-  const [results, setResults] = useState<SearchResponseDto[]>([])
+  const [results, setResults] = useState<DisplayedSearchResponseDto[]>([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -386,7 +370,7 @@ const GlobalSearchPaletteContent = ({
     : false
 
   const handleOpenItem = useCallback(
-    (item: SearchResponseDto) => {
+    (item: DisplayedSearchResponseDto) => {
       const backendUrl = item.url?.trim()
       navigate(backendUrl || getFallbackPath(item))
       onClose()
@@ -400,7 +384,7 @@ const GlobalSearchPaletteContent = ({
         groups[type] = results.filter((item) => item.type === type)
         return groups
       },
-      {} as Record<SearchType, SearchResponseDto[]>,
+      {} as Record<DisplayedSearchType, DisplayedSearchResponseDto[]>,
     )
   }, [results])
 
@@ -414,7 +398,7 @@ const GlobalSearchPaletteContent = ({
 
       void search(trimmedKeyword)
         .then((response) => {
-          setResults(response.data ?? [])
+          setResults((response.data ?? []).filter(isDisplayedSearchResult))
           setActiveIndex(0)
         })
         .catch(() => {
@@ -521,7 +505,7 @@ const GlobalSearchPaletteContent = ({
                   검색어를 입력해 주세요.
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  프로젝트, 업무, 일정, 회의, 교육, 메일을 한 번에 찾을 수 있습니다.
+                  프로젝트, 업무, 일정, 회의, 메일을 한 번에 찾을 수 있습니다.
                 </p>
               </div>
             )}

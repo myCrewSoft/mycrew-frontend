@@ -10,7 +10,7 @@ import type { SearchResponseDto, SearchType } from '../types/search.dto'
  * GET /search
  * query parameters:
  * - keyword: search keyword
- * - type: PROJECT | TASK | SCHEDULE | MEETING | EDUCATION | MAIL
+ * - type: PROJECT | TASK | SCHEDULE | MEETING | MAIL
  */
 export const searchApi = {
   /**

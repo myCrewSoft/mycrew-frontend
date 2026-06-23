@@ -8,7 +8,6 @@ import {
   DoorOpen,
   FileText,
   Folder,
-  GraduationCap,
   Inbox,
   Kanban,
   List,
@@ -58,7 +57,6 @@ export const menuItems: MenuItem[] = [
   { icon: Calendar, label: '일정', path: '/calendar' },
   { icon: Users, label: '회의', path: '/meeting' },
   { icon: DoorOpen, label: '회의실예약', path: '/reservations' },
-  { icon: GraduationCap, label: '교육', path: '/education' },
   { icon: Network, label: '조직관리', path: '/organization' },
 ]
 
@@ -174,23 +172,6 @@ export const subSidebarConfigs: Record<string, SubSidebarConfig> = {
     title: '예약',
     actions: [],
     sections: [],
-  },
-  education: {
-    title: '교육',
-    actions: [
-      { label: '교육 신청', variant: 'primary' },
-      { label: '강의 개설' },
-    ],
-    sections: [
-      {
-        title: '교육 관리',
-        items: [
-          { icon: GraduationCap, label: '교육 목록', path: '/education/list' },
-          { icon: Check, label: '수강 중', path: '/education/learning' },
-          { icon: FileText, label: '수료 내역', path: '/education/completed' },
-        ],
-      },
-    ],
   },
   organization: {
     title: '조직관리',
