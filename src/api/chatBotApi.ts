@@ -9,6 +9,7 @@ export interface ChatStreamParams {
   requestId: string
   aiType: AiType
   boardId?: number
+  projId?:number
 }
 
 interface ChatStreamHandlers {
@@ -137,6 +138,10 @@ const chatbotApi = {
     // 게시글 위험 분석 요청일 때만 분석 대상 게시글 ID를 함께 전달합니다.
     if (typeof params.boardId === 'number') {
       queryParams.set('boardId', String(params.boardId))
+    }
+
+    if (typeof params.projId === 'number') {
+      queryParams.set('projId', String(params.projId))
     }
 
     const query = queryParams.toString()
