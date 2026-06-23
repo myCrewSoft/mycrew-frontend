@@ -36,7 +36,7 @@ const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTa
   )
   const [form, setForm] = useState<TaskUpdateRequest>({
     taskNm: task.taskNm,
-    taskCn: task.taskCn,
+    taskCn: task.taskCn ?? '',
     taskMngrId: task.taskMngrId,
     taskStatCd: task.taskStatCd,
     taskPriorityCd: task.taskPriorityCd,
@@ -92,7 +92,7 @@ const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTa
       await taskApi.updateProjectTask(projectId, task.taskId, {
         ...form,
         taskNm,
-        taskCn: form.taskCn.trim(),
+        taskCn: String(form.taskCn ?? '').trim(),
       })
       await onUpdated()
       onClose()
