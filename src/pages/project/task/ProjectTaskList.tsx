@@ -47,7 +47,10 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
               </button>
               <ProjectTaskTypeBadge typeCd={task.taskTypeCd} />
               <ProjectTaskStatusBadge status={task.taskStatCd} />
-              <ProjectTaskManagerAvatar name={task.taskMngrNm} />
+              <ProjectTaskManagerAvatar
+                name={task.taskMngrNm}
+                fileId={task.prflImgFileId}
+              />
               <span className="text-xs font-medium text-slate-600">
                 {task.taskBgngDt} ~ {task.taskEndDt}
               </span>

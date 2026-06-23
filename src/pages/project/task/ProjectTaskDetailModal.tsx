@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, ClipboardList, UserRound } from 'lucide-react'
+import { CalendarDays, ClipboardList, Pencil, UserRound } from 'lucide-react'
 import { ApiError } from '../../../api/axiosInstance'
 import { taskApi } from '../../../api/taskApi'
 import Button from '../../../components/common/button/Button'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 import Modal from '../../../components/common/overlay/modal/Modal'
 import {
   ProjectTaskManagerAvatar,
@@ -17,9 +18,15 @@ interface ProjectTaskDetailModalProps {
   projectId: string | number
   task: ProjectTask | null
   onClose: () => void
+  onEdit: (task: ProjectTaskDetail) => void
 }
 
-const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailModalProps) => {
+const ProjectTaskDetailModal = ({
+  projectId,
+  task,
+  onClose,
+  onEdit,
+}: ProjectTaskDetailModalProps) => {
   const [detail, setDetail] = useState<ProjectTaskDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -78,9 +85,19 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
       size="md"
       onClose={onClose}
       footer={
-        <Button variant="outline" onClick={onClose}>
-          닫기
-        </Button>
+        <>
+          <Button variant="outline" onClick={onClose}>
+            닫기
+          </Button>
+          <Button
+            variant="primary"
+            leftIcon={<Pencil size={15} />}
+            disabled={loading || !detail}
+            onClick={() => detail && onEdit(detail)}
+          >
+            수정
+          </Button>
+        </>
       }
     >
       <div className="space-y-5">
@@ -130,7 +147,10 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
               <UserRound size={14} />
               담당자
             </div>
-            <ProjectTaskManagerAvatar name={visibleTask.taskMngrNm} />
+            <ProjectTaskManagerAvatar
+              name={visibleTask.taskMngrNm}
+              fileId={visibleTask.prflImgFileId}
+            />
           </div>
         </div>
 
@@ -152,8 +172,13 @@ const ProjectTaskDetailModal = ({ projectId, task, onClose }: ProjectTaskDetailM
               {employeeList.map((employee) => (
                 <span
                   key={employee.empId}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600"
+                  className="inline-flex items-center gap-2 rounded-full bg-slate-100 py-1 pl-1 pr-3 text-xs font-bold text-slate-600"
                 >
+                  <ProfileAvatar
+                    fileId={employee.prflImgFileId}
+                    name={employee.empNm}
+                    size={24}
+                  />
                   {employee.empNm}
                 </span>
               ))}
