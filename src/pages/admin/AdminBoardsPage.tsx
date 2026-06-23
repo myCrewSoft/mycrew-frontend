@@ -918,19 +918,18 @@ const AdminBoardsPage = () => {
         <div className="min-h-0 flex-1">
           <BoardWriteForm
             mode="create"
-            initialBoardType={boardType === 'project' ? 'notice' : boardType}
+            initialBoardType={boardType}
             initialBoardTypeCd={boardType === 'project' ? 'PROJ' : ''}
             departmentCode={selectedDepartmentCode}
-            projectId={boardType === 'project' ? selectedProjectId : undefined}
-            onBoardSelectionChange={(selectedType, departmentName) => {
-              if (boardType === 'project') {
-                setCreatingBoardTitle(boardLabelByType.project)
-                return
-              }
-
+            projectId={selectedProjectId || undefined}
+            projectOptions={projectOptions ?? []}
+            allowProjectBoardSelection
+            onBoardSelectionChange={(selectedType, departmentName, projectName) => {
               const selectedLabel = boardLabelByType[selectedType]
               setCreatingBoardTitle(
-                departmentName
+                projectName
+                  ? `${selectedLabel} ${projectName}`
+                  : departmentName
                   ? `${selectedLabel} ${departmentName}`
                   : selectedLabel,
               )
@@ -968,10 +967,12 @@ const AdminBoardsPage = () => {
           <BoardWriteForm
             mode="edit"
             boardId={editTarget.boardId}
-            initialBoardType={boardType === 'project' ? 'notice' : boardType}
+            initialBoardType={boardType}
             initialBoardTypeCd={editTarget.boardTypeCd}
             departmentCode={editTarget.deptCd || selectedDepartmentCode}
             projectId={editTarget.projId || selectedProjectId || undefined}
+            projectOptions={projectOptions ?? []}
+            allowProjectBoardSelection
             initialTitle={editTarget.boardSj}
             initialContent={editTarget.boardCn}
             initialImportantYn={editTarget.imprtntYn}

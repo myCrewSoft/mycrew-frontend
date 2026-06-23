@@ -13,14 +13,19 @@ import { useApi } from '../../hooks/useApi'
 import type { BoardKind } from '../../types/board'
 import type { BoardMutationRequest } from '../../api/boardApi'
 import type { BoardSideBarResponse } from '../../types'
+import type { ScopeOptionResponse } from '../../types/admin'
+
+type BoardWriteKind = BoardKind | 'project'
 
 interface BoardWriteFormProps {
   mode?: 'create' | 'edit'
   boardId?: number
-  initialBoardType?: BoardKind
+  initialBoardType?: BoardWriteKind
   initialBoardTypeCd?: string
   departmentCode?: string
   projectId?: number
+  projectOptions?: ScopeOptionResponse[]
+  allowProjectBoardSelection?: boolean
   initialTitle?: string
   initialContent?: string
   initialImportantYn?: string
@@ -30,8 +35,9 @@ interface BoardWriteFormProps {
   onCreated?: (boardId: number | null) => void
   onUpdated?: (request: BoardMutationRequest) => void
   onBoardSelectionChange?: (
-    boardType: BoardKind,
+    boardType: BoardWriteKind,
     departmentName?: string,
+    projectName?: string,
   ) => void
 }
 
@@ -47,12 +53,17 @@ type DepartmentBoardSideBarResponse = BoardSideBarResponse & {
   code?: string
 }
 
-const boardOptions: Array<{ value: BoardKind; label: string }> = [
+const boardOptions: Array<{ value: BoardWriteKind; label: string }> = [
   { value: 'notice', label: '공지사항' },
   { value: 'department', label: '부서게시판' },
   { value: 'free', label: '자유게시판' },
   { value: 'anonymous', label: '익명게시판' },
 ]
+
+const projectBoardOption: { value: BoardWriteKind; label: string } = {
+  value: 'project',
+  label: '프로젝트 게시판',
+}
 
 const boardTypeCdByKind: Record<BoardKind, string> = {
   notice: 'NOTICE',
@@ -155,6 +166,8 @@ const BoardWriteForm = ({
   initialBoardTypeCd = '',
   departmentCode = '',
   projectId,
+  projectOptions = [],
+  allowProjectBoardSelection = false,
   initialTitle = '',
   initialContent = '',
   initialImportantYn = 'N',
@@ -169,12 +182,13 @@ const BoardWriteForm = ({
   const editorRef = useRef<ToastEditor | null>(null)
   const selectedImagePreviewUrlRef = useRef<string | null>(null)
   const isEditMode = mode === 'edit'
-  const [boardType, setBoardType] = useState<BoardKind>(initialBoardType)
+  const [boardType, setBoardType] = useState<BoardWriteKind>(initialBoardType)
   const [title, setTitle] = useState(initialTitle)
   const [content, setContent] = useState(initialContent)
   const [isImportant, setIsImportant] = useState(isYes(initialImportantYn))
   const [allowComments, setAllowComments] = useState(initialCommentUseYn.toUpperCase() !== 'N')
   const [selectedDepartmentCode, setSelectedDepartmentCode] = useState(departmentCode)
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId ?? 0)
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([])
   const [validationMessage, setValidationMessage] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -201,9 +215,20 @@ const BoardWriteForm = ({
   >(fileApi.uploadBoardFile, { immediate: false })
 
   const saving = creating || updating || uploading
-  const isProjectBoard = typeof projectId === 'number' && projectId > 0
   const originalBoardTypeCd = initialBoardTypeCd.trim().toUpperCase()
-  const resolvedBoardTypeCd = isProjectBoard ? 'PROJ' : boardTypeCdByKind[boardType]
+  const fixedProjectId = typeof projectId === 'number' && projectId > 0
+    ? projectId
+    : 0
+  const isFixedProjectBoard = !allowProjectBoardSelection && fixedProjectId > 0
+  const firstProjectOptionId = Number(projectOptions[0]?.scopeId ?? 0)
+  const effectiveProjectId = selectedProjectId || fixedProjectId || firstProjectOptionId
+  const isProjectBoard = boardType === 'project' || isFixedProjectBoard
+  const selectableBoardOptions = allowProjectBoardSelection
+    ? [...boardOptions, projectBoardOption]
+    : boardOptions
+  const resolvedBoardTypeCd = isProjectBoard
+    ? 'PROJ'
+    : boardTypeCdByKind[boardType as BoardKind]
   const originalDepartmentCode = departmentCode.trim()
   const contentByteLength = useMemo(
     () => new Blob([content]).size,
@@ -239,12 +264,20 @@ const BoardWriteForm = ({
           (option) => option.code === selectedDepartmentCode,
         )?.name
       : undefined
+    const projectName = isProjectBoard
+      ? projectOptions.find(
+          (option) => Number(option.scopeId) === effectiveProjectId,
+        )?.scopeName
+      : undefined
 
-    onBoardSelectionChange?.(boardType, departmentName)
+    onBoardSelectionChange?.(boardType, departmentName, projectName)
   }, [
     boardType,
     departmentOptions,
+    effectiveProjectId,
+    isProjectBoard,
     onBoardSelectionChange,
+    projectOptions,
     selectedDepartmentCode,
   ])
 
@@ -514,6 +547,11 @@ const BoardWriteForm = ({
       return
     }
 
+    if (isProjectBoard && !effectiveProjectId) {
+      setValidationMessage('프로젝트 게시판은 프로젝트를 선택한 뒤 작성할 수 있습니다.')
+      return
+    }
+
     if (isEditMode && !boardId) {
       setValidationMessage('수정할 게시글 정보를 찾을 수 없습니다.')
       return
@@ -544,14 +582,14 @@ const BoardWriteForm = ({
           : isEditMode
           ? originalDepartmentCode
           : boardType === 'department' ? selectedDepartmentCode : '',
-        projId: projectId ?? 0,
+        projId: isProjectBoard ? effectiveProjectId : 0,
         imprtntYn: isImportant ? 'Y' : 'N',
         cmntUseYn: boardType === 'notice' || allowComments ? 'Y' : 'N',
       }
 
       if (isEditMode && boardId) {
         await updateBoard({
-          type: boardType,
+          type: isProjectBoard ? 'free' : boardType as BoardKind,
           boardId,
           departmentCode: selectedDepartmentCode,
           request,
@@ -595,7 +633,7 @@ const BoardWriteForm = ({
             게시판 선택 <span className="text-red-500">*</span>
           </label>
           <div className="flex w-full items-center gap-3">
-            {isProjectBoard ? (
+            {isFixedProjectBoard ? (
               <div className="flex h-11 items-center rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-semibold text-slate-600">
                 프로젝트 보드
               </div>
@@ -603,13 +641,13 @@ const BoardWriteForm = ({
               <select
                 value={boardType}
                 onChange={(event) => {
-                  setBoardType(event.target.value as BoardKind)
+                  setBoardType(event.target.value as BoardWriteKind)
                   setValidationMessage(null)
                 }}
                 disabled={isEditMode}
                 className="h-11 w-fit rounded-md border border-slate-300 bg-white pl-2 pr-7 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
               >
-                {boardOptions.map((option) => (
+                {selectableBoardOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -631,6 +669,25 @@ const BoardWriteForm = ({
                 {departmentOptions.map((option) => (
                   <option key={option.code} value={option.code}>
                     {option.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {isProjectBoard && !isFixedProjectBoard && (
+              <select
+                value={effectiveProjectId || ''}
+                onChange={(event) => {
+                  setSelectedProjectId(Number(event.target.value))
+                  setValidationMessage(null)
+                }}
+                disabled={isEditMode}
+                className="h-11 w-52 rounded-md border border-slate-300 bg-white pl-2 pr-7 text-sm font-medium text-slate-800 outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+              >
+                <option value="">프로젝트 선택</option>
+                {projectOptions.map((option) => (
+                  <option key={option.scopeId} value={Number(option.scopeId)}>
+                    {option.scopeName}
                   </option>
                 ))}
               </select>

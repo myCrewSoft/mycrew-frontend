@@ -26,6 +26,10 @@ import ReservationAdminPage from './Reservation/ReservationAdminPage';
 import AdminMtngStatsPage from './Meeting/AdminMtngStatsPage';
 import AdminMtngPage from './Meeting/AdminMtngPage';
 import AdminProjectsPage from './Project/AdminProjectsPage';
+import AutoSchedulePage from './Schedule/AutoSchedulePage';
+import HolidayApiPage from './Schedule/HolidayApiPage';
+import ScheduleCategoryPage from './Schedule/ScheduleCategoryPage';
+import OrgSchedulePage from './Schedule/OrgSchedulePage';
 
 export default function AdminAccessGate() {
   const location = useLocation();
@@ -209,6 +213,21 @@ export default function AdminAccessGate() {
         <AdminBoardsPage />
       </AdminLayout>
     );
+  }
+
+  if (location.pathname.startsWith('/admin/schedule')) {
+    const renderPage = () => {
+      if (location.pathname.startsWith('/admin/schedule/auto'))     return <AutoSchedulePage />
+      if (location.pathname.startsWith('/admin/schedule/holiday'))  return <HolidayApiPage />
+      if (location.pathname.startsWith('/admin/schedule/category')) return <ScheduleCategoryPage />
+      return <OrgSchedulePage />
+    }
+
+    return (
+      <AdminLayout access={access}>
+        {renderPage()}
+      </AdminLayout>
+    )
   }
 
   if (location.pathname.startsWith('/admin/meeting')) {

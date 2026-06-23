@@ -7,7 +7,6 @@
 
 import type { components } from "./generated";
 
-
 // 예시 - generate-api 실행 후 아래처럼 추가
 // export type MemberResponseDto = components['schemas']['MemberResponseDto'];
 // export type LoginRequestDto   = components['schemas']['LoginRequestDto'];
@@ -30,6 +29,11 @@ export type ScheduleRequestDto = components['schemas']['ScheduleRequestDto']
 export type ScheduleTargetRequestDto = components['schemas']['ScheduleTargetRequestDto']
 export type ScheduleResponseDto = components['schemas']['ScheduleResponseDto'];
 export type ScheduleTargetResponseDto = components['schemas']['ScheduleTargetResponseDto'];
+export type AdminSchdRequest = components['schemas']['AdminSchdRequest'];
+export type AdminSchdListResponse = components['schemas']['AdminSchdListResponse'];
+export type AdminSchdResponse = components['schemas']['AdminSchdResponse'];
+export type HolidayManualRequest = components['schemas']['HolidayManualRequest'];
+export type HolidayResponse = components['schemas']['HolidayResponse'];
 
 // 메신저
 export type CreateChatRoomRequest = components['schemas']['CreateChatRoomRequest'];
@@ -99,6 +103,7 @@ export type SearchHistVO = components['schemas']['SearchHistVO'];
 
 // 사용자 대시보드(위젯)
 export type DashboardLayoutResponse = components['schemas']['DashboardLayoutResponse'];
+export type DashboardLayoutRequest = components['schemas']['DashboardLayoutRequest'];
 export type ApprovalWidgetResponse = components['schemas']['ApprovalWidgetResponse'];
 export type AttendanceWidgetResponse = components['schemas']['AttendanceWidgetResponse'];
 export type BoardWidgetResponse = components['schemas']['BoardWidgetResponse'];
@@ -110,4 +115,3 @@ export type ReservationWidgetResponse = components['schemas']['ReservationWidget
 export type ScheduleWidgetResponse = components['schemas']['ScheduleWidgetResponse'];
 export type TaskWidgetResponse = components['schemas']['TaskWidgetResponse'];
 export type MailWidgetResponse = components['schemas']['MailWidgetResponse'];
-
