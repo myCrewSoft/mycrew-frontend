@@ -180,7 +180,7 @@ const SubSidebar = ({ isOpen, onToggle }: SubSidebarProps) => {
         variant="outline"
         size="icon"
         onClick={onToggle}
-        className="absolute left-full top-6 z-50 min-w-0 -translate-x-1/2 rounded-full border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
+        className="absolute left-full top-6 z-20 min-w-0 -translate-x-1/2 rounded-full border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-blue-600"
         leftIcon={
           isOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />
         }

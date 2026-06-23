@@ -100,6 +100,12 @@ export type NotificationUnreadCountResponse =
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchType = NonNullable<SearchResponse['type']>;
 export type SearchHistVO = components['schemas']['SearchHistVO'];
+export type EducationSearchDetails = components['schemas']['EducationSearchDetails'];
+export type MailSearchDetails = components['schemas']['MailSearchDetails'];
+export type MeetingSearchDetails = components['schemas']['MeetingSearchDetails'];
+export type ProjectSearchDetails = components['schemas']['ProjectSearchDetails'];
+export type ScheduleSearchDetails = components['schemas']['ScheduleSearchDetails'];
+export type TaskSearchDetails = components['schemas']['TaskSearchDetails'];
 
 // 사용자 대시보드(위젯)
 export type DashboardLayoutResponse = components['schemas']['DashboardLayoutResponse'];
