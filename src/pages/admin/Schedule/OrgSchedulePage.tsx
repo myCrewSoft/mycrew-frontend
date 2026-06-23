@@ -139,8 +139,7 @@ export default function OrgSchedulePage() {
   }
 
   return (
-    <div className="bg-[#f7f9fb] min-h-screen p-6 font-sans text-[#191c1e]">
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -338,7 +337,6 @@ export default function OrgSchedulePage() {
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {isDetailOpen && detailData && (
@@ -432,6 +430,6 @@ export default function OrgSchedulePage() {
           }}
         />
       )}
-    </div>
+    </section>
   )
 }

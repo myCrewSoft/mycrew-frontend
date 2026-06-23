@@ -164,10 +164,9 @@ export default function RoomManagementPage() {
     }
 
     return (
-        <div className="bg-[#f7f9fb] text-[#191c1e] min-h-screen p-6 font-sans">
-            <main className="max-w-7xl mx-auto">
+        <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">회의실 관리</h1>
                         <p className="text-sm text-[#414753] mt-1">
@@ -182,7 +181,7 @@ export default function RoomManagementPage() {
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-white border border-[#c0c6d5] p-5 rounded-xl flex items-center justify-between shadow-sm">
                         <div>
                             <p className="text-[#414753] text-xs font-medium">전체 회의실</p>
@@ -372,8 +371,6 @@ export default function RoomManagementPage() {
                         </div>
                     </div>
                 </div>
-            </main>
-
             {isRegisterOpen && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
                     <div className="flex items-center justify-center min-h-screen p-4">
@@ -576,6 +573,6 @@ export default function RoomManagementPage() {
                     </div>
                 </div>
             )}
-        </div>
+        </section>
     )
 }

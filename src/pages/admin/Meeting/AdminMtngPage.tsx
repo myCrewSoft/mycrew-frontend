@@ -15,7 +15,6 @@ import { useNavigate } from 'react-router-dom'
 import type { AdminMtngDetailResponse, AdminMtngListRequest, AdminMtngListResponse } from '../../../types'
 import { useApi } from '../../../hooks/useApi'
 import { adminMtngApi } from '../../../api/adminMtngApi'
-import PageComponent from '../../../components/layouts/PageComponent'
 
 const MTNG_TYPE_LABEL: Record<string, string> = {
   '01': '온라인',
@@ -116,12 +115,10 @@ export default function AdminMtngPage() {
   const meetings = pageData?.meetings ?? []
 
   return (
-    <PageComponent>
-      <div className="min-h-screen bg-[#f7f9fb] p-6 font-sans text-[#191c1e]">
-        <div className="mx-auto max-w-7xl">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
           {/* 헤더 */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">회의 운영관리</h1>
               <p className="mt-1 text-sm text-[#414753]">
@@ -131,7 +128,7 @@ export default function AdminMtngPage() {
           </div>
 
           {/* 요약 카드 */}
-          <div className="mb-6 grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <StatCard
               label="오늘의 예정 회의"
               value={stats?.todayScheduledCnt ?? 0}
@@ -163,7 +160,7 @@ export default function AdminMtngPage() {
           </div>
 
           {/* 탭 */}
-          <div className="mb-4 flex gap-6 border-b border-[#c0c6d5]">
+          <div className="flex gap-6 border-b border-[#c0c6d5]">
             <button className="border-b-2 border-[#005cad] pb-3 text-sm font-semibold text-[#005cad]">
               전체 회의
             </button>
@@ -324,9 +321,6 @@ export default function AdminMtngPage() {
               )}
             </div>
           </div>
-        </div>
-      </div>
-
       {/* 상세 모달 */}
       {selectedMtng && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -401,7 +395,7 @@ export default function AdminMtngPage() {
           </div>
         </div>
       )}
-    </PageComponent>
+    </section>
   )
 }
 

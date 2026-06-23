@@ -166,6 +166,21 @@ export default function HolidayApiPage() {
     setCalendarTitle(formatMonthTitle(api.getDate()))
   }
 
+  const focusHolidayDate = (holidayDt?: string) => {
+    if (!holidayDt) return
+    const targetDate = new Date(`${holidayDt}T00:00:00`)
+    if (Number.isNaN(targetDate.getTime())) return
+
+    const api = calendarRef.current?.getApi()
+    if (!api) return
+
+    api.gotoDate(targetDate)
+    setCalendarTitle(formatMonthTitle(api.getDate()))
+
+    const targetYear = targetDate.getFullYear()
+    if (targetYear !== year) setYear(targetYear)
+  }
+
   const loading = createLoading || modifyLoading
 
   const lastSyncDt = holidayList
@@ -174,8 +189,7 @@ export default function HolidayApiPage() {
     .at(0)?.syncDt
 
   return (
-    <div className="bg-[#f7f9fb] min-h-screen p-6 font-sans text-[#191c1e]">
-      <div className="max-w-7xl mx-auto flex flex-col gap-6">
+    <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -239,7 +253,7 @@ export default function HolidayApiPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <div className="bg-white border border-[#c0c6d5] rounded-xl shadow-sm overflow-hidden">
+          <div className="flex h-full min-h-0 flex-col bg-white border border-[#c0c6d5] rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-[#c0c6d5] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -272,8 +286,8 @@ export default function HolidayApiPage() {
                 </button>
               </div>
             </div>
-            <div className="p-4">
-              <div className="calendar-main p-4">
+            <div className="p-0">
+              <div className="calendar-main w-full">
                 <FullCalendar
                     ref={calendarRef}
                     plugins={[dayGridPlugin, interactionPlugin]}
@@ -297,11 +311,11 @@ export default function HolidayApiPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-[#c0c6d5] rounded-xl shadow-sm overflow-hidden">
+          <div className="flex h-full min-h-0 flex-col bg-white border border-[#c0c6d5] rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-[#c0c6d5]">
               <h3 className="text-sm font-bold text-[#191c1e]">{year}년 공휴일 목록</h3>
             </div>
-            <div className="overflow-y-auto max-h-[480px]">
+            <div className="min-h-0 flex-1 overflow-auto">
               {listLoading ? (
                 <div className="p-10 text-center text-sm text-[#414753]">로딩 중...</div>
               ) : (holidayList ?? []).length === 0 ? (
@@ -309,7 +323,7 @@ export default function HolidayApiPage() {
                   등록된 공휴일이 없습니다.
                 </div>
               ) : (
-                <table className="w-full text-left text-sm border-collapse">
+                <table className="w-full min-w-[640px] text-left text-sm border-collapse">
                   <thead className="sticky top-0 bg-[#f2f4f6]">
                     <tr className="text-xs font-semibold text-[#717785] uppercase tracking-wider border-b border-[#c0c6d5]">
                       <th className="px-4 py-3">날짜</th>
@@ -326,7 +340,13 @@ export default function HolidayApiPage() {
                           {h.holidayDt}
                         </td>
                         <td className="px-4 py-3 text-[#191c1e] font-semibold">
-                          {h.holidayNm}
+                          <button
+                            type="button"
+                            onClick={() => focusHolidayDate(h.holidayDt)}
+                            className="max-w-full truncate text-left font-semibold text-[#191c1e] transition-colors hover:text-[#005cad] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#005cad]"
+                          >
+                            {h.holidayNm}
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           {h.isHolidayYn === 'Y' ? (
@@ -380,8 +400,6 @@ export default function HolidayApiPage() {
           </div>
 
         </div>
-
-      </div>
 
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -455,6 +473,6 @@ export default function HolidayApiPage() {
           </div>
         </div>
       )}
-    </div>
+    </section>
   )
 }
