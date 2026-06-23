@@ -39,6 +39,7 @@ import type {
 import BoardWriteForm from '../board/BoardWriteForm'
 import BoardAttachmentImage from '../board/BoardAttachmentImage'
 import BoardContentViewer from '../board/BoardContentViewer'
+import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
 
 interface ProjectBoardTabProps {
   projectId: number
@@ -144,6 +145,8 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
 
   const boards = useMemo(() => pageData?.content ?? [], [pageData?.content])
   const totalPages = Math.max(pageData?.totalPages ?? 1, 1)
+  const totalElements = pageData?.totalElements ?? boards.length
+  const pageSize = pageData?.size ?? 10
   const currentEmployeeName = currentProfile?.empNm?.trim() ?? ''
   const { getEmployeeProfile } = useEmployeeProfileDirectory()
 
@@ -956,14 +959,21 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
               <span>조회</span>
             </div>
             <div className="divide-y divide-slate-100">
-              {boards.map((board) => (
+              {boards.map((board, rowIndex) => (
                 <button
                   key={board.boardId}
                   type="button"
                   onClick={() => void openDetail(board)}
                   className="grid min-h-14 w-full grid-cols-[90px_minmax(0,1fr)_150px_130px_90px] items-center px-5 text-left text-sm transition-colors hover:bg-slate-50"
                 >
-                  <span className="text-slate-500">{board.boardId}</span>
+                  <span className="text-slate-500">
+                    {getBoardDisplayNumber({
+                      totalElements,
+                      page,
+                      pageSize,
+                      rowIndex,
+                    })}
+                  </span>
                   <span className="flex min-w-0 items-center gap-2">
                     {isImportant(board) && (
                       <Badge variant="warning">중요</Badge>
