@@ -89,7 +89,9 @@ const ProjectTasksTab = ({
   }, [query, tasks])
 
   const highPriorityCount = filteredTasks.filter((task) => task.taskPriorityCd === '01').length
-  const incompleteTaskCount = filteredTasks.filter((task) => task.taskStatCd !== '02').length
+  const incompleteTaskCount = filteredTasks.filter(
+    (task) => task.taskStatCd !== '02' && task.taskStatCd !== '04',
+  ).length
 
   return (
     <div className="mt-5 space-y-4">
