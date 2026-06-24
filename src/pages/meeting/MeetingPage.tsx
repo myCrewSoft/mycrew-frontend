@@ -821,13 +821,10 @@ const MeetingPage = () => {
     }
 
     if (Number.isFinite(detailMeetingId) && detailMeetingId > 0) {
-      const target = meetingList.find((m: MeetingListItem) => m.mtngId === detailMeetingId)
-      if (target) {
-        queueMicrotask(() => {
-          void openMeetingDetail(target.mtngId)
-          navigate(location.pathname, { replace: true })
-        })
-      }
+      queueMicrotask(() => {
+        void openMeetingDetail(detailMeetingId)
+        navigate(location.pathname, { replace: true })
+      })
     }
 
     if (Number.isFinite(minutesMeetingId) && minutesMeetingId > 0) {

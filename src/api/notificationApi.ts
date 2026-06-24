@@ -23,6 +23,12 @@ export const notificationApi = {
     return axiosInstance.patch('/api/notifications/read-all')
   },
 
+  readNotification: (
+    alrmRcvrId: number,
+  ): Promise<AxiosResponse<ApiResponse<null>>> => {
+    return axiosInstance.patch(`/api/notifications/${alrmRcvrId}/read`)
+  },
+
   deleteNotification: (
     alrmRcvrId: number,
   ): Promise<AxiosResponse<ApiResponse<null>>> => {

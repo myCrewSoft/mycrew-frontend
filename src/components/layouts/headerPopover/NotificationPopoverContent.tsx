@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckSquare, Clock, Megaphone, UserPlus, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { notificationApi } from '../../../api/notificationApi'
 import { useApi, useApiList } from '../../../hooks/useApi'
 import type { NotificationResponse } from '../../../types'
@@ -61,15 +62,56 @@ const getNotificationReceiverId = (
     : null
 }
 
+const getNotificationPath = (
+  notification: NotificationResponse,
+): string | null => {
+  const { targetType, targetId, parentTargetId } = notification
+
+  if (targetType && Number.isInteger(targetId) && Number(targetId) > 0) {
+    switch (targetType) {
+      case 'APPROVAL':
+        return `/approval/received/requests?documentId=${targetId}`
+      case 'SCHEDULE':
+        return `/calendar?scheduleId=${targetId}`
+      case 'MEETING':
+        return `/meeting/list?detailMeetingId=${targetId}`
+      case 'PROJECT':
+        return `/project/${targetId}`
+      case 'TASK':
+        if (Number.isInteger(parentTargetId) && Number(parentTargetId) > 0) {
+          return `/project/${parentTargetId}?tab=tasks&taskId=${targetId}`
+        }
+        break
+    }
+  }
+
+  switch (notification.alrmTypeCd) {
+    case '02':
+      return '/approval/received/requests'
+    case '03':
+      return '/calendar'
+    case '04':
+    case '05':
+      return '/project'
+    case '06':
+      return '/meeting/list'
+    default:
+      return null
+  }
+}
+
 interface NotificationPopoverContentProps {
   refreshSignal?: number
   onNotificationsChanged?: () => void | Promise<unknown>
+  onRequestClose?: () => void
 }
 
 const NotificationPopoverContent = ({
   refreshSignal,
   onNotificationsChanged,
+  onRequestClose,
 }: NotificationPopoverContentProps) => {
+  const navigate = useNavigate()
   const [deletedNotificationIds, setDeletedNotificationIds] = useState<
     number[]
   >([])
@@ -86,6 +128,11 @@ const NotificationPopoverContent = ({
 
   const { execute: deleteNotification } = useApi<null>(
     notificationApi.deleteNotification,
+    { immediate: false },
+  )
+
+  const { execute: readNotification } = useApi<null>(
+    notificationApi.readNotification,
     { immediate: false },
   )
 
@@ -155,6 +202,28 @@ const NotificationPopoverContent = ({
     }
   }
 
+  const handleOpenNotification = async (notification: NotificationResponse) => {
+    const path = getNotificationPath(notification)
+    const alrmRcvrId = getNotificationReceiverId(notification)
+
+    if (notification.alrmCfmtnDt === null && alrmRcvrId !== null) {
+      try {
+        await readNotification(alrmRcvrId)
+        await Promise.allSettled([
+          fetchNotifications(),
+          Promise.resolve(onNotificationsChanged?.()),
+        ])
+      } catch {
+        // Reading failure must not block navigation to the notification target.
+      }
+    }
+
+    if (!path) return
+
+    onRequestClose?.()
+    navigate(path)
+  }
+
   if (loading) {
     return (
       <div className="px-4 py-6 text-center text-sm text-slate-500">
@@ -203,11 +272,27 @@ const NotificationPopoverContent = ({
           const Icon = notificationIcon[notificationType]
           const unread = notification.alrmCfmtnDt === null
           const alrmRcvrId = getNotificationReceiverId(notification)
+          const notificationPath = getNotificationPath(notification)
 
           return (
             <li
               key={notification.alrmId}
-              className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50 ${
+              role={notificationPath ? 'link' : undefined}
+              tabIndex={notificationPath ? 0 : undefined}
+              onClick={() => void handleOpenNotification(notification)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  void handleOpenNotification(notification)
+                }
+              }}
+              className={`group relative flex items-center gap-3 px-4 py-2.5 transition-colors ${
+                notificationPath
+                  ? 'cursor-pointer hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500'
+                  : ''
+              } ${
                 unread ? 'bg-white' : 'bg-slate-50 opacity-60'
               }`}
             >
@@ -243,7 +328,9 @@ const NotificationPopoverContent = ({
               <button
                 type="button"
                 aria-label="알림 삭제"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation()
+
                   if (alrmRcvrId === null) {
                     setDeleteErrorMessage(
                       '삭제할 수 없는 알림입니다. 잠시 후 다시 시도해 주세요.',

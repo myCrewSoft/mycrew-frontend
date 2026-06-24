@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type FullCalendarComponent from '@fullcalendar/react'
 import type {
   DateSelectArg,
@@ -23,6 +24,7 @@ import {
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Tabs from '../../components/common/tabs/Tabs'
+import { scheduleApi } from '../../api/scheduleApi'
 import { formatDateKey, formatMonthTitle, formatTime } from '../../utils/date'
 import { useCalendar } from './CalendarContext'
 import CalendarScheduleDetailModal from './CalendarScheduleDetailModal'
@@ -32,6 +34,7 @@ import type {
   CalendarEventItem,
   CalendarSelectedRange,
 } from '../../types/calendar'
+import { toCalendarEvent } from './calendar.mapper'
 
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listMonth';
 
@@ -169,6 +172,8 @@ const isDateInSelectedRange = (
 }
 
 const CalendarPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const notificationScheduleId = searchParams.get('scheduleId')
   // visibleCalendarEvents는 체크 필터가 적용된 일정 목록입니다.
   // selectedDate는 미니 캘린더와 큰 캘린더가 공유하는 선택 날짜입니다.
   const {
@@ -203,6 +208,56 @@ const CalendarPage = () => {
     () => getFullCalendarEvents(visibleCalendarEvents),
     [visibleCalendarEvents],
   )
+
+  useEffect(() => {
+    if (!notificationScheduleId) return
+
+    let cancelled = false
+
+    const openNotificationSchedule = async () => {
+      let schedule = visibleCalendarEvents.find(
+        (event) => event.id === notificationScheduleId,
+      )
+
+      if (!schedule) {
+        try {
+          const response = await scheduleApi.getSchedule(notificationScheduleId)
+          const scheduleResponse = response.data.data
+          schedule = scheduleResponse
+            ? (toCalendarEvent(scheduleResponse) ?? undefined)
+            : undefined
+        } catch {
+          return
+        }
+      }
+
+      if (cancelled || !schedule) return
+
+      setSelectedDate(formatDateKey(new Date(schedule.start)))
+      setSelectedSchedule(schedule)
+      setSelectedRange(null)
+      setScheduleDrawerOpen(false)
+      setScheduleDetailOpen(true)
+
+      const nextSearchParams = new URLSearchParams(searchParams)
+      nextSearchParams.delete('scheduleId')
+      setSearchParams(nextSearchParams, { replace: true })
+
+      calendarRef.current?.getApi().gotoDate(schedule.start)
+    }
+
+    void openNotificationSchedule()
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    notificationScheduleId,
+    searchParams,
+    setSearchParams,
+    setSelectedDate,
+    visibleCalendarEvents,
+  ])
 
   const restoreSelectedRange = () => {
     const range = selectedRangeRef.current
