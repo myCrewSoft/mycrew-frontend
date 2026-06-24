@@ -1,6 +1,6 @@
-// src/pages/admin/AdminProjectDetailDrawer.tsx
+// src/pages/admin/Project/AdminProjectDetailDrawer.tsx
 
-import { useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
 import {
   X,
   Users,
@@ -11,6 +11,7 @@ import {
   PauseCircle,
   AlertTriangle,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
@@ -18,6 +19,7 @@ import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 import Button from '../../../components/common/button/Button'
 import { projectApi } from '../../../api/projectApi'
 import { ApiError } from '../../../api/axiosInstance'
+import chatbotApi from '../../../api/chatBotApi'
 
 // ── 타입 ──────────────────────────────────
 interface AdminProjectListResponseDto {
@@ -52,7 +54,117 @@ const STATUS_VARIANT: Record<string, 'primary' | 'neutral' | 'success' | 'warnin
   '04': 'success',
 }
 
-// ── 컴포넌트 ──────────────────────────────
+// ── AI 보고서 내부 컴포넌트 ──────────────────
+function AiReportPanel({ projId }: { projId: number }) {
+  const [content, setContent] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const requestIdRef = useRef('')
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const generate = useCallback(async (signal: AbortSignal) => {
+    const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    requestIdRef.current = requestId
+
+    setContent('')
+    setIsStreaming(true)
+
+    let accumulated = ''
+
+    try {
+      await chatbotApi.streamChat(
+        {
+          message: '이 프로젝트의 현황 보고서를 작성해주세요.',
+          requestId,
+          aiType: 'REPT',
+          projId,
+        },
+        {
+          onMessage: (chunk) => {
+            accumulated += chunk
+            setContent(accumulated)
+          },
+        },
+        signal,
+      )
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      console.error(error)
+    } finally {
+      setIsStreaming(false)
+      abortControllerRef.current = null
+    }
+  }, [projId])
+
+  // 마운트 시 자동 생성
+  useEffect(() => {
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    startTransition(() => {
+      void generate(controller.signal)
+    })
+    return () => { controller.abort() }
+  }, [generate])
+
+  // 다시 생성 버튼용
+  const handleGenerate = () => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    void generate(controller.signal)
+  }
+
+  const stop = async () => {
+    abortControllerRef.current?.abort()
+    await chatbotApi.stopStream(requestIdRef.current).catch(() => undefined)
+    setIsStreaming(false)
+  }
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [content])
+
+  return (
+    <div className="flex flex-col rounded-xl border border-slate-200 overflow-hidden">
+      <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] px-4 py-3">
+        {content && (
+          <div className="w-full rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+            {content}
+            {isStreaming && <span className="animate-pulse">▌</span>}
+          </div>
+        )}
+
+        {isStreaming && !content && (
+          <div className="w-full rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-400">
+            보고서를 생성하고 있습니다...
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="flex gap-2 border-t border-slate-100 px-3 py-2 justify-end">
+        {isStreaming ? (
+          <button
+            onClick={() => void stop()}
+            className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600"
+          >
+            중지
+          </button>
+        ) : (
+          <button
+            onClick={handleGenerate}
+            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+          >
+            다시 생성
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── 메인 컴포넌트 ──────────────────────────
 export default function AdminProjectDetailDrawer({
   project,
   onClose,
@@ -60,48 +172,66 @@ export default function AdminProjectDetailDrawer({
   const navigate = useNavigate()
   const isOpen = project !== null
 
-  // 참여자 목록
-  const [memberList, setMemberList] = useState<{ empId: number; empNm: string; deptNm?: string; profileImageFileId?: number | null; projLdrYn?: string }[]>([])
+  const [memberList, setMemberList] = useState<
+    {
+      empId: number
+      empNm: string
+      deptNm?: string
+      profileImageFileId?: number | null
+      projLdrYn?: string
+    }[]
+  >([])
   const [memberLoading, setMemberLoading] = useState(false)
 
-  // 업무 요약
-  const [summary, setSummary] = useState<{ totalCount: number; completedCount: number; inProgressCount: number; stopCount: number } | null>(null)
+  const [summary, setSummary] = useState<{
+    totalCount: number
+    completedCount: number
+    inProgressCount: number
+    stopCount: number
+  } | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
 
+  const [showAiReport, setShowAiReport] = useState(false)
+
+  const handleClose = () => {
+    setShowAiReport(false)
+    onClose()
+  }
+
   useEffect(() => {
-  if (!project) return
+    if (!project) return
 
-  let cancelled = false
+    let cancelled = false
 
-  const fetchData = async () => {
-    setMemberLoading(true)
-    setSummaryLoading(true)
+    const fetchData = async () => {
+      setMemberLoading(true)
+      setSummaryLoading(true)
 
-    try {
-      const [projectRes, dashboardRes] = await Promise.all([
-        projectApi.getProject(project.projId),
-        projectApi.getTaskDashboard(project.projId),
-      ])
-      if (cancelled) return
-      setMemberList(projectRes.data.data?.projMemberList ?? [])
-      setSummary(dashboardRes.data.data?.summary ?? null)
-    } catch (err) {
-      if (cancelled) return
-      console.error(err instanceof ApiError ? err.message : err)
-    } finally {
-      if (!cancelled) {
-        setMemberLoading(false)
-        setSummaryLoading(false)
+      try {
+        const [projectRes, dashboardRes] = await Promise.all([
+          projectApi.getProject(project.projId),
+          projectApi.getTaskDashboard(project.projId),
+        ])
+        if (cancelled) return
+        setMemberList(projectRes.data.data?.projMemberList ?? [])
+        setSummary(dashboardRes.data.data?.summary ?? null)
+      } catch (err) {
+        if (cancelled) return
+        console.error(err instanceof ApiError ? err.message : err)
+      } finally {
+        if (!cancelled) {
+          setMemberLoading(false)
+          setSummaryLoading(false)
+        }
       }
     }
-  }
 
-  void fetchData()
+    void fetchData()
 
-  return () => {
-    cancelled = true
-  }
-}, [project])
+    return () => {
+      cancelled = true
+    }
+  }, [project])
 
   const prgrsRt = project?.projPrgrsRt ?? 0
   const barColor =
@@ -115,17 +245,12 @@ export default function AdminProjectDetailDrawer({
 
   return (
     <>
-      {/* 딤 배경 */}
       {isOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/20"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 z-40 bg-black/20" onClick={handleClose} />
       )}
 
-      {/* Drawer 패널 */}
       <aside
-        className={`fixed right-0 top-0 z-50 flex h-full w-[400px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 z-50 flex h-full w-[560px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -151,7 +276,7 @@ export default function AdminProjectDetailDrawer({
                 <p className="mt-0.5 text-sm text-slate-500">리더: {project.projLdrNm}</p>
               </div>
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
                 <X size={18} />
@@ -161,13 +286,11 @@ export default function AdminProjectDetailDrawer({
             {/* 본문 */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
-              {/* 기간 */}
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <CalendarRange size={15} className="shrink-0 text-slate-400" />
                 <span>{project.projBgngYmd} ~ {project.projEndYmd}</span>
               </div>
 
-              {/* 진척률 */}
               <div>
                 <div className="mb-2 flex items-center justify-between text-sm">
                   <span className="font-semibold text-slate-700">프로젝트 진척률</span>
@@ -181,7 +304,6 @@ export default function AdminProjectDetailDrawer({
                 </div>
               </div>
 
-              {/* 업무 요약 */}
               <div>
                 <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
                   <BarChart3 size={15} className="text-slate-400" />
@@ -209,7 +331,6 @@ export default function AdminProjectDetailDrawer({
                 )}
               </div>
 
-              {/* 참여자 목록 */}
               <div>
                 <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
                   <Users size={15} className="text-slate-400" />
@@ -246,18 +367,37 @@ export default function AdminProjectDetailDrawer({
                   </div>
                 )}
               </div>
+
+              {/* AI 보고서 */}
+              {showAiReport && (
+                <div>
+                  <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                    <Sparkles size={15} className="text-indigo-400" />
+                    AI 프로젝트 보고서
+                  </p>
+                  <AiReportPanel projId={project.projId} />
+                </div>
+              )}
+
             </div>
 
             {/* 푸터 */}
             <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={handleClose}>
                 닫기
+              </Button>
+              <Button
+                variant="outline"
+                leftIcon={<Sparkles size={14} />}
+                onClick={() => setShowAiReport((prev) => !prev)}
+              >
+                {showAiReport ? 'AI 보고서 닫기' : 'AI 보고서'}
               </Button>
               <Button
                 variant="primary"
                 leftIcon={<ExternalLink size={14} />}
                 onClick={() => {
-                  onClose()
+                  handleClose()
                   navigate(`/project/${project.projId}`)
                 }}
               >
