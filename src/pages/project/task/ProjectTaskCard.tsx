@@ -6,6 +6,7 @@ import {
   ProjectTaskTypeBadge,
 } from './TaskBadges'
 import type { ProjectTask } from './task.types'
+import { formatDateTime } from '../../../utils/date'
 
 interface ProjectTaskCardProps {
   task: ProjectTask
@@ -37,7 +38,7 @@ const ProjectTaskCard = ({ task, onOpenTask }: ProjectTaskCardProps) => {
 
       <div className="mt-3 flex items-center gap-1 text-xs font-medium text-slate-500">
         <CalendarDays size={13} />
-        {task.taskBgngDt} ~ {task.taskEndDt}
+        {formatDateTime(task.taskBgngDt)} ~ {formatDateTime(task.taskEndDt)}
       </div>
 
       <div className="mt-4">
