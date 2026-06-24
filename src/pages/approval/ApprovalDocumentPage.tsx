@@ -16,7 +16,7 @@ import {
   useState,
   type FormEvent,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { approvalApi, type ApprovalPageParams } from '../../api/approvalApi'
 import type { PageInfo } from '../../api/axiosInstance'
 import Button from '../../components/common/button/Button'
@@ -59,12 +59,20 @@ type Props = {
 
 export default function ApprovalDocumentPage({ folder, status }: Props) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const requestedDocumentId = Number(searchParams.get('documentId'))
+  const notificationDocumentId =
+    Number.isInteger(requestedDocumentId) && requestedDocumentId > 0
+      ? requestedDocumentId
+      : null
   const { showToast } = useToast()
   const currentBox = routeToBox(folder, status)
 
   const [documents, setDocuments] = useState<ApprovalDraftSummaryResponse[]>([])
   const [pagination, setPagination] = useState<PageInfo | null>(null)
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null)
+  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(
+    notificationDocumentId,
+  )
   const [detail, setDetail] = useState<ApprovalDocumentDetailResponse | null>(null)
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -96,6 +104,7 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
       setDocuments(nextDocuments)
       setPagination(nextPagination)
       setSelectedDocumentId((current) => {
+        if (notificationDocumentId) return notificationDocumentId
         if (current && nextDocuments.some((d) => d.drftDocSn === current)) return current
         return nextDocuments[0]?.drftDocSn ?? null
       })
@@ -107,7 +116,7 @@ export default function ApprovalDocumentPage({ folder, status }: Props) {
     } finally {
       setListLoading(false)
     }
-  }, [currentBox, keyword, page])
+  }, [currentBox, keyword, notificationDocumentId, page])
 
   const loadDetail = useCallback(async () => {
     if (!selectedDocumentId) {
