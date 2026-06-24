@@ -12,7 +12,7 @@ interface ProjectTaskBoardProps {
 
 const ProjectTaskBoard = ({ tasks, onAddTask, onOpenTask }: ProjectTaskBoardProps) => {
   return (
-    <div className="grid gap-4 xl:grid-cols-4">
+    <div className="grid gap-4 xl:grid-cols-5">
       {taskColumns.map((statusKey) => {
         const status = taskStatusConfig[statusKey]
         const columnTasks = tasks.filter((task) => task.taskStatCd === statusKey)

@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 
-type BadgeVariant =
+export type BadgeVariant =
   | 'primary'
   | 'danger'
   | 'success'
@@ -10,12 +10,16 @@ type BadgeVariant =
   | 'neutral'
   | 'outline'
 
-type BadgeSize = 'sm' | 'md' | 'count'
+export type BadgeSize = 'sm' | 'md' | 'count'
+export type BadgeShape = 'pill' | 'rounded'
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   children: ReactNode
   variant?: BadgeVariant
   size?: BadgeSize
+  shape?: BadgeShape
+  leftIcon?: ReactNode
+  iconClassName?: string
 }
 
 const variantStyle: Record<BadgeVariant, string> = {
@@ -35,18 +39,31 @@ const sizeStyle: Record<BadgeSize, string> = {
   count: 'h-4 min-w-4 px-1 text-[9px]',
 }
 
+const shapeStyle: Record<BadgeShape, string> = {
+  pill: 'rounded-full',
+  rounded: 'rounded-lg',
+}
+
 const Badge = ({
   children,
   variant = 'neutral',
   size = 'sm',
+  shape = 'pill',
+  leftIcon,
+  iconClassName = '',
   className = '',
   ...props
 }: BadgeProps) => {
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full font-bold ${variantStyle[variant]} ${sizeStyle[size]} ${className}`}
+      className={`inline-flex items-center justify-center font-bold ${leftIcon ? 'gap-1.5' : ''} ${variantStyle[variant]} ${sizeStyle[size]} ${shapeStyle[shape]} ${className}`}
       {...props}
     >
+      {leftIcon ? (
+        <span className={`inline-flex shrink-0 items-center justify-center ${iconClassName}`}>
+          {leftIcon}
+        </span>
+      ) : null}
       {children}
     </span>
   )
