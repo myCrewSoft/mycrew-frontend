@@ -7,6 +7,7 @@ import type { DepartmentTreeNode } from './adminDepartmentTree';
 import { dispatchAdminEvent } from './adminEvents';
 import AdminSelectionMark from './AdminSelectionMark';
 import {
+  adminSubSidebarActionButtonClass,
   getSubNavBadgeClass,
   getSubNavButtonClass,
   subSidebarErrorClass,
@@ -87,7 +88,7 @@ export default function AdminDepartmentsSubSidebar() {
         variant="primary"
         leftIcon={<PlusCircle size={16} />}
         onClick={() => dispatchAdminEvent('admin:open-department-create')}
-        className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+        className={adminSubSidebarActionButtonClass}
         fullWidth
       >
         부서 생성

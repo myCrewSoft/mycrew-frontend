@@ -6,6 +6,7 @@ import type { AdminAccessResponse } from '../../../types/admin';
 import AdminHeader from '../../common/admin/AdminHeader';
 import AdminPrimarySidebar from '../../common/admin/AdminPrimarySidebar';
 import AdminSubSidebar from '../../common/admin/AdminSubSidebar';
+import { adminLayoutClass } from '../../common/admin/adminLayoutStyles';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;
@@ -27,7 +28,7 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#edf3f8] text-slate-950">
+    <div className={adminLayoutClass}>
       <AdminPrimarySidebar pathname={location.pathname} />
       <AdminSubSidebar />
 

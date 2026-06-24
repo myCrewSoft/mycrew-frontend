@@ -5,6 +5,7 @@ import { employeeFilterItems } from './adminLayoutConfig';
 import { dispatchAdminEvent } from './adminEvents';
 import AdminSelectionMark from './AdminSelectionMark';
 import {
+  adminSubSidebarActionButtonClass,
   getSubNavLinkClass,
   subSidebarSectionClass,
   subSidebarSectionLabelClass,
@@ -26,7 +27,7 @@ export default function AdminEmployeesSubSidebar({
         variant="primary"
         leftIcon={<PlusCircle size={16} />}
         onClick={() => dispatchAdminEvent('admin:open-employee-register')}
-        className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+        className={adminSubSidebarActionButtonClass}
         fullWidth
       >
         사원 등록
