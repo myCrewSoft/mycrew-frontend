@@ -44,6 +44,22 @@ export const formatTime = (date: Date) => {
   }).format(date)
 }
 
+// API의 ISO 일시를 그룹웨어 공통 표기인 YYYY-MM-DD HH:mm 형식으로 보여줍니다.
+export const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
 // ISO 날짜 문자열을 현재 시간 기준으로 "3일 후", "2시간 후", "30분 후" 형태로 보여줍니다.
 export const formatRemainingTime = (start: string) => {
   const startDate = new Date(start)

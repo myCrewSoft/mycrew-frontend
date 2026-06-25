@@ -4,6 +4,7 @@ import { AlertCircle } from 'lucide-react'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import Badge from '../../components/common/dataDisplay/badge/Badge'
 import type { TaskUpcomingResponse } from '../../types'
+import { formatDateTime } from '../../utils/date'
 
 interface ProjectUrgentTaskCardProps {
   taskList: TaskUpcomingResponse[]
@@ -67,13 +68,15 @@ const ProjectUrgentTaskCard = ({ taskList }: ProjectUrgentTaskCardProps) => {
                     <span className="text-slate-500">{task.taskMngrNm}</span>
                   </td>
                   <td className="py-3 pr-4">
-                    <span className="text-slate-500">{task.taskEndDt}</span>
+                    <span className="text-slate-500">
+                      {formatDateTime(task.taskEndDt)}
+                    </span>
                   </td>
                   <td className="py-3 pr-4">
                     <PriorityBadge taskPriorityCd={task.taskPriorityCd} />
                   </td>
                   <td className="py-3 text-right">
-                    <DDayBadge dDay={task.dDay} />
+                    <DDayBadge dDay={task.dday} />
                   </td>
                 </tr>
               ))}

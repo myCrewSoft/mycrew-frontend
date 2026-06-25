@@ -22,10 +22,6 @@ const Header = () => {
   const [notificationRefreshKey, setNotificationRefreshKey] = useState(0)
   const { unreadCount: messengerUnreadCount } = useMessengerSocketContext()
 
-  const { execute: readAllNotifications } = useApi<null>(
-    notificationApi.readAllNotifications,
-    { immediate: false },
-  )
   const {
     data: notificationUnreadCount,
     execute: fetchNotificationUnreadCount,
@@ -35,15 +31,6 @@ const Header = () => {
     mailApi.getMailUnreadCount,
   )
   const [mailRefreshKey, setMailRefreshKey] = useState(0)
-
-  const handleCloseNotifications = () => {
-    void readAllNotifications()
-      .then(() => {
-        setNotificationRefreshKey((current) => current + 1)
-        return fetchNotificationUnreadCount()
-      })
-      .catch(() => undefined)
-  }
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -191,7 +178,6 @@ const Header = () => {
             title="알림"
             className="!w-[420px]"
             bodyClassName="overflow-visible"
-            onClose={handleCloseNotifications}
             trigger={({ open, toggle }) => (
               <NotificationIconButton
                 active={open}
@@ -208,10 +194,13 @@ const Header = () => {
               />
             )}
           >
-            <NotificationPopoverContent
-              refreshSignal={notificationRefreshKey}
-              onNotificationsChanged={() => fetchNotificationUnreadCount()}
-            />
+            {({ close }) => (
+              <NotificationPopoverContent
+                refreshSignal={notificationRefreshKey}
+                onNotificationsChanged={() => fetchNotificationUnreadCount()}
+                onRequestClose={close}
+              />
+            )}
           </HeaderPopover>
 
           <div className="mx-1 h-5 w-[1px] bg-slate-200" />

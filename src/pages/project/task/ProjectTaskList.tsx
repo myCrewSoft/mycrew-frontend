@@ -1,4 +1,4 @@
-import { GripVertical, MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 import {
   ProjectTaskManagerAvatar,
   ProjectTaskPriorityIndicator,
@@ -6,6 +6,7 @@ import {
   ProjectTaskTypeBadge,
 } from './TaskBadges'
 import type { ProjectTask } from './task.types'
+import { formatDateTime } from '../../../utils/date'
 
 interface ProjectTaskListProps {
   tasks: ProjectTask[]
@@ -16,7 +17,7 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
       <div className="min-w-[980px]">
-        <div className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_0.6fr_40px] items-center bg-slate-50 px-5 py-3 text-xs font-bold text-slate-500">
+        <div className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_88px] items-center bg-slate-50 px-5 py-3 text-xs font-bold text-slate-500">
           <span>업무명</span>
           <span>업무 유형</span>
           <span>상태</span>
@@ -24,20 +25,18 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
           <span>기간</span>
           <span>진척률</span>
           <span>우선순위</span>
-          <span />
         </div>
         <div className="divide-y divide-slate-100">
           {tasks.map((task) => (
             <div
               key={task.taskId}
-              className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_0.6fr_40px] items-center px-5 py-3 text-sm transition-colors hover:bg-slate-50"
+              className="grid grid-cols-[1.4fr_0.55fr_0.55fr_0.7fr_0.95fr_0.55fr_88px] items-center px-5 py-3 text-sm transition-colors hover:bg-slate-50"
             >
               <button
                 type="button"
                 onClick={() => onOpenTask(task)}
-                className="flex min-w-0 items-center gap-3 text-left"
+                className="block min-w-0 text-left"
               >
-                <GripVertical size={16} className="shrink-0 text-slate-300" />
                 <div className="min-w-0">
                   <p className="truncate font-bold text-slate-900">{task.taskNm}</p>
                   <p className="truncate text-xs font-medium text-slate-400">
@@ -52,7 +51,7 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
                 fileId={task.prflImgFileId}
               />
               <span className="text-xs font-medium text-slate-600">
-                {task.taskBgngDt} ~ {task.taskEndDt}
+                {formatDateTime(task.taskBgngDt)} ~ {formatDateTime(task.taskEndDt)}
               </span>
               <div className="pr-4">
                 <div className="mb-1 flex justify-end text-xs font-bold text-slate-600">
@@ -65,15 +64,17 @@ const ProjectTaskList = ({ tasks, onOpenTask }: ProjectTaskListProps) => {
                   />
                 </div>
               </div>
-              <ProjectTaskPriorityIndicator priority={task.taskPriorityCd} />
-              <button
-                type="button"
-                onClick={() => onOpenTask(task)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                aria-label="업무 상세 보기"
-              >
-                <MoreHorizontal size={16} />
-              </button>
+              <div className="flex items-center gap-1">
+                <ProjectTaskPriorityIndicator priority={task.taskPriorityCd} />
+                <button
+                  type="button"
+                  onClick={() => onOpenTask(task)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="업무 상세 보기"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

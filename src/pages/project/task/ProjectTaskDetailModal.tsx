@@ -13,6 +13,7 @@ import {
 } from './TaskBadges'
 import { getTaskStatusConfig } from './task.config'
 import type { ProjectTask, ProjectTaskDetail } from './task.types'
+import { formatDateTime } from '../../../utils/date'
 
 interface ProjectTaskDetailModalProps {
   projectId: string | number
@@ -75,7 +76,11 @@ const ProjectTaskDetailModal = ({
   const status = getTaskStatusConfig(visibleTask.taskStatCd)
   const employeeList = (
     Array.isArray(detail?.employeeList) ? detail.employeeList : []
-  ) as Array<{ empId: number; empNm: string }>
+  ) as Array<{
+    empId: number
+    empNm: string
+    prflImgFileId?: number | null
+  }>
 
   return (
     <Modal
@@ -139,7 +144,8 @@ const ProjectTaskDetailModal = ({
               업무 기간
             </div>
             <p className="text-sm font-bold text-slate-800">
-              {visibleTask.taskBgngDt} ~ {visibleTask.taskEndDt}
+              {formatDateTime(visibleTask.taskBgngDt)} ~{' '}
+              {formatDateTime(visibleTask.taskEndDt)}
             </p>
           </div>
           <div className="rounded-lg border border-slate-100 bg-white p-4">
