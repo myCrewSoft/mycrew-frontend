@@ -7,10 +7,7 @@ const useImage = (atchFileDtlId?: number | null) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!atchFileDtlId) {
-      setImageSrc(null)
-      return
-    }
+    if (!atchFileDtlId) return
 
     let objectUrl: string
     let active = true
@@ -27,7 +24,10 @@ const useImage = (atchFileDtlId?: number | null) => {
 
     return () => {
       active = false
-      if (objectUrl) URL.revokeObjectURL(objectUrl) // 클로저 문제 해결
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+        setImageSrc(null)
+      }
     }
   }, [atchFileDtlId])
 
