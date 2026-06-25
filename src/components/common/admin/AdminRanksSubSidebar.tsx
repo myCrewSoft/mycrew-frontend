@@ -4,6 +4,7 @@ import { useOptionalAdminRanks } from '../../../pages/admin/adminRanksHooks';
 import { dispatchAdminEvent } from './adminEvents';
 import AdminSelectionMark from './AdminSelectionMark';
 import {
+  adminSubSidebarActionButtonClass,
   getSubNavBadgeClass,
   getSubNavButtonClass,
   subSidebarErrorClass,
@@ -29,7 +30,7 @@ export default function AdminRanksSubSidebar() {
         variant="primary"
         leftIcon={<PlusCircle size={16} />}
         onClick={() => dispatchAdminEvent('admin:open-rank-create')}
-        className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+        className={adminSubSidebarActionButtonClass}
         fullWidth
       >
         직급 생성

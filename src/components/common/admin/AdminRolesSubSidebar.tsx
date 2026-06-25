@@ -4,6 +4,7 @@ import { useOptionalAdminRoles } from '../../../pages/admin/adminRolesHooks';
 import { dispatchAdminEvent } from './adminEvents';
 import AdminSelectionMark from './AdminSelectionMark';
 import {
+  adminSubSidebarActionButtonClass,
   getSubNavBadgeClass,
   getSubNavButtonClass,
   subSidebarErrorClass,
@@ -29,7 +30,7 @@ export default function AdminRolesSubSidebar() {
         variant="primary"
         leftIcon={<PlusCircle size={16} />}
         onClick={() => dispatchAdminEvent('admin:open-role-create')}
-        className="mt-5 h-11 rounded-lg text-base shadow-lg shadow-blue-200"
+        className={adminSubSidebarActionButtonClass}
         fullWidth
       >
         역할 생성

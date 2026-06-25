@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Settings } from 'lucide-react';
 import { adminNavItems } from './adminLayoutConfig';
 import {
+  adminLogoLinkClass,
   getPrimaryNavLinkClass,
   primarySidebarClass,
 } from './adminLayoutStyles';
@@ -18,7 +19,7 @@ export default function AdminPrimarySidebar({
       <div className="flex w-full flex-col items-center">
         <Link
           to="/admin/dashboard"
-          className="mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563eb] to-[#5ac8fa] text-3xl font-black text-white no-underline shadow-md transition-transform hover:scale-105"
+          className={adminLogoLinkClass}
         >
           A
         </Link>

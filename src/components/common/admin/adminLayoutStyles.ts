@@ -1,8 +1,17 @@
+export const adminLayoutClass =
+  'flex h-screen w-full overflow-hidden bg-[#eef3ef] text-slate-950';
+
 export const primarySidebarClass =
   'flex h-screen w-24 flex-shrink-0 flex-col justify-between bg-[#0d1527] px-2 py-5 text-white';
 
+export const adminLogoLinkClass =
+  'mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-[#16a34a] text-3xl font-black text-white no-underline shadow-md transition-transform hover:scale-105';
+
+export const adminSubSidebarActionButtonClass =
+  'mt-5 h-11 rounded-lg !bg-[#16a34a] !bg-none text-base !text-white shadow-lg !shadow-emerald-200 hover:!bg-[#15803d]';
+
 export const subSidebarClass =
-  'flex h-screen w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-[#f8fafc] px-6 py-7';
+  'flex h-screen w-72 flex-shrink-0 flex-col bg-[#e3ece5] px-6 py-7';
 
 export const subSidebarTitleClass =
   'text-2xl font-black tracking-tight text-slate-950';
@@ -20,6 +29,22 @@ export const subSidebarMessageClass =
 export const subSidebarErrorClass =
   'rounded-xl bg-red-50 px-3 py-4 text-sm font-bold text-red-600';
 
+export const subNavButtonActiveClass =
+  'flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition bg-[#16a34a] text-white shadow-sm';
+
+export const subNavButtonInactiveClass =
+  'flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition text-slate-800 hover:bg-[#eef3ef]';
+
+export const subNavLinkActiveClass =
+  'flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black no-underline transition bg-[#16a34a] text-white shadow-sm';
+
+export const subNavLinkInactiveClass =
+  'flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black no-underline transition text-slate-800 hover:bg-[#eef3ef]';
+
+export const subNavBadgeActiveClass = 'bg-white/20 text-white';
+
+export const subNavBadgeInactiveClass = 'bg-emerald-100 text-emerald-800';
+
 export const getPrimaryNavLinkClass = (active: boolean) =>
   `flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl no-underline transition-all duration-200 ${
     active
@@ -28,16 +53,12 @@ export const getPrimaryNavLinkClass = (active: boolean) =>
   }`;
 
 export const getSubNavButtonClass = (active: boolean) =>
-  `flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black transition ${
-    active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-800 hover:bg-white'
-  }`;
+  active ? subNavButtonActiveClass : subNavButtonInactiveClass;
 
 export const getSubNavLinkClass = (active: boolean) =>
-  `flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-black no-underline transition ${
-    active ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-800 hover:bg-white'
-  }`;
+  active ? subNavLinkActiveClass : subNavLinkInactiveClass;
 
 export const getSubNavBadgeClass = (active: boolean) =>
   `ml-3 flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs ${
-    active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+    active ? subNavBadgeActiveClass : subNavBadgeInactiveClass
   }`;
