@@ -62,14 +62,8 @@ export function AdminRolesProvider({ children }: { children: ReactNode }) {
           (role) => role.roleId === selectedRoleId,
         );
 
-        if (nextRoles.length > 0 && !hasSelectedRole && !isPermissionsView) {
-          navigate(`/admin/roles?roleId=${nextRoles[0].roleId}`, {
-            replace: true,
-          });
-        }
-
-        if (nextRoles.length === 0 && selectedRoleId) {
-          navigate('/admin/roles', { replace: true });
+        if (!isPermissionsView && (!selectedRoleId || !hasSelectedRole)) {
+          navigate('/admin/roles?view=permissions', { replace: true });
         }
       } catch (err) {
         if (active) {

@@ -189,7 +189,7 @@ export default function RoomManagementPage() {
                                 {statsLoading ? '-' : (stats?.totalCount ?? 0)}
                             </h3>
                         </div>
-                        <div className="p-3 bg-[#005cad]/10 rounded-lg text-[#005cad]">
+                        <div className="p-3 bg-[#e5efe8] rounded-lg text-[#6f8f76]">
                             <Building2 size={24} />
                         </div>
                     </div>
@@ -318,7 +318,7 @@ export default function RoomManagementPage() {
                                                 <td className="px-6 py-4 text-right">
                                                     <button
                                                         onClick={() => openEditModal(room)}
-                                                        className="text-[#005cad] hover:bg-[#005cad]/10 p-2 rounded-lg transition-all"
+                                                        className="text-[#6f8f76] hover:bg-[#e5efe8] p-2 rounded-lg transition-all"
                                                         title="수정"
                                                     >
                                                         <Edit3 size={18} />

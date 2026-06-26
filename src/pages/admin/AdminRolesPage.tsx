@@ -36,6 +36,11 @@ import type {
   ScopeOptionResponse,
 } from '../../types/admin';
 import type { AdminEmployeeListItem } from '../../types/adminEmployee';
+import {
+  inferPermissionCategory,
+  permissionCategoryOptions,
+  type PermissionCategory,
+} from './adminPermissionCategories';
 
 const pageSize = 10;
 
@@ -50,28 +55,6 @@ const scopeOptions: Array<{ value: RoleScopeType; label: string }> = [
 ];
 
 type ScopedOptionType = Extract<RoleScopeType, 'DEPT' | 'PROJECT' | 'TASK'>;
-
-type PermissionCategory =
-  | 'ALL'
-  | 'ADMIN'
-  | 'DEPT'
-  | 'BOARD'
-  | 'PROJECT'
-  | 'TASK'
-  | 'OTHER';
-
-const permissionCategoryOptions: Array<{
-  value: PermissionCategory;
-  label: string;
-}> = [
-  { value: 'ALL', label: '전체' },
-  { value: 'ADMIN', label: '관리자' },
-  { value: 'DEPT', label: '부서' },
-  { value: 'BOARD', label: '게시판' },
-  { value: 'PROJECT', label: '프로젝트' },
-  { value: 'TASK', label: '업무' },
-  { value: 'OTHER', label: '기타' },
-];
 
 const roleErrorMessages: Record<string, string> = {
   AUTH_002: '접근 권한이 없습니다.',
@@ -158,18 +141,6 @@ const requiresScopeId = (scopeTypeCd: RoleScopeType) =>
   scopeTypeCd === 'DEPT' ||
   scopeTypeCd === 'PROJECT' ||
   scopeTypeCd === 'TASK';
-
-const inferPermissionCategory = (
-  permission: PermissionResponse,
-): PermissionCategory => {
-  const prefix = permission.permissionCode.split('_')[0]?.toUpperCase();
-
-  return permissionCategoryOptions.some(
-    (category) => category.value === prefix && category.value !== 'ALL',
-  )
-    ? (prefix as PermissionCategory)
-    : 'OTHER';
-};
 
 const buildRoleForm = (role: RoleDetailResponse): RoleFormState => ({
   roleCode: role.roleCode,
@@ -969,7 +940,12 @@ export default function AdminRolesPage() {
                   aria-label="권한 검색"
                   wrapperClassName="min-w-72"
                 />
-                <Button type="submit" variant="outline" size="sm">
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 whitespace-nowrap"
+                >
                   검색
                 </Button>
               </form>
@@ -1380,7 +1356,7 @@ export default function AdminRolesPage() {
                   aria-label="사원 검색"
                   wrapperClassName="min-w-72"
                 />
-                <Button type="submit" variant="outline">
+                <Button type="submit" variant="outline" className="shrink-0 whitespace-nowrap">
                   검색
                 </Button>
               </form>

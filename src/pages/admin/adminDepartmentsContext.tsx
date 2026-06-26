@@ -16,6 +16,16 @@ const sortDepartments = (departments: AdminDepartmentResponseDTO[]) =>
     left.deptNm.localeCompare(right.deptNm, 'ko'),
   );
 
+const getTopDepartment = (departments: AdminDepartmentResponseDTO[]) => {
+  const rootDepartments = departments.filter(
+    (department) => !department.parentDeptCd,
+  );
+
+  return sortDepartments(
+    rootDepartments.length > 0 ? rootDepartments : departments,
+  )[0];
+};
+
 export function AdminDepartmentsProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -50,11 +60,12 @@ export function AdminDepartmentsProvider({ children }: { children: ReactNode }) 
         const hasSelectedDepartment = nextDepartments.some(
           (department) => department.deptCd === nextSelectedDeptCd,
         );
+        const topDepartment = getTopDepartment(nextDepartments);
 
-        if (nextDepartments.length > 0 && !hasSelectedDepartment) {
+        if (topDepartment && !hasSelectedDepartment) {
           navigate(
             `/admin/departments?deptCd=${encodeURIComponent(
-              nextDepartments[0].deptCd,
+              topDepartment.deptCd,
             )}`,
             { replace: true },
           );

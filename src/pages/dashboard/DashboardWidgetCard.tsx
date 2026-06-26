@@ -520,7 +520,7 @@ const renderAdminWidgetBody = (
     case 'attendance': {
       const adminData = data as unknown as AdminAttendanceWidgetResponseDto
       return (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="mb-2 flex items-center justify-between rounded-lg bg-amber-50 px-4 py-3 ring-1 ring-amber-100">
             <span className="text-[13px] font-black text-amber-800">특이사항 사원</span>
             <strong className="text-2xl font-black text-amber-700">
@@ -528,7 +528,7 @@ const renderAdminWidgetBody = (
             </strong>
           </div>
           {adminData.employees.length ? (
-            <ul className="space-y-1">
+            <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain pr-1">
               {adminData.employees.map((emp) => (
                 <ListRow
                   key={emp.empId}
@@ -543,7 +543,7 @@ const renderAdminWidgetBody = (
           ) : (
             <EmptyState label="오늘 특이사항이 없습니다." />
           )}
-        </>
+        </div>
       )
     }
 

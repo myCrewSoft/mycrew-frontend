@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, LogOut } from 'lucide-react';
 import Button from '../button/Button';
-import Badge from '../dataDisplay/badge/Badge';
 import type { AdminAccessResponse } from '../../../types/admin';
 
 interface AdminHeaderProps {
@@ -29,7 +28,6 @@ export default function AdminHeader({ access, onLogout }: AdminHeaderProps) {
           <ArrowLeft size={15} />
           사용자 화면
         </Link>
-        <Badge variant="success">ADMIN_CONSOLE_ACCESS</Badge>
         <Button
           variant="outline"
           size="sm"

@@ -116,6 +116,7 @@ const PolicyView = () => {
 
   useEffect(() => {
     if (policy) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         policyNm: policy.policyNm,
         workBgnTm: policy.workBgnTm,
@@ -290,11 +291,13 @@ const StatsView = () => {
           workedList.reduce((s, r) => s + (r.workMin ?? 0), 0) / workedList.length,
         )
 
-  // 사원별 근무시간 (상위 정렬)
-  const byWork = [...list]
-    .filter((r) => (r.workMin ?? 0) > 0)
-    .sort((a, b) => (b.workMin ?? 0) - (a.workMin ?? 0))
-  const maxWork = Math.max(1, ...byWork.map((r) => r.workMin ?? 0))
+  // 사원별 근무시간 (전체 사원 기준)
+  const workChartRows = [...list].sort(
+    (a, b) =>
+      (b.workMin ?? 0) - (a.workMin ?? 0) ||
+      a.empNm.localeCompare(b.empNm, 'ko'),
+  )
+  const maxWork = Math.max(1, ...workChartRows.map((r) => r.workMin ?? 0))
 
   return (
     <>
@@ -335,28 +338,49 @@ const StatsView = () => {
         </div>
 
         {/* 사원별 근무시간 */}
-        <ContentCard title="사원별 근무시간 (기간 합계)">
-          {byWork.length === 0 ? (
+        <ContentCard
+          title="사원별 근무시간 (기간 합계)"
+          description="전체 사원을 세로 막대로 표시합니다."
+        >
+          {workChartRows.length === 0 ? (
             <EmptyHint />
           ) : (
-            <div className="flex flex-col gap-3 pt-2">
-              {byWork.map((r) => (
-                <div key={r.empId} className="flex items-center gap-3">
-                  <span className="w-20 shrink-0 truncate text-sm font-bold text-slate-700">
-                    {r.empNm}
-                  </span>
-                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-100">
+            <div className="overflow-x-auto pb-2">
+              <div
+                className="flex h-72 items-end gap-3 border-b border-slate-200 px-2 pt-5"
+                style={{ minWidth: `${Math.max(640, workChartRows.length * 76)}px` }}
+              >
+                {workChartRows.map((r) => {
+                  const workMin = r.workMin ?? 0
+                  const height = workMin > 0 ? Math.max(8, (workMin / maxWork) * 100) : 3
+
+                  return (
                     <div
-                      className="flex h-full items-center justify-end rounded-md bg-blue-500 px-2"
-                      style={{ width: `${Math.max(8, ((r.workMin ?? 0) / maxWork) * 100)}%` }}
+                      key={r.empId}
+                      className="flex h-full w-16 flex-col items-center justify-end"
                     >
-                      <span className="text-[10px] font-black text-white">
-                        {formatMin(r.workMin)}
+                      <span className="mb-1 whitespace-nowrap text-[10px] font-black text-slate-600">
+                        {formatMin(workMin)}
+                      </span>
+                      <div className="flex h-52 w-full items-end justify-center">
+                        <div
+                          className={`w-10 rounded-t-lg ${
+                            workMin > 0 ? 'bg-emerald-500' : 'bg-slate-200'
+                          }`}
+                          style={{ height: `${height}%` }}
+                          title={`${r.empNm} ${formatMin(workMin)}`}
+                        />
+                      </div>
+                      <span className="mt-2 w-16 truncate text-center text-xs font-bold text-slate-700">
+                        {r.empNm}
                       </span>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  )
+                })}
+              </div>
+              <p className="mt-3 text-xs font-semibold text-slate-500">
+                총 {workChartRows.length}명 기준
+              </p>
             </div>
           )}
         </ContentCard>
