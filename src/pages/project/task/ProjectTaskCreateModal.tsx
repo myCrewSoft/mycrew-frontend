@@ -20,16 +20,21 @@ interface ProjectTaskCreateModalProps {
   onCreated: () => void
 }
 
+type TaskCreateFormState = Omit<TaskCreateForm, 'empIdList'> & {
+  taskPrgrsSmry: number
+}
+
 const createDefaultForm = (
   projId: number,
   taskStatCd: ProjectTaskStatusCode,
-): Omit<TaskCreateForm, 'empIdList'> => ({
+): TaskCreateFormState => ({
   projId,
   taskTypeCd: '01',
   taskMngrId: 0,
   taskStatCd,
   taskPriorityCd: '02',
   taskImprtncCd: '02',
+  taskPrgrsSmry: 0,
   taskNm: '',
   taskCn: '',
   taskBgngDt: '',
@@ -37,6 +42,8 @@ const createDefaultForm = (
 })
 
 const getEmployeeIdKey = (id: string | number | null) => String(id ?? '')
+const COMPLETED_TASK_STATUS = '02'
+const clampProgress = (value: number) => Math.min(100, Math.max(0, value))
 
 const ProjectTaskCreateModal = ({
   open,
@@ -45,7 +52,7 @@ const ProjectTaskCreateModal = ({
   onClose,
   onCreated,
 }: ProjectTaskCreateModalProps) => {
-  const [form, setForm] = useState<Omit<TaskCreateForm, 'empIdList'>>(() =>
+  const [form, setForm] = useState<TaskCreateFormState>(() =>
     createDefaultForm(projId, initialStatus),
   )
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<Array<string | number>>([])
@@ -83,6 +90,26 @@ const ProjectTaskCreateModal = ({
 
       return currentManagerStillSelected ? currentManagerId : nextIds[0] ?? null
     })
+  }
+
+  const handleStatusChange = (taskStatCd: string) => {
+    setForm((prev) => ({
+      ...prev,
+      taskStatCd,
+      taskPrgrsSmry:
+        taskStatCd === COMPLETED_TASK_STATUS ? 100 : prev.taskPrgrsSmry,
+    }))
+  }
+
+  const handleProgressChange = (value: number) => {
+    const taskPrgrsSmry = clampProgress(value)
+
+    setForm((prev) => ({
+      ...prev,
+      taskPrgrsSmry,
+      taskStatCd:
+        taskPrgrsSmry === 100 ? COMPLETED_TASK_STATUS : prev.taskStatCd,
+    }))
   }
 
   const handleCreate = async () => {
@@ -207,11 +234,19 @@ const ProjectTaskCreateModal = ({
                   value,
                   label: config.label,
                 }))}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, taskStatCd: event.target.value }))
-                }
+                onChange={(event) => handleStatusChange(event.target.value)}
               />
             </div>
+
+            <FormField
+              label="진척률"
+              type="number"
+              min={0}
+              max={100}
+              value={form.taskPrgrsSmry}
+              rightSlot={<span className="text-sm font-bold text-slate-400">%</span>}
+              onChange={(event) => handleProgressChange(Number(event.target.value))}
+            />
 
             <div className="grid gap-4 md:grid-cols-2">
               <Select
