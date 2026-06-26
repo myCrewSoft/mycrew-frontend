@@ -1,12 +1,19 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Bell,
   ChevronRight,
+  Clock,
   GripVertical,
+  LogIn,
+  LogOut,
   Mail,
   MessageSquare,
   Trash2,
 } from 'lucide-react'
 import { useNavigate, type NavigateFunction } from 'react-router-dom'
+import { ApiError } from '../../api/axiosInstance'
+import { attendanceApi, type AtndToday } from '../../api/attendanceApi'
+import Button from '../../components/common/button/Button'
 import type {
   AdminAttendanceWidgetItem,
   AdminAttendanceWidgetResponseDto,
@@ -36,6 +43,7 @@ interface DashboardWidgetCardProps {
   variant?: DashboardVariant
   onRemove: (widgetKey: DashboardWidgetKey) => void
   onBoardTypeChange: (boardType: DashboardBoardType) => void
+  onRefreshWidget?: (widgetKey: DashboardWidgetKey) => Promise<void> | void
 }
 
 // 관리자 변형(variant='admin')에서 위젯 헤더에 표시할 제목 오버라이드
@@ -114,14 +122,36 @@ interface WidgetHeaderBadgeData {
 
 const isAdminDashboard = (variant: DashboardVariant): boolean => variant === 'admin'
 
-const formatMinutes = (minutes = 0) => {
-  const hour = Math.floor(minutes / 60)
-  const minute = minutes % 60
-  return `${hour}시간 ${String(minute).padStart(2, '0')}분`
+const formatWorkDuration = (minutes?: number | null) => {
+  const safeMinutes = Math.max(0, minutes ?? 0)
+  const hour = Math.floor(safeMinutes / 60)
+  const minute = safeMinutes % 60
+  if (hour === 0) return `${minute}분`
+  if (minute === 0) return `${hour}시간`
+  return `${hour}시간 ${minute}분`
+}
+
+const formatClockTime = (value?: string | null) => {
+  if (!value) return '-'
+  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5)
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 const getAttendanceStatus = (status: AttendanceWidgetResponseDto['status']) =>
   statusLabel[status] ?? status ?? '-'
+
+const getTodayAttendanceStatus = (
+  today: AtndToday | null,
+  fallbackStatus?: AttendanceWidgetResponseDto['status'],
+) => {
+  if (!today) return getAttendanceStatus(fallbackStatus)
+  if (today.checkedOut) return '퇴근 완료'
+  if (today.checkedIn) return today.atndStatNm ?? '근무 중'
+  return '출근 전'
+}
 
 const getScheduleTarget = (
   schedule: DashboardWidgetResponseMap['todaySchedule']['schedules'][number],
@@ -403,6 +433,15 @@ const Metric = ({
   </div>
 )
 
+const AttendanceMetric = ({ label, value }: { label: string; value: string }) => (
+  <div className="min-w-0 rounded-md bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
+    <p className="truncate text-[10px] font-bold text-slate-500">{label}</p>
+    <p className="mt-0.5 truncate text-[13px] font-black text-slate-900">
+      {value}
+    </p>
+  </div>
+)
+
 const EmptyState = ({ label = '표시할 데이터가 없습니다.' }: { label?: string }) => (
   <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-lg bg-slate-50 text-sm font-semibold text-slate-400">
     {label}
@@ -429,6 +468,7 @@ const DashboardWidgetCard = ({
   variant = 'user',
   onRemove,
   onBoardTypeChange,
+  onRefreshWidget,
 }: DashboardWidgetCardProps) => {
   const navigate = useNavigate()
   const config = DASHBOARD_WIDGET_CONFIG_MAP[widgetKey]
@@ -485,6 +525,7 @@ const DashboardWidgetCard = ({
             onBoardTypeChange,
             variant,
             navigate,
+            onRefreshWidget,
           )}
         </div>
       )}
@@ -506,6 +547,154 @@ const scheduleRange = (schedule: AdminImportantScheduleWidgetItem) => {
 const joinMeta = (parts: (string | null | undefined)[]) => {
   const text = parts.filter((part) => Boolean(part)).join(' · ')
   return text || undefined
+}
+
+const AttendanceControlWidget = ({
+  data,
+  onRefreshWidget,
+}: {
+  data: DashboardWidgetResponseMap['attendance']
+  onRefreshWidget?: (widgetKey: DashboardWidgetKey) => Promise<void> | void
+}) => {
+  const [today, setToday] = useState<AtndToday | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [acting, setActing] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const loadToday = useCallback(async () => {
+    const response = await attendanceApi.getToday()
+    setToday(response.data.data)
+  }, [])
+
+  const refreshAttendance = useCallback(async () => {
+    await Promise.all([
+      loadToday(),
+      onRefreshWidget?.('attendance'),
+    ])
+  }, [loadToday, onRefreshWidget])
+
+  useEffect(() => {
+    void loadToday().catch(() => {
+      setToday(null)
+    })
+
+    const handleRefresh = () => {
+      void refreshAttendance().catch(() => {
+        setToday(null)
+      })
+    }
+
+    window.addEventListener('attendance:refresh', handleRefresh)
+    return () => window.removeEventListener('attendance:refresh', handleRefresh)
+  }, [loadToday, refreshAttendance])
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const checkedIn = today?.checkedIn ?? data.status === 'working'
+  const checkedOut = today?.checkedOut ?? data.status === 'afterWork'
+  const working = checkedIn && !checkedOut
+  const checkInAt = today?.wrkStartDtm ?? data.checkInAt
+  const checkOutAt = today?.wrkEndDtm ?? data.checkOutAt
+  const elapsedMinutes = useMemo(() => {
+    if (working && checkInAt) {
+      const startTime = new Date(checkInAt).getTime()
+      if (!Number.isNaN(startTime)) {
+        return Math.max(0, Math.floor((now - startTime) / 60000))
+      }
+    }
+    return today?.workMin ?? data.workDurationMinutes ?? 0
+  }, [checkInAt, data.workDurationMinutes, now, today?.workMin, working])
+
+  const handleCheck = async (kind: 'in' | 'out') => {
+    setActing(true)
+    setMessage('')
+
+    try {
+      const response =
+        kind === 'in'
+          ? await attendanceApi.checkIn()
+          : await attendanceApi.checkOut()
+      setMessage(response.data.message ?? '처리되었습니다.')
+      await refreshAttendance()
+      window.dispatchEvent(new Event('attendance:refresh'))
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.message : '처리 중 오류가 발생했습니다.')
+    } finally {
+      setActing(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="rounded-lg bg-slate-950 px-3.5 py-2.5 text-white shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black text-sky-200">현재 상태</p>
+            <strong className="mt-0.5 block truncate text-[19px] font-black leading-6 tracking-tight">
+              {getTodayAttendanceStatus(today, data.status)}
+            </strong>
+          </div>
+          <span
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
+              working ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/10 text-slate-200'
+            }`}
+          >
+            <Clock size={18} className={working ? 'animate-pulse' : ''} />
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-emerald-400 transition-all"
+            style={{
+              width: `${Math.min(100, Math.round((elapsedMinutes / 480) * 100))}%`,
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <AttendanceMetric label="출근" value={formatClockTime(checkInAt)} />
+        <AttendanceMetric label="퇴근" value={formatClockTime(checkOutAt)} />
+        <AttendanceMetric label="근무 시간" value={formatWorkDuration(elapsedMinutes)} />
+      </div>
+
+      <div className="mt-auto grid grid-cols-2 gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          fullWidth
+          leftIcon={<LogIn size={15} />}
+          loading={acting}
+          disabled={checkedIn}
+          onClick={() => void handleCheck('in')}
+          className="dashboard-widget-action h-8"
+        >
+          출근
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          fullWidth
+          leftIcon={<LogOut size={15} />}
+          loading={acting}
+          disabled={!checkedIn || checkedOut}
+          onClick={() => void handleCheck('out')}
+          className="dashboard-widget-action h-8"
+        >
+          퇴근
+        </Button>
+      </div>
+
+      {message && (
+        <p className="truncate text-[12px] font-bold text-slate-500">
+          {message}
+        </p>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -634,6 +823,7 @@ const renderWidgetBody = (
   onBoardTypeChange: (boardType: DashboardBoardType) => void,
   variant: DashboardVariant,
   navigate: NavigateFunction,
+  onRefreshWidget?: (widgetKey: DashboardWidgetKey) => Promise<void> | void,
 ) => {
   if (widgetState?.loading && !widgetState.data) return <LoadingState />
   if (widgetState?.error && !widgetState.data) return <ErrorState message={widgetState.error} />
@@ -650,24 +840,10 @@ const renderWidgetBody = (
     case 'attendance': {
       const data = widgetState.data as DashboardWidgetResponseMap['attendance']
       return (
-        <div className="flex flex-1 flex-col justify-between gap-4">
-          <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-4 py-3 ring-1 ring-emerald-100">
-            <div>
-              <p className="text-[12px] font-black text-emerald-700">현재 상태</p>
-              <strong className="mt-1 block text-2xl font-black tracking-tight text-emerald-700">
-                {getAttendanceStatus(data.status)}
-              </strong>
-            </div>
-            <span className="rounded-full bg-white px-3 py-1.5 text-[12px] font-black text-emerald-700 ring-1 ring-emerald-100">
-              근무
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Metric label="출근" value={data.checkInAt ?? '-'} />
-            <Metric label="퇴근" value={data.checkOutAt ?? '-'} />
-            <Metric label="근무 시간" value={formatMinutes(data.workDurationMinutes)} accent />
-          </div>
-        </div>
+        <AttendanceControlWidget
+          data={data}
+          onRefreshWidget={onRefreshWidget}
+        />
       )
     }
 

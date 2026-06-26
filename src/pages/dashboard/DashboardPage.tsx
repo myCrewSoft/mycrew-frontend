@@ -343,7 +343,7 @@ const DashboardPage = ({
     () => new Set(activeWidgetKeys),
     [activeWidgetKeys],
   )
-  const { widgetStates } = useDashboardWidgetData(
+  const { widgetStates, refetchWidget } = useDashboardWidgetData(
     activeWidgetKeys,
     boardType,
     variant,
@@ -590,6 +590,7 @@ const DashboardPage = ({
                   variant={variant}
                   onRemove={handleRemoveWidget}
                   onBoardTypeChange={setBoardType}
+                  onRefreshWidget={refetchWidget}
                 />
               </div>
             ))}

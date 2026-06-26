@@ -1,4 +1,3 @@
-/* eslint-disable no-useless-assignment */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -42,13 +41,13 @@ import Tabs from '../../components/common/tabs/Tabs'
 import { useToast } from '../../components/common/toast/useToast'
 import PageComponent from '../../components/layouts/PageComponent'
 import { useApi } from '../../hooks/useApi'
+import { useAuth } from '../../store/AuthContext'
 import type {
   ReservationResponse,
   RoomResponse,
 } from '../../types'
 import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import MeetingRoomAvailabilityTimeline from './MeetingRoomAvailabilityTimeline'
-import MeetingMinutesPage from './MeetingMinutesPage'
 import type {
   MeetingDetail,
   MeetingCreateRequest,
@@ -197,12 +196,10 @@ const toDateTimeInputValue = (dateTime?: string | null) => {
 const getMeetingDateKey = (meeting: MeetingListItem) =>
   toDateKey(new Date(meeting.beginDt ?? ''))
 
-// 예약됨(01)·진행 중(02) 모두 입장 가능
 const canJoinMeeting = (meeting: MeetingListItem | MeetingDetail) =>
   meeting.vconfId !== null &&
   (meeting.mtngSttus === 'scheduled' || meeting.mtngSttus === 'live')
 
-// 회의록 상태 한글 변환
 const getMomStatusLabel = (cd?: string | null) => {
   const map: Record<string, string> = {
     '01': 'AI 초안',
@@ -222,11 +219,6 @@ const groupMeetingsByDate = (meetings: MeetingListItem[]) =>
     }
   }, {})
 
-const isMeetingDetail = (
-  meeting: MeetingListItem | MeetingDetail,
-): meeting is MeetingDetail =>
-  Array.isArray((meeting as MeetingDetail).ptcptList)
-
 // 서버 전송 필드와 화면 전용 체크박스 상태를 함께 관리합니다.
 type ScheduleForm = Omit<MeetingCreateRequest, 'mtngTypeCd'> & {
   beginDt: string
@@ -234,6 +226,12 @@ type ScheduleForm = Omit<MeetingCreateRequest, 'mtngTypeCd'> & {
   confRmId: number | null
   useVideoConference: boolean
   useMeetingRoom: boolean
+}
+
+const statusColorMap: Record<MeetingStatus, { bg: string; border: string }> = {
+  scheduled: { bg: '#3b82f6', border: '#2563eb' },
+  live:      { bg: '#10b981', border: '#059669' },
+  ended:     { bg: '#94a3b8', border: '#64748b' },
 }
 
 const createDefaultScheduleForm = (): ScheduleForm => {
@@ -257,14 +255,26 @@ const MeetingPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { showToast } = useToast()
+  const { auth } = useAuth()
 
   const selectedFilter = useMemo(
     () => getFilterFromPath(location.pathname),
     [location.pathname],
   )
 
+  const currentEmpId = useMemo(() => {
+    const payloadEmpId =
+      typeof auth.payload?.sub === 'number'
+        ? auth.payload.sub
+        : Number(auth.payload?.sub)
+    const storedEmpId = Number(localStorage.getItem('empId'))
+
+    if (Number.isFinite(payloadEmpId)) return payloadEmpId
+    if (Number.isFinite(storedEmpId)) return storedEmpId
+    return null
+  }, [auth.payload?.sub])
+
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
-  const [activeMinutesMeeting, setActiveMinutesMeeting] = useState<MeetingDetail | null>(null)
   const [rcrdgBlobUrl, setRcrdgBlobUrl] = useState<string | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
@@ -405,12 +415,6 @@ const MeetingPage = () => {
   const groupedMeetings = groupMeetingsByDate(filteredMeetings)
   const dateKeys = Object.keys(groupedMeetings).sort()
 
-  const statusColorMap: Record<MeetingStatus, { bg: string; border: string }> = {
-    scheduled: { bg: '#3b82f6', border: '#2563eb' },
-    live:      { bg: '#10b981', border: '#059669' },
-    ended:     { bg: '#94a3b8', border: '#64748b' },
-  }
-
   const calendarEvents = useMemo(
     () =>
       filteredMeetings.map((m) => ({
@@ -423,7 +427,6 @@ const MeetingPage = () => {
         textColor: '#ffffff',
         extendedProps: { meeting: m },
       })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [filteredMeetings],
   )
 
@@ -479,7 +482,6 @@ const MeetingPage = () => {
     setMeetingDateTo('')
   }
 
-  // 회의 입장 버튼 - 토큰 발급 후 LiveKit 회의실 페이지로 이동
   const handleJoinMeeting = useCallback(
     async (meeting: MeetingListItem | MeetingDetail) => {
       if (meeting.vconfId === null) return
@@ -496,7 +498,7 @@ const MeetingPage = () => {
           })
         }
       } catch {
-        // 에러 처리는 추후 토스트로 교체
+        // silent: 토큰 발급 실패 시 별도 UX 처리 예정
       }
     },
     [issueToken, navigate],
@@ -511,7 +513,6 @@ const MeetingPage = () => {
   )
 
   const handlePrimaryMeetingAction = (meeting: MeetingListItem) => {
-    // 진행 중인 회의는 바로 입장, 그 외(예약됨·종료)는 상세 모달 먼저 표시
     if (meeting.mtngSttus === 'live' && meeting.vconfId !== null) {
       void handleJoinMeeting(meeting)
       return
@@ -542,17 +543,11 @@ const MeetingPage = () => {
   }
 
   const openMinutesWorkspace = useCallback(
-    async (meeting: MeetingListItem | MeetingDetail) => {
-      const detail =
-        isMeetingDetail(meeting)
-          ? meeting
-          : (await fetchMeetingDetail(meeting.mtngId)).data
-
-      if (!detail) return
+    (meeting: MeetingListItem | MeetingDetail) => {
       setSelectedMeeting(null)
-      setActiveMinutesMeeting(detail)
+      navigate(`/meeting/minutes/${meeting.mtngId}`)
     },
-    [fetchMeetingDetail],
+    [navigate],
   )
 
   const handleDownloadRecording = useCallback(
@@ -637,7 +632,6 @@ const MeetingPage = () => {
     field: keyof ScheduleForm,
     value: string | boolean | number | number[] | null,
   ) => {
-    // 해당 필드 에러만 초기화
     if (field === 'mtngNm') setFormErrors((prev) => ({ ...prev, mtngNm: undefined }))
     if (field === 'beginDt' || field === 'endDt') setFormErrors((prev) => ({ ...prev, dateRange: undefined }))
     if (field === 'confRmId' || field === 'useMeetingRoom') setFormErrors((prev) => ({ ...prev, confRm: undefined }))
@@ -645,24 +639,25 @@ const MeetingPage = () => {
     setScheduleForm((current: ScheduleForm) => {
       const next = { ...current, [field]: value }
 
-      const roomId = field === 'confRmId' ? (value as number | null) : current.confRmId
-      const beginDt = field === 'beginDt' ? (value as string) : current.beginDt
-      const endDt = field === 'endDt' ? (value as string) : current.endDt
-
-      if (next.useMeetingRoom && roomId !== null) {
-        const overlapping = (roomReservations ?? []).some(
-          (reservation) =>
-            reservation.roomId === roomId &&
-            !isCurrentEditingMeetingReservation(reservation, editingMeetingId) &&
-            isReservationOverlapping(beginDt, endDt, reservation),
-        )
-        if (overlapping) {
-          queueMicrotask(() =>
-            setFormErrors((prev) => ({
-              ...prev,
-              confRm: '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택하거나 시간을 변경해 주세요.',
-            })),
+      if (next.useMeetingRoom) {
+        const roomId = field === 'confRmId' ? (value as number | null) : current.confRmId
+        if (roomId !== null) {
+          const beginDt = field === 'beginDt' ? (value as string) : current.beginDt
+          const endDt = field === 'endDt' ? (value as string) : current.endDt
+          const overlapping = (roomReservations ?? []).some(
+            (reservation) =>
+              reservation.roomId === roomId &&
+              !isCurrentEditingMeetingReservation(reservation, editingMeetingId) &&
+              isReservationOverlapping(beginDt, endDt, reservation),
           )
+          if (overlapping) {
+            queueMicrotask(() =>
+              setFormErrors((prev) => ({
+                ...prev,
+                confRm: '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택하거나 시간을 변경해 주세요.',
+              })),
+            )
+          }
         }
       }
 
@@ -679,6 +674,15 @@ const MeetingPage = () => {
   }
 
   const handleEditMeeting = (meeting: MeetingDetail) => {
+    if (!isMeetingCreator(meeting)) {
+      showToast({
+        title: '회의 생성자만 수정할 수 있습니다.',
+        description: '회의를 생성한 사용자에게 요청해 주세요.',
+        variant: 'info',
+      })
+      return
+    }
+
     const usesVideoConference =
       meeting.mtngTypeCd === '01' || meeting.mtngTypeCd === '03'
     const usesMeetingRoom = meeting.confRmId !== null
@@ -700,7 +704,19 @@ const MeetingPage = () => {
     setSchedulePanelOpen(true)
   }
 
+  const isMeetingCreator = (meeting: MeetingDetail) =>
+    currentEmpId !== null && meeting.crtrId === currentEmpId
+
   const handleDeleteMeeting = async (meeting: MeetingDetail) => {
+    if (!isMeetingCreator(meeting)) {
+      showToast({
+        title: '회의 생성자만 삭제할 수 있습니다.',
+        description: '회의를 생성한 사용자에게 요청해 주세요.',
+        variant: 'info',
+      })
+      return
+    }
+
     if (!window.confirm(`'${meeting.mtngNm}' 회의를 삭제하시겠습니까?`)) return
 
     try {
@@ -828,22 +844,16 @@ const MeetingPage = () => {
     }
 
     if (Number.isFinite(minutesMeetingId) && minutesMeetingId > 0) {
-      const target = meetingList.find((m: MeetingListItem) => m.mtngId === minutesMeetingId)
-      if (target) {
-        queueMicrotask(() => {
-          setSelectedMeeting(null)
-          void openMinutesWorkspace(target)
-          navigate(location.pathname, { replace: true })
-        })
-      }
+      queueMicrotask(() => {
+        setSelectedMeeting(null)
+        navigate(`/meeting/minutes/${minutesMeetingId}`, { replace: true })
+      })
     }
   }, [
     location.pathname,
     location.search,
-    meetingList,
     navigate,
     openMeetingDetail,
-    openMinutesWorkspace,
   ])
 
   useEffect(() => {
@@ -876,7 +886,7 @@ const MeetingPage = () => {
         setEditingMeetingId(null)
         setScheduleForm(createDefaultScheduleForm())
         setSelectedEmployeeIds([])
-        setFormErrors({})  // 추가
+        setFormErrors({})
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -903,19 +913,6 @@ const MeetingPage = () => {
       behavior: 'smooth',
     })
   }, [formErrors])
-
-  // ─────────────────────────────────────────────────────────────
-  // 목록 화면
-  // ─────────────────────────────────────────────────────────────
-
-  if (activeMinutesMeeting) {
-    return (
-      <MeetingMinutesPage
-        meeting={activeMinutesMeeting}
-        onBack={() => setActiveMinutesMeeting(null)}
-      />
-    )
-  }
 
   return (
     <PageComponent>
@@ -1212,7 +1209,6 @@ const MeetingPage = () => {
         </section>
       </div>
 
-      {/* ── 상세 모달 ── */}
       {selectedMeeting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
           <section className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
@@ -1344,7 +1340,7 @@ const MeetingPage = () => {
                 <Button
                   variant="danger"
                   leftIcon={<Trash2 size={16} />}
-                  disabled={!selectedMeeting.canDelete}
+                  disabled={!isMeetingCreator(selectedMeeting)}
                   loading={deleteMeetingLoading}
                   onClick={() => void handleDeleteMeeting(selectedMeeting)}
                 >
@@ -1353,7 +1349,7 @@ const MeetingPage = () => {
                 <Button
                   variant="outline"
                   leftIcon={<Pencil size={16} />}
-                  disabled={!selectedMeeting.canEdit}
+                  disabled={!isMeetingCreator(selectedMeeting)}
                   onClick={() => handleEditMeeting(selectedMeeting)}
                 >
                   수정
@@ -1462,7 +1458,6 @@ const MeetingPage = () => {
                         handleScheduleFormChange('confRmId', roomId)
                       }}
                     />
-                    {/* 회의실 겹침 경고 */}
                     {formErrors.confRm && (
                       <p className="mt-2 flex items-center gap-1.5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
                         <AlertCircle size={14} />

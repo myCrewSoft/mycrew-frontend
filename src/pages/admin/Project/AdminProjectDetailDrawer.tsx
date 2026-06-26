@@ -213,8 +213,18 @@ export default function AdminProjectDetailDrawer({
           projectApi.getTaskDashboard(project.projId),
         ])
         if (cancelled) return
+        const taskSummary = dashboardRes.data.data?.summary
         setMemberList(projectRes.data.data?.projMemberList ?? [])
-        setSummary(dashboardRes.data.data?.summary ?? null)
+        setSummary(
+          taskSummary
+            ? {
+                totalCount: taskSummary.totalCount,
+                completedCount: taskSummary.completedCount,
+                inProgressCount: taskSummary.inProgressCount,
+                stopCount: taskSummary.stopCount ?? 0,
+              }
+            : null,
+        )
       } catch (err) {
         if (cancelled) return
         console.error(err instanceof ApiError ? err.message : err)

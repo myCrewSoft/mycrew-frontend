@@ -48,7 +48,7 @@ const ReservationCreateModal = ({
   onSubmit,
 }: ReservationCreateModalProps) => {
   const selectedRoom = rooms.find((room) => room.roomId === formValues.roomId)
-  const allDay = formValues.intgRsrvYn === 'Y'
+  const allDay = formValues.allDayYn === 'Y'
 
   const roomOptions = useMemo(
     () =>
@@ -110,7 +110,7 @@ const ReservationCreateModal = ({
 
     onChange({
       ...formValues,
-      intgRsrvYn: nextAllDay ? 'Y' : 'N',
+      allDayYn: nextAllDay ? 'Y' : 'N',
       startDateTime: nextAllDay
         ? fromStartDateInputValue(toDateInputValue(formValues.startDateTime))
         : formValues.startDateTime,

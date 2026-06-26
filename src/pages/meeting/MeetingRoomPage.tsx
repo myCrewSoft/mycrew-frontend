@@ -63,9 +63,22 @@ interface ParticipantTile {
 // ── 상수 ──────────────────────────────────────────────────────────
 
 const STT_CHUNK_INTERVAL_MS = 5000
+const STT_SPEECH_RMS_THRESHOLD = 0.018
+const STT_SPEECH_CHECK_INTERVAL_MS = 200
 const DEFAULT_LIVEKIT_URL = `${
   window.location.protocol === 'https:' ? 'wss' : 'ws'
 }://${window.location.hostname}:7880`
+
+const getVideoGridClass = (participantCount: number) => {
+  const base =
+    'grid h-full min-h-0 flex-1 auto-rows-fr gap-3 overflow-y-auto p-3'
+
+  if (participantCount <= 1) return `${base} grid-cols-1`
+  if (participantCount <= 2) return `${base} grid-cols-1 lg:grid-cols-2`
+  if (participantCount <= 4) return `${base} grid-cols-1 sm:grid-cols-2`
+  if (participantCount <= 6) return `${base} grid-cols-1 sm:grid-cols-2 xl:grid-cols-3`
+  return `${base} grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4`
+}
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────
 
@@ -85,9 +98,12 @@ const MeetingRoomPage = () => {
   const roomRef = useRef<Room | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const sttChunksRef = useRef<Blob[]>([])
   const rcrdgChunksRef = useRef<Blob[]>([])
   const sttIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const speechDetectionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const speechDetectedInChunkRef = useRef(false)
   const participantProfileMapRef = useRef<Map<string, ParticipantProfile>>(
     new Map(),
   )
@@ -229,13 +245,25 @@ const MeetingRoomPage = () => {
 
   // ── 녹음 중지 ───────────────────────────────────────────────────
 
+  const stopSpeechDetection = useCallback(() => {
+    if (speechDetectionIntervalRef.current) {
+      clearInterval(speechDetectionIntervalRef.current)
+      speechDetectionIntervalRef.current = null
+    }
+    void audioContextRef.current?.close()
+    audioContextRef.current = null
+    speechDetectedInChunkRef.current = false
+  }, [])
+
   const stopRecording = useCallback(() => {
     if (sttIntervalRef.current) clearInterval(sttIntervalRef.current)
+    sttIntervalRef.current = null
+    stopSpeechDetection()
     if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop()
     }
     setIsRecording(false)
-  }, [])
+  }, [stopSpeechDetection])
 
   const discardFullRecording = useCallback(() => {
     const recorder = recordingRecorderRef.current
@@ -245,7 +273,8 @@ const MeetingRoomPage = () => {
     recorder.stream.getTracks().forEach((track) => track.stop())
     recordingRecorderRef.current = null
     rcrdgChunksRef.current = []
-  }, [])
+    stopSpeechDetection()
+  }, [stopSpeechDetection])
 
   const uploadFullRecording = useCallback(async () => {
     const recorder = recordingRecorderRef.current
@@ -288,9 +317,10 @@ const MeetingRoomPage = () => {
       recorder.stream.getTracks().forEach((track) => track.stop())
       recordingRecorderRef.current = null
       rcrdgChunksRef.current = []
+      stopSpeechDetection()
       setUploadingRcrdg(false)
     }
-  }, [vconfId])
+  }, [stopSpeechDetection, vconfId])
 
   // ── STT 청크 전송 ───────────────────────────────────────────────
 
@@ -311,10 +341,51 @@ const MeetingRoomPage = () => {
 
   // ── STT 녹음 시작 ───────────────────────────────────────────────
 
+  const startSpeechDetection = useCallback((stream: MediaStream) => {
+    stopSpeechDetection()
+
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext
+
+    if (!AudioContextConstructor) return
+
+    try {
+      const audioContext = new AudioContextConstructor()
+      const analyser = audioContext.createAnalyser()
+      const source = audioContext.createMediaStreamSource(stream)
+
+      analyser.fftSize = 1024
+      const samples = new Uint8Array(analyser.fftSize)
+      source.connect(analyser)
+      audioContextRef.current = audioContext
+      speechDetectedInChunkRef.current = false
+
+      speechDetectionIntervalRef.current = setInterval(() => {
+        analyser.getByteTimeDomainData(samples)
+
+        const sum = samples.reduce((total, sample) => {
+          const normalized = (sample - 128) / 128
+          return total + normalized * normalized
+        }, 0)
+        const rms = Math.sqrt(sum / samples.length)
+
+        if (rms >= STT_SPEECH_RMS_THRESHOLD) {
+          speechDetectedInChunkRef.current = true
+        }
+      }, STT_SPEECH_CHECK_INTERVAL_MS)
+    } catch {
+      speechDetectedInChunkRef.current = true
+    }
+  }, [stopSpeechDetection])
+
   const startRecording = useCallback(() => {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
+        startSpeechDetection(stream)
+
         // 전체 녹취록용 MediaRecorder
         const rcrdgRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
         rcrdgRecorder.ondataavailable = (e) => {
@@ -344,15 +415,20 @@ const MeetingRoomPage = () => {
         sttRecorder.onstop = () => {
           if (sttChunksRef.current.length === 0) return
           const chunk = new Blob(sttChunksRef.current, { type: 'audio/webm' })
+          const hasSpeech = speechDetectedInChunkRef.current
           sttChunksRef.current = []
-          void sendSttChunk(chunk)
+          speechDetectedInChunkRef.current = false
+
+          if (hasSpeech) {
+            void sendSttChunk(chunk)
+          }
         }
 
       })
       .catch(() => {
         // 마이크 권한 거부 시 STT/녹취록 없이 진행
       })
-  }, [sendSttChunk])
+  }, [sendSttChunk, startSpeechDetection])
 
   // ── LiveKit 연결 ────────────────────────────────────────────────
 
@@ -492,7 +568,7 @@ const MeetingRoomPage = () => {
 
   // ── 회의 종료 ───────────────────────────────────────────────────
 
-  const handleLeave = useCallback(async () => {
+  const disconnectAndNavigate = useCallback(async () => {
     isIntentionalDisconnectRef.current = true
     stopRecording()
 
@@ -502,6 +578,11 @@ const MeetingRoomPage = () => {
       // 녹취 업로드 실패가 사용자의 방 나가기를 막지는 않도록 합니다.
     }
 
+    await roomRef.current?.disconnect()
+    navigate('/meeting/history')
+  }, [navigate, stopRecording, uploadFullRecording])
+
+  const handleLeave = useCallback(async () => {
     if (vconfId) {
       try {
         await meetingApi.leaveConf(Number(vconfId))
@@ -510,9 +591,8 @@ const MeetingRoomPage = () => {
       }
     }
 
-    await roomRef.current?.disconnect()
-    navigate('/meeting/history')
-  }, [navigate, stopRecording, uploadFullRecording, vconfId])
+    await disconnectAndNavigate()
+  }, [disconnectAndNavigate, vconfId])
 
   const handleEndMeeting = useCallback(async () => {
     if (!vconfId) return
@@ -521,7 +601,7 @@ const MeetingRoomPage = () => {
     setEndingMeeting(true)
     try {
       await meetingApi.endConf(Number(vconfId))
-      await handleLeave()
+      await disconnectAndNavigate()
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -532,7 +612,7 @@ const MeetingRoomPage = () => {
       window.alert(`회의를 종료하지 못했습니다.\n${message}`)
       setEndingMeeting(false)
     }
-  }, [handleLeave, vconfId])
+  }, [disconnectAndNavigate, vconfId])
 
   // ── 마이크 토글 ─────────────────────────────────────────────────
 
@@ -605,7 +685,7 @@ const MeetingRoomPage = () => {
 
   if (!connected) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
+      <div className="flex h-dvh items-center justify-center bg-slate-950">
         <div className="text-center">
           {connectionError ? (
             <>
@@ -652,10 +732,10 @@ const MeetingRoomPage = () => {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-white">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-slate-950 text-white">
 
       {/* ── 상단 헤더 ── */}
-      <header className="flex items-center justify-between border-b border-slate-800 px-6 py-3">
+      <header className="flex shrink-0 items-center justify-between border-b border-slate-800 px-4 py-2">
         <div className="flex items-center gap-3">
           <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
           <span className="text-sm font-bold text-white">회의 진행 중</span>
@@ -669,7 +749,7 @@ const MeetingRoomPage = () => {
           <button
             type="button"
             onClick={() => setInviteOpen((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors ${
               inviteOpen ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
             }`}
           >
@@ -679,7 +759,7 @@ const MeetingRoomPage = () => {
           <button
             type="button"
             onClick={() => setParticipantListOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
           >
             <Users size={16} />
             {participants.length}명
@@ -687,7 +767,7 @@ const MeetingRoomPage = () => {
           <button
             type="button"
             onClick={() => setChatOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800"
           >
             <MessageSquare size={16} />
             채팅
@@ -696,14 +776,14 @@ const MeetingRoomPage = () => {
       </header>
 
       {/* ── 메인 영역 ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
 
         {/* ── 비디오 그리드 ── */}
-        <div className="flex flex-1 flex-wrap content-start gap-3 overflow-y-auto p-4">
+        <div className={getVideoGridClass(participants.length)}>
           {participants.map((p) => (
             <div
               key={p.identity}
-              className="relative aspect-video w-full max-w-sm overflow-hidden rounded-xl bg-slate-800 sm:w-[calc(50%-6px)] xl:w-[calc(33.333%-8px)]"
+              className="relative min-h-0 overflow-hidden rounded-lg bg-slate-800"
             >
               {p.videoTrack && !p.isCameraOff ? (
                 <video
@@ -956,7 +1036,7 @@ const MeetingRoomPage = () => {
 
       {/* ── 자막 영역 ── */}
       {subtitles.length > 0 && (
-        <div className="border-t border-slate-800 bg-slate-900/80 px-6 py-2">
+        <div className="shrink-0 border-t border-slate-800 bg-slate-900/80 px-4 py-1.5">
           {subtitles.map((text, idx) => (
             <p
               key={idx}
@@ -971,11 +1051,11 @@ const MeetingRoomPage = () => {
       )}
 
       {/* ── 하단 컨트롤바 ── */}
-      <footer className="flex items-center justify-center gap-4 border-t border-slate-800 bg-slate-900 px-6 py-4">
+      <footer className="flex shrink-0 items-center justify-center gap-3 border-t border-slate-800 bg-slate-900 px-4 py-2.5">
         <button
           type="button"
           onClick={() => void toggleMic()}
-          className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
             isMuted
               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
               : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -987,7 +1067,7 @@ const MeetingRoomPage = () => {
         <button
           type="button"
           onClick={() => void toggleCamera()}
-          className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
             isCameraOff
               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
               : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -999,7 +1079,7 @@ const MeetingRoomPage = () => {
         <button
           type="button"
           onClick={() => void toggleScreenShare()}
-          className={`flex h-12 w-12 items-center justify-center rounded-full transition-colors ${
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
             isScreenSharing
               ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
               : 'bg-slate-700 text-white hover:bg-slate-600'
@@ -1012,7 +1092,7 @@ const MeetingRoomPage = () => {
           type="button"
           onClick={() => void handleLeave()}
           disabled={uploadingRcrdg || endingMeeting}
-          className="flex h-12 w-28 items-center justify-center gap-2 rounded-full bg-red-600 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+          className="flex h-10 w-24 items-center justify-center gap-2 rounded-full bg-red-600 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
         >
           <PhoneOff size={18} />
           {uploadingRcrdg ? '저장 중...' : '나가기'}
@@ -1027,7 +1107,7 @@ const MeetingRoomPage = () => {
           }
           onClick={() => void handleEndMeeting()}
           disabled={uploadingRcrdg || endingMeeting}
-          className="flex h-12 w-32 items-center justify-center gap-2 rounded-full border border-red-500 bg-red-950 text-sm font-bold text-red-300 transition-colors hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-10 w-28 items-center justify-center gap-2 rounded-full border border-red-500 bg-red-950 text-sm font-bold text-red-300 transition-colors hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <PhoneOff size={18} />
           {endingMeeting ? '종료 중...' : '회의 종료'}
