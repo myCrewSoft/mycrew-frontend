@@ -37,7 +37,7 @@ const getMom = (mtngId: number) =>
   axiosInstance.get<ApiResponse<MeetingMinutesResponse>>(
     `${MEETING_API_PREFIX}/${mtngId}/minutes`,
   )
-
+  
 const createEmptyMom = (mtngId: number) =>
   axiosInstance.post<ApiResponse<number>>(
     `${MEETING_API_PREFIX}/${mtngId}/minutes`,

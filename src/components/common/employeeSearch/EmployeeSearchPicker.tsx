@@ -54,44 +54,21 @@ const canSearchByKeyword = (keyword: string) =>
 
 const getEmployeeIdKey = (id: string | number) => String(id)
 
-const hasUsableProfileImageUrl = (profileImageUrl?: string | null) => {
-  if (!profileImageUrl) return false
-  const normalizedUrl = profileImageUrl.trim().toLowerCase()
-  return normalizedUrl !== 'null' && normalizedUrl !== 'undefined'
-}
-
 const EmployeeAvatar = ({
   employee,
   size = 'md',
 }: {
   employee: EmployeeSearchItem
-  index?: number
   size?: 'sm' | 'md'
 }) => {
-  const [imageFailed, setImageFailed] = useState(false)
-  const sizeClassName = size === 'sm' ? 'h-8 w-8' : 'h-10 w-10'
   const avatarSize = size === 'sm' ? 32 : 40
-  const src =
-    hasUsableProfileImageUrl(employee.profileImageUrl) && !imageFailed && employee.profileImageUrl
-      ? employee.profileImageUrl
-      : '/avatar-default.svg'
-
-  if (employee.profileImageFileId) {
-    return (
-      <ProfileAvatar
-        fileId={employee.profileImageFileId}
-        name={employee.name}
-        size={avatarSize}
-      />
-    )
-  }
-
+  const urlFileId = employee.profileImageUrl?.match(/\/images\/(\d+)/)?.[1]
+  const fileId = employee.profileImageFileId ?? (urlFileId ? Number(urlFileId) : null)
   return (
-    <img
-      src={src}
-      alt={employee.name}
-      className={`${sizeClassName} shrink-0 rounded-full object-cover`}
-      onError={() => setImageFailed(true)}
+    <ProfileAvatar
+      fileId={fileId}
+      name={employee.name}
+      size={avatarSize}
     />
   )
 }

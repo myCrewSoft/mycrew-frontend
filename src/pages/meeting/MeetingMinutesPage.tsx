@@ -19,11 +19,13 @@ import Badge from '../../components/common/dataDisplay/badge/Badge'
 import Button from '../../components/common/button/Button'
 import Textarea from '../../components/common/form/textarea/Textarea'
 import PageComponent from '../../components/layouts/PageComponent'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
 import type {
   MeetingDetail,
   MeetingMinutesResponse,
+  MeetingParticipant,
 } from '../../types/meeting.dto'
 
 interface ActionItem {
@@ -170,9 +172,10 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
     meetingApi.createEmptyMom,
     { immediate: false },
   )
-  const { execute: updateMom } = useApi(meetingApi.updateMom, {
-    immediate: false,
-  })
+  const { loading: updateMomLoading, execute: updateMom } = useApi(
+    meetingApi.updateMom,
+    { immediate: false },
+  )
   const { execute: requestReview } = useApi(meetingApi.requestMomApproval, {
     immediate: false,
   })
@@ -221,9 +224,10 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
   const handleSave = async () => {
     try {
       const newHtml = buildMinutesHtml(minutesForm, minutesContent)
-      const response = await updateMom(meeting.mtngId, { momCn: newHtml })
-      setMomData(response.data ?? null)
-      setMinutesContent(response.data?.momCn ?? newHtml)
+      await updateMom(meeting.mtngId, { momCn: newHtml })
+      const fresh = await fetchMom(meeting.mtngId)
+      setMomData(fresh.data ?? null)
+      setMinutesContent(fresh.data?.momCn ?? newHtml)
       setMinutesEditing(false)
     } catch {
       showToast({
@@ -235,9 +239,34 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
   }
 
   const handleStartOfflineMinutes = async () => {
-    if (!isOfflineMeeting) return
-
     try {
+      let existingResponse: Awaited<ReturnType<typeof fetchMom>> | null = null
+
+      try {
+        existingResponse = await fetchMom(meeting.mtngId)
+      } catch {
+        existingResponse = null
+      }
+
+      if (existingResponse?.data) {
+        const existingContent = existingResponse.data?.momCn ?? minutesContent
+        const updatedResponse = await updateMom(meeting.mtngId, {
+          momCn: existingContent,
+        })
+        const content = updatedResponse.data?.momCn ?? existingContent
+
+        setMomData(updatedResponse.data ?? existingResponse.data ?? null)
+        setMinutesContent(content)
+        setMinutesForm(parseMinutesHtml(content))
+        setMinutesEditing(true)
+        showToast({
+          title: '회의록 수정을 시작합니다.',
+          description: '회의 내용을 직접 수정한 뒤 저장해 주세요.',
+          variant: 'success',
+        })
+        return
+      }
+
       await createEmptyMom(meeting.mtngId)
       const response = await fetchMom(meeting.mtngId)
       const content = response.data?.momCn ?? ''
@@ -332,10 +361,12 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-5">
           {momData ? (
-            <section className="rounded-xl border border-blue-100 bg-blue-50/80 px-5 py-4">
-              <p className="flex items-center gap-2 text-sm font-bold text-blue-800">
+            <section className={`rounded-xl border px-5 py-4 ${approvalStarted ? 'border-emerald-100 bg-emerald-50/80' : 'border-blue-100 bg-blue-50/80'}`}>
+              <p className={`flex items-center gap-2 text-sm font-bold ${approvalStarted ? 'text-emerald-800' : 'text-blue-800'}`}>
                 <CheckCircle2 size={18} />
-                회의록이 생성되었습니다. 내용을 확인한 뒤 전자결재를 요청할 수 있습니다.
+                {approvalStarted
+                  ? '전자결재 요청이 완료되었습니다. 결재 진행 상황은 전자결재 메뉴에서 확인할 수 있습니다.'
+                  : '회의록이 생성되었습니다. 내용을 확인한 뒤 전자결재를 요청할 수 있습니다.'}
               </p>
             </section>
           ) : (
@@ -392,7 +423,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                 variant={!momData && isOfflineMeeting ? 'primary' : 'outline'}
                 size="sm"
                 disabled={!momData && !isOfflineMeeting}
-                loading={createEmptyMomLoading}
+                loading={createEmptyMomLoading || updateMomLoading}
                 leftIcon={
                   minutesEditing ? <Save size={15} /> : <Pencil size={15} />
                 }
@@ -572,12 +603,17 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                 </div>
               </div>
             ) : (
-              <div
-                className="minutes-preview rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm leading-7 text-slate-700 [&_h1]:text-xl [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-1.5 [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100 [&_th]:px-3 [&_th]:py-1.5"
-                dangerouslySetInnerHTML={{
-                  __html:
-                    minutesContent ||
-                    '<p style="color:#94a3b8">회의록 내용이 없습니다.</p>',
+              <iframe
+                srcDoc={
+                  minutesContent.replace(/\{\{SIGN:\d+\}\}/g, '') ||
+                  '<p style="color:#94a3b8;font-family:sans-serif;padding:16px">회의록 내용이 없습니다.</p>'
+                }
+                className="w-full rounded-xl border border-slate-100"
+                sandbox="allow-same-origin"
+                title="회의록 내용"
+                onLoad={(e) => {
+                  const doc = e.currentTarget.contentDocument
+                  if (doc) e.currentTarget.style.height = `${doc.documentElement.scrollHeight}px`
                 }}
               />
             )}
@@ -592,27 +628,26 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                 {approvalStarted ? '요청 완료' : '요청 전'}
               </Badge>
             </div>
-            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3">
-              <p className="text-sm font-bold text-blue-800">
-                {approvalStarted
-                  ? `전자결재 문서가 생성되었습니다${momData?.drftDocSn ? ` (#${momData.drftDocSn})` : ''}.`
-                  : '회의록 검토가 끝나면 전자결재 시스템으로 결재를 요청할 수 있습니다.'}
-              </p>
-            </div>
-            <div className="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-5">
-              <Button
-                variant="outline"
-                disabled={(!momData && !isOfflineMeeting) || approvalStarted}
-                loading={createEmptyMomLoading}
-                leftIcon={<Pencil size={16} />}
-                onClick={() => {
-                  if (!momData && isOfflineMeeting) {
-                    void handleStartOfflineMinutes()
-                  } else startEditing()
-                }}
-              >
-                {!momData && isOfflineMeeting ? '회의록 작성' : '회의록 수정'}
-              </Button>
+            {(meeting.ptcptList ?? []).length > 0 && (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <p className="mb-3 text-xs font-bold text-slate-500">
+                  참석자 ({meeting.ptcptList?.length ?? 0}명)
+                </p>
+                <div className="flex flex-col gap-2">
+                  {(meeting.ptcptList ?? []).map((p: MeetingParticipant) => (
+                    <div key={p.empId} className="flex items-center gap-2.5">
+                      <ProfileAvatar fileId={p.prflImgFileId} name={p.empNm} size={30} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">{p.empNm}</p>
+                        <p className="truncate text-xs text-slate-500">{p.deptNm}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4">
               <Button
                 disabled={!momData || approvalStarted}
                 leftIcon={<Send size={16} />}
@@ -722,10 +757,15 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
               </p>
             </div>
             <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
-              <div
-                className="rounded-xl border border-slate-100 bg-slate-50/80 px-5 py-4 text-sm leading-7 text-slate-700 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:px-3 [&_td]:py-1.5 [&_th]:border [&_th]:border-slate-300 [&_th]:bg-slate-100 [&_th]:px-3 [&_th]:py-1.5"
-                dangerouslySetInnerHTML={{
-                  __html: selectedRevision.content,
+              <iframe
+                srcDoc={selectedRevision.content}
+                className="w-full rounded-xl border border-slate-100"
+                sandbox="allow-same-origin"
+                title="수정 이력 내용"
+                scrolling="no"
+                onLoad={(e) => {
+                  const doc = e.currentTarget.contentDocument
+                  if (doc) e.currentTarget.style.height = `${doc.documentElement.scrollHeight}px`
                 }}
               />
             </div>

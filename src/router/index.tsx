@@ -61,9 +61,9 @@ export const router = createBrowserRouter([
       ...meetingRoutes,
       ...driveRoutes,
       ...projectRoutes,
-      { path: '/meeting/room/:vconfId', element: <MeetingRoomPage /> }
     ],
   },
+  { path: '/meeting/room/:vconfId', element: <MeetingRoomPage /> },
   {
     element: (
       <ReservationProvider>
