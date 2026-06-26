@@ -42,6 +42,7 @@ import { useApi } from '../../hooks/useApi'
 import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind, BoardListParams } from '../../types/board'
 import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
+import { hasBoardAttachment } from '../../utils/boardAttachment'
 import type {
   BoardCommentUpdateRequest,
   BoardResponse,
@@ -393,7 +394,7 @@ const AdminBoardsPage = () => {
     (board) => board.imprtntYn?.toUpperCase() === 'Y',
   ).length
   const attachmentCount = boards.filter(
-    (board) => Boolean(board.boardAtchFileId),
+    (board) => hasBoardAttachment(board.boardAtchFileId),
   ).length
 
   const submitSearch = () => {
@@ -997,7 +998,7 @@ const AdminBoardsPage = () => {
     <section className="flex w-full flex-col gap-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Badge variant="outline">BOARD_POST_DELETE</Badge>
+
           <h2 className="mt-3 text-2xl font-bold text-slate-950">게시판 관리</h2>
           <p className="mt-2 text-sm font-medium text-slate-500">
             게시판별 게시글을 조회하고 운영 권한에 따라 삭제할 수 있습니다.
@@ -1156,7 +1157,7 @@ const AdminBoardsPage = () => {
                         <span className="truncate font-semibold text-slate-900">
                           {board.boardSj}
                         </span>
-                        {board.boardAtchFileId ? (
+                        {hasBoardAttachment(board.boardAtchFileId) ? (
                           <Paperclip size={14} className="shrink-0 text-slate-400" />
                         ) : null}
                       </div>
@@ -1407,7 +1408,7 @@ const AdminBoardsPage = () => {
               <Badge variant={detailTarget.cmntUseYn === 'Y' ? 'success' : 'danger'}>
                 댓글 {detailTarget.cmntUseYn === 'Y' ? '허용' : '중지'}
               </Badge>
-              {detailTarget.boardAtchFileId ? (
+              {hasBoardAttachment(detailTarget.boardAtchFileId) ? (
                 <Badge variant="outline">
                   첨부파일 ID {detailTarget.boardAtchFileId}
                 </Badge>

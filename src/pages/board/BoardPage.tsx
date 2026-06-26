@@ -17,8 +17,9 @@ import SearchInput from '../../components/common/form/searchInput/SearchInput'
 import { boardApi } from '../../api/boardApi'
 import { ApiError } from '../../api/axiosInstance'
 import type { BoardKind, BoardMeta } from '../../types/board'
-import type { BoardResponse } from '../../types'
+import type { BoardResponse, BoardSideBarResponse } from '../../types'
 import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
+import { hasBoardAttachment } from '../../utils/boardAttachment'
 
 export type BoardVo = BoardResponse
 
@@ -69,6 +70,41 @@ const getBoardTypeFromPath = (pathname: string): BoardKind => {
   if (pathname.includes('/free')) return 'free'
   if (pathname.includes('/anonymous') || pathname.includes('/anon')) return 'anonymous'
   return 'notice'
+}
+
+type DepartmentBoardSideBarResponse = BoardSideBarResponse & {
+  deptCd?: string
+  deptCode?: string
+  departmentCode?: string
+  code?: string
+}
+
+const getDepartmentCode = (board: DepartmentBoardSideBarResponse) => {
+  const candidates = [
+    board.deptCd,
+    board.deptCode,
+    board.departmentCode,
+    board.code,
+    board.boardTypeCd,
+  ]
+
+  return candidates.find((value): value is string => Boolean(value?.trim()))?.toUpperCase() ?? ''
+}
+
+const getDepartmentName = (
+  boards: BoardSideBarResponse[],
+  departmentCode: string,
+) => {
+  const normalizedDepartmentCode = departmentCode.trim().toUpperCase()
+  const departmentBoard = boards.find(
+    (board) => board.boardTypeCd?.toUpperCase() === 'DEPT',
+  )
+
+  const matchedDepartment = departmentBoard?.underlevel?.find((board) =>
+    getDepartmentCode(board).toUpperCase() === normalizedDepartmentCode,
+  )
+
+  return matchedDepartment?.boardName?.trim() ?? ''
 }
 
 const getBoardDetailPath = (boardType: BoardKind, boardId: number, deptCd?: string) => {
@@ -187,9 +223,15 @@ const BoardPage = () => {
   const isCreateMode = searchParams.get('mode') === 'create'
   const meta = boardMeta[boardType]
   const Icon = boardIcon[boardType]
-  const departmentName = deptCd
-    ? departmentNameMap[deptCd.toLowerCase()] ?? deptCd
+  const [departmentNameByCode, setDepartmentNameByCode] = useState<Record<string, string>>({})
+  const normalizedDepartmentCode = deptCd?.trim().toUpperCase() ?? ''
+  const fallbackDepartmentName = deptCd
+    ? departmentNameMap[deptCd.toLowerCase()] ??
+      (normalizedDepartmentCode.startsWith('DEPT_') ? '' : deptCd)
     : ''
+  const departmentDisplayName = departmentNameByCode[normalizedDepartmentCode] || (
+    fallbackDepartmentName
+  )
   const boardContextKey = `${boardType}:${deptCd ?? ''}`
   const previousBoardContextKey = useRef(boardContextKey)
   const boardCreatedRef = useRef(false)
@@ -237,6 +279,34 @@ const BoardPage = () => {
 
     navigate(queryString ? `${detailPath}?${queryString}` : detailPath)
   }
+
+  useEffect(() => {
+    if (boardType !== 'department' || !deptCd) {
+      return
+    }
+
+    let ignore = false
+    const currentDepartmentCode = deptCd.trim().toUpperCase()
+
+    boardApi.getBoardSideBar()
+      .then((response) => {
+        if (ignore) return
+
+        const nextDepartmentName = getDepartmentName(response.data.data ?? [], deptCd)
+
+        if (!nextDepartmentName) return
+
+        setDepartmentNameByCode((currentMap) => ({
+          ...currentMap,
+          [currentDepartmentCode]: nextDepartmentName,
+        }))
+      })
+      .catch(() => undefined)
+
+    return () => {
+      ignore = true
+    }
+  }, [boardType, deptCd])
 
   useEffect(() => {
     const fetchBoardData = async () => {
@@ -370,7 +440,7 @@ const BoardPage = () => {
             <>
               <span className="text-2xl text-slate-300">/</span>
               <div className="rounded-2xl border border-slate-200 bg-white px-5 py-2 text-[18px] font-semibold text-slate-700">
-                {departmentName}
+                {departmentDisplayName}
               </div>
             </>
           )}
@@ -481,7 +551,7 @@ const BoardPage = () => {
                     </Badge>
                   )}
                   <span className="truncate">{board.boardSj}</span>
-                  {board.boardAtchFileId !== null && (
+                  {hasBoardAttachment(board.boardAtchFileId) && (
                     <Paperclip size={14} className="shrink-0 text-slate-400" />
                   )}
                 </div>
