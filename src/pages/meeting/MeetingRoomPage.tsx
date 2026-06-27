@@ -20,6 +20,7 @@ import {
   RoomEvent,
   Track,
   Participant,
+  DisconnectReason,
 } from 'livekit-client'
 import { ApiError } from '../../api/axiosInstance'
 import { meetingApi } from '../../api/meetingApi'
@@ -99,6 +100,10 @@ const MeetingRoomPage = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const mixerContextRef = useRef<AudioContext | null>(null)
+  const mixerDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null)
+  const trackSourcesRef = useRef<Map<string, MediaStreamAudioSourceNode>>(new Map())
+  const localMicStreamRef = useRef<MediaStream | null>(null)
   const sttChunksRef = useRef<Blob[]>([])
   const rcrdgChunksRef = useRef<Blob[]>([])
   const sttIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -129,7 +134,9 @@ const MeetingRoomPage = () => {
   const [connectionError, setConnectionError] = useState('')
   const [connectionAttempt, setConnectionAttempt] = useState(0)
   const [canEndMeeting, setCanEndMeeting] = useState(canEnd ?? false)
+  const canEndMeetingRef = useRef(canEnd ?? false)
   const [endingMeeting, setEndingMeeting] = useState(false)
+  const [speakingIdentities, setSpeakingIdentities] = useState<Set<string>>(new Set())
 
   // ── 참여자 타일 업데이트 ────────────────────────────────────────
 
@@ -218,7 +225,9 @@ const MeetingRoomPage = () => {
         if (disposed) return
 
         const meeting = response.data.data
-        setCanEndMeeting(meeting?.canEnd ?? false)
+        const canEnd = meeting?.canEnd ?? false
+        setCanEndMeeting(canEnd)
+        canEndMeetingRef.current = canEnd
         participantProfileMapRef.current = new Map(
           (meeting?.ptcptList ?? []).map((participant) => [
             String(participant.empId),
@@ -270,9 +279,14 @@ const MeetingRoomPage = () => {
     if (!recorder) return
 
     if (recorder.state === 'recording') recorder.stop()
-    recorder.stream.getTracks().forEach((track) => track.stop())
     recordingRecorderRef.current = null
     rcrdgChunksRef.current = []
+    localMicStreamRef.current?.getTracks().forEach((track) => track.stop())
+    localMicStreamRef.current = null
+    trackSourcesRef.current.clear()
+    void mixerContextRef.current?.close()
+    mixerContextRef.current = null
+    mixerDestinationRef.current = null
     stopSpeechDetection()
   }, [stopSpeechDetection])
 
@@ -314,9 +328,14 @@ const MeetingRoomPage = () => {
       )
       await meetingApi.uploadRcrdg(Number(vconfId), file)
     } finally {
-      recorder.stream.getTracks().forEach((track) => track.stop())
       recordingRecorderRef.current = null
       rcrdgChunksRef.current = []
+      localMicStreamRef.current?.getTracks().forEach((track) => track.stop())
+      localMicStreamRef.current = null
+      trackSourcesRef.current.clear()
+      void mixerContextRef.current?.close()
+      mixerContextRef.current = null
+      mixerDestinationRef.current = null
       stopSpeechDetection()
       setUploadingRcrdg(false)
     }
@@ -381,13 +400,46 @@ const MeetingRoomPage = () => {
   }, [stopSpeechDetection])
 
   const startRecording = useCallback(() => {
+    const room = roomRef.current
+    if (!room) return
+
     navigator.mediaDevices
       .getUserMedia({ audio: true })
-      .then((stream) => {
-        startSpeechDetection(stream)
+      .then((localStream) => {
+        localMicStreamRef.current = localStream
+        startSpeechDetection(localStream)
 
-        // 전체 녹취록용 MediaRecorder
-        const rcrdgRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        const AudioContextConstructor =
+          window.AudioContext ||
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext
+
+        if (!AudioContextConstructor) return
+
+        // 전체 참여자 오디오 믹서 생성
+        const mixerContext = new AudioContextConstructor()
+        const destination = mixerContext.createMediaStreamDestination()
+        mixerContextRef.current = mixerContext
+        mixerDestinationRef.current = destination
+        trackSourcesRef.current = new Map()
+
+        // 내 마이크를 믹서에 연결
+        const localSource = mixerContext.createMediaStreamSource(localStream)
+        localSource.connect(destination)
+
+        // 이미 구독 중인 원격 참여자 오디오 트랙을 믹서에 연결
+        room.remoteParticipants.forEach((participant) => {
+          const audioPublication = participant.getTrackPublication(Track.Source.Microphone)
+          const mediaStreamTrack = audioPublication?.track?.mediaStreamTrack
+          if (mediaStreamTrack) {
+            const source = mixerContext.createMediaStreamSource(new MediaStream([mediaStreamTrack]))
+            source.connect(destination)
+            trackSourcesRef.current.set(`${participant.identity}:${mediaStreamTrack.id}`, source)
+          }
+        })
+
+        // 믹싱된 스트림으로 전체 녹취록용 MediaRecorder
+        const rcrdgRecorder = new MediaRecorder(destination.stream, { mimeType: 'audio/webm' })
         rcrdgRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) rcrdgChunksRef.current.push(e.data)
         }
@@ -395,8 +447,8 @@ const MeetingRoomPage = () => {
         rcrdgRecorder.start()
         setIsRecording(true)
 
-        // STT용 5초 청크 MediaRecorder
-        const sttRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        // STT용 5초 청크 MediaRecorder (내 마이크 스트림만 사용)
+        const sttRecorder = new MediaRecorder(localStream, { mimeType: 'audio/webm' })
         sttRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) sttChunksRef.current.push(e.data)
         }
@@ -423,7 +475,6 @@ const MeetingRoomPage = () => {
             void sendSttChunk(chunk)
           }
         }
-
       })
       .catch(() => {
         // 마이크 권한 거부 시 STT/녹취록 없이 진행
@@ -451,21 +502,70 @@ const MeetingRoomPage = () => {
     // 참여자 변경 이벤트
     room.on(RoomEvent.ParticipantConnected, () => updateParticipants(room))
     room.on(RoomEvent.ParticipantDisconnected, () => updateParticipants(room))
-    room.on(RoomEvent.TrackSubscribed, () => updateParticipants(room))
-    room.on(RoomEvent.TrackUnsubscribed, () => updateParticipants(room))
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      updateParticipants(room)
+      // 녹음 중이면 새로 구독된 마이크 트랙을 믹서에 연결합니다.
+      if (
+        publication.source === Track.Source.Microphone &&
+        mixerContextRef.current &&
+        mixerDestinationRef.current
+      ) {
+        const mediaStreamTrack = track.mediaStreamTrack
+        if (mediaStreamTrack) {
+          const source = mixerContextRef.current.createMediaStreamSource(
+            new MediaStream([mediaStreamTrack]),
+          )
+          source.connect(mixerDestinationRef.current)
+          trackSourcesRef.current.set(`${participant.identity}:${mediaStreamTrack.id}`, source)
+        }
+      }
+    })
+    room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      updateParticipants(room)
+      // 구독 해제된 마이크 트랙을 믹서에서 분리합니다.
+      if (publication.source === Track.Source.Microphone) {
+        const key = `${participant.identity}:${track.mediaStreamTrack?.id}`
+        const source = trackSourcesRef.current.get(key)
+        if (source) {
+          source.disconnect()
+          trackSourcesRef.current.delete(key)
+        }
+      }
+    })
     room.on(RoomEvent.TrackMuted, () => updateParticipants(room))
     room.on(RoomEvent.TrackUnmuted, () => updateParticipants(room))
     room.on(RoomEvent.ParticipantMetadataChanged, () =>
       updateParticipants(room),
     )
-    room.on(RoomEvent.Disconnected, () => {
+    room.on(RoomEvent.Disconnected, (reason) => {
       // StrictMode cleanup으로 폐기된 이전 Room 이벤트는 현재 화면에 영향을 주면 안 됩니다.
       if (disposed || roomRef.current !== room) return
 
       setConnected(false)
       if (!isIntentionalDisconnectRef.current) {
-        setConnectionError('LiveKit 서버와의 연결이 종료되었습니다.')
+        if (
+          reason === DisconnectReason.ROOM_DELETED ||
+          reason === DisconnectReason.PARTICIPANT_REMOVED
+        ) {
+          // 방이 삭제됐을 때: 주최자는 녹취록을 업로드하고, 나머지는 바로 이동합니다.
+          stopRecording()
+          if (canEndMeetingRef.current) {
+            uploadFullRecording()
+              .catch(() => {})
+              .finally(() => { navigate('/meeting/history') })
+          } else {
+            discardFullRecording()
+            navigate('/meeting/history')
+          }
+        } else {
+          setConnectionError('LiveKit 서버와의 연결이 종료되었습니다.')
+        }
       }
+    })
+
+    room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      if (disposed || roomRef.current !== room) return
+      setSpeakingIdentities(new Set(speakers.map((s) => s.identity)))
     })
 
     // 다른 참여자가 보낸 채팅 메시지 수신
@@ -543,6 +643,7 @@ const MeetingRoomPage = () => {
       }
       stopRecording()
       discardFullRecording()
+      setSpeakingIdentities(new Set())
       void room.disconnect()
     }
   }, [
@@ -572,15 +673,20 @@ const MeetingRoomPage = () => {
     isIntentionalDisconnectRef.current = true
     stopRecording()
 
-    try {
-      await uploadFullRecording()
-    } catch {
-      // 녹취 업로드 실패가 사용자의 방 나가기를 막지는 않도록 합니다.
+    // 회의 주최자만 전체 참여자 오디오가 믹싱된 녹취록을 업로드합니다.
+    if (canEndMeeting) {
+      try {
+        await uploadFullRecording()
+      } catch {
+        // 녹취 업로드 실패가 사용자의 방 나가기를 막지는 않도록 합니다.
+      }
+    } else {
+      discardFullRecording()
     }
 
     await roomRef.current?.disconnect()
     navigate('/meeting/history')
-  }, [navigate, stopRecording, uploadFullRecording])
+  }, [canEndMeeting, discardFullRecording, navigate, stopRecording, uploadFullRecording])
 
   const handleLeave = useCallback(async () => {
     if (vconfId) {
@@ -683,6 +789,9 @@ const MeetingRoomPage = () => {
 
   // ── 렌더링 ──────────────────────────────────────────────────────
 
+  const localIdentity = participants.find((p) => p.isLocal)?.identity
+  const isLocalSpeaking = !!localIdentity && speakingIdentities.has(localIdentity) && !isMuted
+
   if (!connected) {
     return (
       <div className="flex h-dvh items-center justify-center bg-slate-950">
@@ -783,7 +892,11 @@ const MeetingRoomPage = () => {
           {participants.map((p) => (
             <div
               key={p.identity}
-              className="relative min-h-0 overflow-hidden rounded-lg bg-slate-800"
+              className={`relative min-h-0 overflow-hidden rounded-lg bg-slate-800 transition-all duration-150 ${
+                speakingIdentities.has(p.identity) && !p.isMuted
+                  ? 'ring-2 ring-green-400 shadow-[0_0_8px_rgba(74,222,128,0.4)]'
+                  : 'ring-2 ring-transparent'
+              }`}
             >
               {p.videoTrack && !p.isCameraOff ? (
                 <video
@@ -806,8 +919,10 @@ const MeetingRoomPage = () => {
               <div className="absolute bottom-2 left-2 flex items-center gap-2 rounded-lg bg-slate-950/75 px-2.5 py-1.5">
                 {p.isMuted ? (
                   <MicOff size={12} className="text-red-400" />
+                ) : speakingIdentities.has(p.identity) ? (
+                  <Mic size={12} className="animate-pulse text-green-400" />
                 ) : (
-                  <Mic size={12} className="text-green-400" />
+                  <Mic size={12} className="text-slate-400" />
                 )}
                 <span>
                   <span className="block text-xs font-semibold text-white">
@@ -1055,10 +1170,12 @@ const MeetingRoomPage = () => {
         <button
           type="button"
           onClick={() => void toggleMic()}
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-150 ${
             isMuted
               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-              : 'bg-slate-700 text-white hover:bg-slate-600'
+              : isLocalSpeaking
+                ? 'bg-green-500/20 text-green-400 ring-2 ring-green-400 ring-offset-1 ring-offset-slate-900 hover:bg-green-500/30'
+                : 'bg-slate-700 text-white hover:bg-slate-600'
           }`}
         >
           {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
@@ -1098,20 +1215,18 @@ const MeetingRoomPage = () => {
           {uploadingRcrdg ? '저장 중...' : '나가기'}
         </button>
 
-        <button
-          type="button"
-          title={
-            canEndMeeting
-              ? '모든 참여자의 회의를 종료합니다.'
-              : '서버에서 회의 종료 권한을 확인합니다.'
-          }
-          onClick={() => void handleEndMeeting()}
-          disabled={uploadingRcrdg || endingMeeting}
-          className="flex h-10 w-28 items-center justify-center gap-2 rounded-full border border-red-500 bg-red-950 text-sm font-bold text-red-300 transition-colors hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <PhoneOff size={18} />
-          {endingMeeting ? '종료 중...' : '회의 종료'}
-        </button>
+        {canEndMeeting && (
+          <button
+            type="button"
+            title="모든 참여자의 회의를 종료합니다."
+            onClick={() => void handleEndMeeting()}
+            disabled={uploadingRcrdg || endingMeeting}
+            className="flex h-10 w-28 items-center justify-center gap-2 rounded-full border border-red-500 bg-red-950 text-sm font-bold text-red-300 transition-colors hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <PhoneOff size={18} />
+            {endingMeeting ? '종료 중...' : '회의 종료'}
+          </button>
+        )}
       </footer>
     </div>
   )

@@ -262,17 +262,16 @@ const MeetingPage = () => {
     [location.pathname],
   )
 
-  const currentEmpId = useMemo(() => {
-    const payloadEmpId =
-      typeof auth.payload?.sub === 'number'
-        ? auth.payload.sub
-        : Number(auth.payload?.sub)
-    const storedEmpId = Number(localStorage.getItem('empId'))
-
-    if (Number.isFinite(payloadEmpId)) return payloadEmpId
-    if (Number.isFinite(storedEmpId)) return storedEmpId
-    return null
-  }, [auth.payload?.sub])
+  const payloadEmpId =
+    typeof auth.payload?.sub === 'number'
+      ? auth.payload.sub
+      : Number(auth.payload?.sub)
+  const storedEmpId = Number(localStorage.getItem('empId'))
+  const currentEmpId = Number.isFinite(payloadEmpId)
+    ? payloadEmpId
+    : Number.isFinite(storedEmpId)
+      ? storedEmpId
+      : null
 
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
   const [rcrdgBlobUrl, setRcrdgBlobUrl] = useState<string | null>(null)
@@ -415,20 +414,16 @@ const MeetingPage = () => {
   const groupedMeetings = groupMeetingsByDate(filteredMeetings)
   const dateKeys = Object.keys(groupedMeetings).sort()
 
-  const calendarEvents = useMemo(
-    () =>
-      filteredMeetings.map((m) => ({
-        id: String(m.mtngId),
-        title: m.mtngNm ?? '',
-        start: m.beginDt ?? '',
-        end: m.endDt ?? '',
-        backgroundColor: statusColorMap[m.mtngSttus].bg,
-        borderColor: statusColorMap[m.mtngSttus].border,
-        textColor: '#ffffff',
-        extendedProps: { meeting: m },
-      })),
-    [filteredMeetings],
-  )
+  const calendarEvents = filteredMeetings.map((meeting) => ({
+    id: String(meeting.mtngId),
+    title: meeting.mtngNm ?? '',
+    start: meeting.beginDt ?? '',
+    end: meeting.endDt ?? '',
+    backgroundColor: statusColorMap[meeting.mtngSttus].bg,
+    borderColor: statusColorMap[meeting.mtngSttus].border,
+    textColor: '#ffffff',
+    extendedProps: { meeting },
+  }))
 
   const handleCalendarEventClick = (info: EventClickArg) => {
     const meeting = info.event.extendedProps.meeting as MeetingListItem
@@ -743,24 +738,19 @@ const MeetingPage = () => {
 
   const handleSubmitScheduleMeeting = async () => {
     const errors: typeof formErrors = {}
-    let firstErrorRef: React.RefObject<HTMLDivElement | null> | null = null
 
     if (!scheduleForm.mtngNm.trim()) {
       errors.mtngNm = '회의 제목을 입력해주세요.'
-      if (!firstErrorRef) firstErrorRef = mtngNmRef
     }
 
     if (!scheduleForm.beginDt || !scheduleForm.endDt) {
       errors.dateRange = '회의 시작 일시와 종료 일시를 입력해주세요.'
-      if (!firstErrorRef) firstErrorRef = dateRangeRef
     } else if (new Date(scheduleForm.beginDt) >= new Date(scheduleForm.endDt)) {
       errors.dateRange = '종료 일시는 시작 일시보다 늦어야 합니다.'
-      if (!firstErrorRef) firstErrorRef = dateRangeRef
     }
 
     if (scheduleForm.useMeetingRoom && scheduleForm.confRmId === null) {
       errors.confRm = '사용할 회의실을 선택해주세요.'
-      if (!firstErrorRef) firstErrorRef = confRmRef
     }
 
     const selectedRoomUnavailable =
@@ -774,7 +764,6 @@ const MeetingPage = () => {
 
     if (selectedRoomUnavailable) {
       errors.confRm = '선택한 시간에 이미 예약된 회의실입니다. 다른 회의실을 선택해주세요.'
-      if (!firstErrorRef) firstErrorRef = confRmRef
     }
 
     if (Object.keys(errors).length > 0) {
