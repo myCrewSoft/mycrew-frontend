@@ -140,8 +140,8 @@ const formatClockTime = (value?: string | null) => {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-const getAttendanceStatus = (status: AttendanceWidgetResponseDto['status']) =>
-  statusLabel[status] ?? status ?? '-'
+const getAttendanceStatus = (status?: AttendanceWidgetResponseDto['status']) =>
+  status ? statusLabel[status] ?? status : '-'
 
 const getTodayAttendanceStatus = (
   today: AtndToday | null,
@@ -433,14 +433,6 @@ const Metric = ({
   </div>
 )
 
-const AttendanceMetric = ({ label, value }: { label: string; value: string }) => (
-  <div className="min-w-0 rounded-md bg-slate-50 px-2.5 py-2 ring-1 ring-slate-100">
-    <p className="truncate text-[10px] font-bold text-slate-500">{label}</p>
-    <p className="mt-0.5 truncate text-[13px] font-black text-slate-900">
-      {value}
-    </p>
-  </div>
-)
 
 const EmptyState = ({ label = '표시할 데이터가 없습니다.' }: { label?: string }) => (
   <div className="flex min-h-[120px] flex-1 items-center justify-center rounded-lg bg-slate-50 text-sm font-semibold text-slate-400">
@@ -561,27 +553,24 @@ const AttendanceControlWidget = ({
   const [acting, setActing] = useState(false)
   const [message, setMessage] = useState('')
 
-  const loadToday = useCallback(async () => {
+  const loadToday = useCallback(async (): Promise<AtndToday | null> => {
     const response = await attendanceApi.getToday()
-    setToday(response.data.data)
+    return response.data.data ?? null
   }, [])
 
-  const refreshAttendance = useCallback(async () => {
-    await Promise.all([
+  const refreshAttendance = useCallback(async (): Promise<AtndToday | null> => {
+    const [todayData] = await Promise.all([
       loadToday(),
       onRefreshWidget?.('attendance'),
     ])
+    return todayData
   }, [loadToday, onRefreshWidget])
 
   useEffect(() => {
-    void loadToday().catch(() => {
-      setToday(null)
-    })
+    void loadToday().then(setToday).catch(() => setToday(null))
 
     const handleRefresh = () => {
-      void refreshAttendance().catch(() => {
-        setToday(null)
-      })
+      void refreshAttendance().then(setToday).catch(() => setToday(null))
     }
 
     window.addEventListener('attendance:refresh', handleRefresh)
@@ -607,6 +596,12 @@ const AttendanceControlWidget = ({
     }
     return today?.workMin ?? data.workDurationMinutes ?? 0
   }, [checkInAt, data.workDurationMinutes, now, today?.workMin, working])
+  const progressPercent = Math.min(100, Math.round((elapsedMinutes / 480) * 100))
+  const statusCaption = checkedOut
+    ? '오늘 업무가 마무리됐어요'
+    : working
+      ? `${progressPercent}% 진행 중`
+      : '출근을 기다리고 있어요'
 
   const handleCheck = async (kind: 'in' | 'out') => {
     setActing(true)
@@ -618,7 +613,8 @@ const AttendanceControlWidget = ({
           ? await attendanceApi.checkIn()
           : await attendanceApi.checkOut()
       setMessage(response.data.message ?? '처리되었습니다.')
-      await refreshAttendance()
+      const todayData = await refreshAttendance()
+      setToday(todayData)
       window.dispatchEvent(new Event('attendance:refresh'))
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : '처리 중 오류가 발생했습니다.')
@@ -627,40 +623,69 @@ const AttendanceControlWidget = ({
     }
   }
 
+  const cardGradient = checkedOut
+    ? 'from-indigo-600 to-violet-700'
+    : working
+      ? 'from-emerald-500 to-teal-600'
+      : 'from-blue-500 to-blue-700'
+
+  const cardShadow = checkedOut
+    ? 'shadow-[0_8px_20px_rgba(99,60,220,0.25)]'
+    : working
+      ? 'shadow-[0_8px_20px_rgba(16,185,129,0.25)]'
+      : 'shadow-[0_8px_20px_rgba(37,99,235,0.25)]'
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="rounded-lg bg-slate-950 px-3.5 py-2.5 text-white shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black text-sky-200">현재 상태</p>
-            <strong className="mt-0.5 block truncate text-[19px] font-black leading-6 tracking-tight">
+      {/* 상태 히어로 카드 */}
+      <div
+        className={`relative shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${cardGradient} ${cardShadow} px-4 py-3 text-white`}
+      >
+        <div className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10" />
+
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">현재 상태</p>
+            <strong className="mt-0.5 block truncate text-[20px] font-black leading-tight text-white">
               {getTodayAttendanceStatus(today, data.status)}
             </strong>
           </div>
-          <span
-            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
-              working ? 'bg-emerald-400/15 text-emerald-300' : 'bg-white/10 text-slate-200'
-            }`}
-          >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
             <Clock size={18} className={working ? 'animate-pulse' : ''} />
-          </span>
+          </div>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-emerald-400 transition-all"
-            style={{
-              width: `${Math.min(100, Math.round((elapsedMinutes / 480) * 100))}%`,
-            }}
-          />
+
+        <div className="relative mt-2.5">
+          <div className="h-1 overflow-hidden rounded-full bg-black/20">
+            <div
+              className="h-full rounded-full bg-white/80 transition-all duration-700"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <p className="mt-1 text-[11px] font-medium text-white/60">{statusCaption}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <AttendanceMetric label="출근" value={formatClockTime(checkInAt)} />
-        <AttendanceMetric label="퇴근" value={formatClockTime(checkOutAt)} />
-        <AttendanceMetric label="근무 시간" value={formatWorkDuration(elapsedMinutes)} />
+      {/* 근무 지표 */}
+      <div className="flex gap-2">
+        <div className="flex flex-1 flex-col justify-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100/80">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400">출근</span>
+            <span className="text-[13px] font-black text-slate-900">{formatClockTime(checkInAt)}</span>
+          </div>
+          <div className="h-px bg-slate-200/70" />
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400">퇴근</span>
+            <span className="text-[13px] font-black text-slate-900">{formatClockTime(checkOutAt)}</span>
+          </div>
+        </div>
+        <div className="flex min-w-[88px] flex-col items-center justify-center rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100/80">
+          <span className="text-[10px] font-bold text-slate-400">근무 시간</span>
+          <span className="mt-0.5 text-[15px] font-black text-slate-900">{formatWorkDuration(elapsedMinutes)}</span>
+        </div>
       </div>
 
+      {/* 액션 버튼 */}
       <div className="mt-auto grid grid-cols-2 gap-2">
         <Button
           variant="primary"
@@ -670,7 +695,7 @@ const AttendanceControlWidget = ({
           loading={acting}
           disabled={checkedIn}
           onClick={() => void handleCheck('in')}
-          className="dashboard-widget-action h-8"
+          className="dashboard-widget-action h-10 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 font-black shadow-[0_6px_16px_rgba(37,99,235,0.22)] hover:from-blue-700 hover:to-sky-600 disabled:opacity-40"
         >
           출근
         </Button>
@@ -682,16 +707,16 @@ const AttendanceControlWidget = ({
           loading={acting}
           disabled={!checkedIn || checkedOut}
           onClick={() => void handleCheck('out')}
-          className="dashboard-widget-action h-8"
+          className="dashboard-widget-action h-10 rounded-xl border-slate-200 bg-white font-black text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
         >
           퇴근
         </Button>
       </div>
 
       {message && (
-        <p className="truncate text-[12px] font-bold text-slate-500">
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-center text-[12px] font-bold text-slate-600 ring-1 ring-slate-100">
           {message}
-        </p>
+        </div>
       )}
     </div>
   )
