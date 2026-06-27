@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router-dom'
 import MeetingPage from '../../pages/meeting/MeetingPage'
+import MeetingMinutesDetailPage from '../../pages/meeting/MeetingMinutesDetailPage'
 
 export const meetingRoutes: RouteObject[] = [
     { path: '/meeting', element: <MeetingPage /> },
@@ -7,4 +8,5 @@ export const meetingRoutes: RouteObject[] = [
     { path: '/meeting/scheduled', element: <MeetingPage /> },
     { path: '/meeting/history', element: <MeetingPage /> },
     { path: '/meeting/minutes', element: <MeetingPage /> },
+    { path: '/meeting/minutes/:mtngId', element: <MeetingMinutesDetailPage /> },
 ]

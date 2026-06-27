@@ -64,6 +64,7 @@ export type RsrvStatsSummary = components['schemas']['RsrvStatsSummary'];
 export type RsrvListItem = components['schemas']['RsrvListItem'];
 export type PopularRmItem = components['schemas']['PopularRmItem'];
 export type RsrvSearchRequest = components['schemas']['RsrvSearchRequest'];
+export type ConfRmListItem = components['schemas']['ConfRmListItem'];
 
 // 회의실
 export type RoomCreateRequest = components['schemas']['RoomCreateRequest'];

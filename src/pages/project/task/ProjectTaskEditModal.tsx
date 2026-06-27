@@ -22,6 +22,8 @@ interface ProjectTaskEditModalProps {
 
 const toDateTimeLocal = (value: string) => value.slice(0, 16)
 const getEmployeeIdKey = (id: string | number | null) => String(id ?? '')
+const COMPLETED_TASK_STATUS = '02'
+const clampProgress = (value: number) => Math.min(100, Math.max(0, value))
 
 const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTaskEditModalProps) => {
   const initialParticipants = useMemo<EmployeeSearchItem[]>(
@@ -64,6 +66,26 @@ const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTa
       taskMngrId: empIdList.includes(current.taskMngrId)
         ? current.taskMngrId
         : (empIdList[0] ?? 0),
+    }))
+  }
+
+  const handleStatusChange = (taskStatCd: string) => {
+    setForm((current) => ({
+      ...current,
+      taskStatCd,
+      taskPrgrsSmry:
+        taskStatCd === COMPLETED_TASK_STATUS ? 100 : current.taskPrgrsSmry,
+    }))
+  }
+
+  const handleProgressChange = (value: number) => {
+    const taskPrgrsSmry = clampProgress(value)
+
+    setForm((current) => ({
+      ...current,
+      taskPrgrsSmry,
+      taskStatCd:
+        taskPrgrsSmry === 100 ? COMPLETED_TASK_STATUS : current.taskStatCd,
     }))
   }
 
@@ -140,7 +162,7 @@ const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTa
                 label="상태"
                 value={form.taskStatCd}
                 options={Object.entries(taskStatusConfig).map(([value, config]) => ({ value, label: config.label }))}
-                onChange={(event) => setForm((current) => ({ ...current, taskStatCd: event.target.value }))}
+                onChange={(event) => handleStatusChange(event.target.value)}
               />
               <Select
                 label="우선순위"
@@ -157,7 +179,7 @@ const ProjectTaskEditModal = ({ projectId, task, onClose, onUpdated }: ProjectTa
               max={100}
               value={form.taskPrgrsSmry}
               rightSlot={<span className="text-sm font-bold text-slate-400">%</span>}
-              onChange={(event) => setForm((current) => ({ ...current, taskPrgrsSmry: Math.min(100, Math.max(0, Number(event.target.value))) }))}
+              onChange={(event) => handleProgressChange(Number(event.target.value))}
             />
 
             <div className="grid gap-4 md:grid-cols-2">

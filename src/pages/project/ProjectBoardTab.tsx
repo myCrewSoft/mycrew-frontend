@@ -40,6 +40,7 @@ import BoardWriteForm from '../board/BoardWriteForm'
 import BoardAttachmentImage from '../board/BoardAttachmentImage'
 import BoardContentViewer from '../board/BoardContentViewer'
 import { getBoardDisplayNumber } from '../../utils/boardDisplayNumber'
+import { hasBoardAttachment } from '../../utils/boardAttachment'
 
 interface ProjectBoardTabProps {
   projectId: number
@@ -602,7 +603,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
               alt={`${selectedBoard.boardSj} 첨부 이미지`}
             />
 
-            {selectedBoard.boardAtchFileId ? (
+            {hasBoardAttachment(selectedBoard.boardAtchFileId) ? (
               <div className="flex items-center gap-2 border-b border-slate-200 py-4 text-sm text-slate-600">
                 <Paperclip size={16} />
                 첨부파일 ID {selectedBoard.boardAtchFileId}
@@ -981,7 +982,7 @@ const ProjectBoardTab = ({ projectId }: ProjectBoardTabProps) => {
                     <span className="truncate font-semibold text-slate-800">
                       {board.boardSj}
                     </span>
-                    {board.boardAtchFileId ? (
+                    {hasBoardAttachment(board.boardAtchFileId) ? (
                       <Paperclip size={14} className="shrink-0 text-slate-400" />
                     ) : null}
                     {(board.commentList?.length ?? 0) > 0 && (

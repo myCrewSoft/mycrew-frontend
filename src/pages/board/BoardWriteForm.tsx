@@ -630,12 +630,12 @@ const BoardWriteForm = ({
       <div className="min-h-0 flex-1 overflow-y-auto px-11 py-8">
         <div className="grid grid-cols-[104px_minmax(0,1fr)] gap-x-8 gap-y-6">
           <label className="pt-3 text-base font-bold text-slate-950">
-            게시판 선택 <span className="text-red-500">*</span>
+           제목 <span className="text-red-500">*</span>
           </label>
-          <div className="flex w-full items-center gap-3">
+          <div className="flex w-full items-center ">
             {isFixedProjectBoard ? (
-              <div className="flex h-11 items-center rounded-md border border-slate-300 bg-slate-100 px-3 text-sm font-semibold text-slate-600">
-                프로젝트 보드
+              <div className="">
+                
               </div>
             ) : (
               <select

@@ -31,6 +31,7 @@ import { useApi } from '../../hooks/useApi'
 import { useEmployeeProfileDirectory } from '../../hooks/useEmployeeProfileDirectory'
 import type { BoardKind } from '../../types/board'
 import type { BoardCommentUpdateRequest, BoardResponse } from '../../types'
+import { hasBoardAttachment } from '../../utils/boardAttachment'
 
 const boardLabelByType: Record<BoardKind, string> = {
   notice: '공지사항',
@@ -330,7 +331,7 @@ const BoardDetailPage = () => {
     [detail?.commentList],
   )
 
-  const hasAttachment = Boolean(detail?.boardAtchFileId)
+  const hasAttachment = hasBoardAttachment(detail?.boardAtchFileId)
   const commentsEnabled = detail ? isCommentEnabled(detail, boardType) : false
   const trimmedComment = commentContent.trim()
   const trimmedReply = replyContent.trim()
