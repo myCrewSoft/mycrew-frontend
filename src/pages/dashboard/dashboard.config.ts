@@ -27,7 +27,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
     key: 'attendance',
     title: '근태',
     icon: Timer,
-    defaultSize: { w: 4, h: 3, minW: 3, minH: 3, maxW: 5, maxH: 4 },
+    defaultSize: { w: 4, h: 3, minW: 3, minH: 3, maxW: 6, maxH: 4 },
   },
   {
     key: 'approval',
@@ -92,7 +92,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetConfig[] = [
 ]
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayoutItem[] = [
-  { i: 'attendance', x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 3, maxW: 5, maxH: 4 },
+  { i: 'attendance', x: 0, y: 0, w: 4, h: 3, minW: 3, minH: 3, maxW: 6, maxH: 4 },
   { i: 'approval', x: 4, y: 0, w: 4, h: 4, minW: 3, minH: 4, maxW: 6, maxH: 6 },
   { i: 'todaySchedule', x: 8, y: 0, w: 4, h: 4, minW: 3, minH: 4, maxW: 6, maxH: 6 },
   { i: 'meeting', x: 0, y: 4, w: 4, h: 4, minW: 3, minH: 4, maxW: 6, maxH: 6 },
