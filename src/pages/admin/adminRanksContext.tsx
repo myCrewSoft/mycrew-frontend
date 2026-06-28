@@ -18,6 +18,8 @@ const sortRanks = (ranks: RankResponse[]) =>
       left.rankName.localeCompare(right.rankName, 'ko'),
   );
 
+const getTopRank = (ranks: RankResponse[]) => sortRanks(ranks)[0];
+
 export function AdminRanksProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -58,9 +60,10 @@ export function AdminRanksProvider({ children }: { children: ReactNode }) {
         const hasSelectedRank = nextRanks.some(
           (rank) => rank.rankId === selectedRankId,
         );
+        const topRank = getTopRank(nextRanks);
 
-        if (nextRanks.length > 0 && !hasSelectedRank) {
-          navigate(`/admin/ranks?rankId=${nextRanks[0].rankId}`, {
+        if (topRank && !hasSelectedRank) {
+          navigate(`/admin/ranks?rankId=${topRank.rankId}`, {
             replace: true,
           });
         }

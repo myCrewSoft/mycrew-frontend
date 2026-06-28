@@ -6,7 +6,10 @@ import type { AdminAccessResponse } from '../../../types/admin';
 import AdminHeader from '../../common/admin/AdminHeader';
 import AdminPrimarySidebar from '../../common/admin/AdminPrimarySidebar';
 import AdminSubSidebar from '../../common/admin/AdminSubSidebar';
-import { adminLayoutClass } from '../../common/admin/adminLayoutStyles';
+import {
+  adminContentClass,
+  adminLayoutClass,
+} from '../../common/admin/adminLayoutStyles';
 
 interface AdminLayoutProps {
   access: AdminAccessResponse;
@@ -35,7 +38,7 @@ export default function AdminLayout({ access, children }: AdminLayoutProps) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AdminHeader access={access} onLogout={() => void handleLogout()} />
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+        <main className={adminContentClass}>
           {children}
         </main>
       </div>

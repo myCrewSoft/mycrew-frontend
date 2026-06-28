@@ -821,7 +821,7 @@ export default function AdminRanksPage() {
                   aria-label="사원 검색"
                   wrapperClassName="min-w-72"
                 />
-                <Button type="submit" variant="outline">
+                <Button type="submit" variant="outline" className="shrink-0 whitespace-nowrap">
                   검색
                 </Button>
               </form>

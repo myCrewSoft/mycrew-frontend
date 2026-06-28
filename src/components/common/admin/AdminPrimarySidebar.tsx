@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { Settings } from 'lucide-react';
 import { adminNavItems } from './adminLayoutConfig';
 import {
   adminLogoLinkClass,
@@ -17,10 +16,7 @@ export default function AdminPrimarySidebar({
   return (
     <aside className={primarySidebarClass}>
       <div className="flex w-full flex-col items-center">
-        <Link
-          to="/admin/dashboard"
-          className={adminLogoLinkClass}
-        >
+        <Link to="/admin/dashboard" className={adminLogoLinkClass}>
           A
         </Link>
 
@@ -45,15 +41,6 @@ export default function AdminPrimarySidebar({
         </nav>
       </div>
 
-      <Link
-        to="/admin/settings"
-        className={getPrimaryNavLinkClass(pathname.startsWith('/admin/settings'))}
-      >
-        <Settings size={22} />
-        <span className="text-[11px] font-bold leading-none tracking-tight">
-          설정
-        </span>
-      </Link>
     </aside>
   );
 }

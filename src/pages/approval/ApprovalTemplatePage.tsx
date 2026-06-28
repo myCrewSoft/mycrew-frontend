@@ -335,15 +335,17 @@ export default function ApprovalTemplatePage({
                           <span>{template.tmplatCd}</span>
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className={`approval-page__favorite-btn${template.favoriteYn === 'Y' ? ' approval-page__favorite-btn--active' : ''}`}
-                        disabled={togglingFavorite === template.tmplatCd}
-                        onClick={(e) => void handleToggleFavorite(template.tmplatCd, e)}
-                        aria-label={template.favoriteYn === 'Y' ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                      >
-                        <Star size={15} />
-                      </button>
+                      {!manageOnly && (
+                        <button
+                          type="button"
+                          className={`approval-page__favorite-btn${template.favoriteYn === 'Y' ? ' approval-page__favorite-btn--active' : ''}`}
+                          disabled={togglingFavorite === template.tmplatCd}
+                          onClick={(e) => void handleToggleFavorite(template.tmplatCd, e)}
+                          aria-label={template.favoriteYn === 'Y' ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                        >
+                          <Star size={15} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -383,7 +385,7 @@ export default function ApprovalTemplatePage({
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="danger"
                     leftIcon={<Trash2 size={15} />}
                     loading={deleting}
                     onClick={() => void handleDeleteTemplate()}
@@ -402,14 +404,18 @@ export default function ApprovalTemplatePage({
                   <span>사용 여부</span>
                   <strong>{selectedTemplate.useYn}</strong>
                 </div>
-                <div>
-                  <span>즐겨찾기</span>
-                  <strong>{selectedTemplate.favoriteYn}</strong>
-                </div>
-                <div>
-                  <span>첨부파일</span>
-                  <strong>{selectedTemplate.atchFileId ?? '-'}</strong>
-                </div>
+                {!manageOnly && (
+                  <>
+                    <div>
+                      <span>즐겨찾기</span>
+                      <strong>{selectedTemplate.favoriteYn}</strong>
+                    </div>
+                    <div>
+                      <span>첨부파일</span>
+                      <strong>{selectedTemplate.atchFileId ?? '-'}</strong>
+                    </div>
+                  </>
+                )}
               </div>
 
               <section className="approval-page__detail-section">

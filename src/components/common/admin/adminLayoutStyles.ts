@@ -1,8 +1,11 @@
 export const adminLayoutClass =
-  'flex h-screen w-full overflow-hidden bg-[#eef3ef] text-slate-950';
+  'mycrew-admin-theme flex h-screen w-full overflow-hidden bg-[#eef3ef] text-slate-950';
+
+export const adminContentClass =
+  'mycrew-admin-content min-h-0 flex-1 overflow-y-auto px-8 py-6';
 
 export const primarySidebarClass =
-  'flex h-screen w-24 flex-shrink-0 flex-col justify-between bg-[#0d1527] px-2 py-5 text-white';
+  'flex h-screen w-24 flex-shrink-0 flex-col bg-[#0d1527] px-2 py-5 text-white';
 
 export const adminLogoLinkClass =
   'mb-5 flex h-16 w-16 items-center justify-center rounded-xl bg-[#16a34a] text-3xl font-black text-white no-underline shadow-md transition-transform hover:scale-105';

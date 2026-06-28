@@ -133,7 +133,7 @@ export default function AdminMtngPage() {
               label="오늘의 예정 회의"
               value={stats?.todayScheduledCnt ?? 0}
               icon={<Calendar size={24} />}
-              iconBg="bg-[#005cad]/10 text-[#005cad]"
+              iconBg="bg-[#e5efe8] text-[#6f8f76]"
               valueColor="text-[#005cad]"
             />
             <StatCard
@@ -470,7 +470,7 @@ function MtngTableRow({ mtng, onDetail }: {
       <td className="px-6 py-4 text-right">
         <button
           onClick={() => onDetail(mtng.mtngId)}
-          className="rounded-lg p-2 text-[#005cad] transition-all hover:bg-[#005cad]/10"
+          className="rounded-lg p-2 text-[#6f8f76] transition-all hover:bg-[#e5efe8]"
           title="상세 보기"
         >
           <Edit3 size={18} />
