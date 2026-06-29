@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Mail, MessageSquare, Search } from 'lucide-react'
+import { Bell, Bot, Mail, MessageSquare, Search } from 'lucide-react'
 import { mailApi } from '../../api/mailApi'
 import { notificationApi } from '../../api/notificationApi'
 import { useApi } from '../../hooks/useApi'
@@ -9,6 +9,7 @@ import HeaderPopover from '../common/overlay/headerPopover/HeaderPopover'
 import GlobalSearchPalette from './headerSearch/GlobalSearchPalette'
 import MessengerPopoverContent from './headerPopover/messenger/MessengerPopoverContent'
 import { useMessengerSocketContext } from './headerPopover/messenger/MessengerSocketProvider'
+import AIChatbotPopoverContent from './headerPopover/AIChatbotPopoverContent'
 import MailPopoverContent from './headerPopover/MailPopoverContent'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
 import { NOTIFICATION_RECEIVED_EVENT } from './headerPopover/useNotificationStream'
@@ -120,6 +121,27 @@ const Header = () => {
         <div className="flex-1" />
 
         <div className="flex items-center gap-4">
+          <HeaderPopover
+            title="AI 어시스턴트"
+            className="!w-[420px]"
+            bodyClassName="h-[520px] flex flex-col overflow-hidden p-0"
+            trigger={({ open, toggle }) => (
+              <NotificationIconButton
+                active={open}
+                label="AI 어시스턴트"
+                onClick={toggle}
+                icon={
+                  <Bot
+                    size={20}
+                    className={open ? 'text-white' : 'text-slate-700'}
+                  />
+                }
+              />
+            )}
+          >
+            <AIChatbotPopoverContent />
+          </HeaderPopover>
+
           <HeaderPopover
             title="메일"
             trigger={({ open, toggle }) => (
