@@ -148,7 +148,7 @@ const getTypeIcon = (type?: SearchType) => {
   return Mail
 }
 
-const getFallbackPath = (item: SearchResponseDto) => {
+const getResultPath = (item: SearchResponseDto) => {
   const id = item.id
 
   if (item.type === 'PROJECT') return `/project/${id}`
@@ -165,8 +165,8 @@ const getFallbackPath = (item: SearchResponseDto) => {
   }
 
   if (item.type === 'SCHEDULE') return `/calendar?scheduleId=${id}`
-  if (item.type === 'MEETING') return '/meeting/scheduled'
-  if (item.type === 'MAIL') return '/mail'
+  if (item.type === 'MEETING') return `/meeting/list?detailMeetingId=${id}`
+  if (item.type === 'MAIL') return `/mail?mailId=${id}`
 
   return '/dashboard'
 }
@@ -372,8 +372,7 @@ const GlobalSearchPaletteContent = ({
 
   const handleOpenItem = useCallback(
     (item: SearchResponseDto) => {
-      const backendUrl = item.url?.trim()
-      navigate(backendUrl || getFallbackPath(item))
+      navigate(getResultPath(item))
       onClose()
     },
     [navigate, onClose],
