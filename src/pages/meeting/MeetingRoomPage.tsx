@@ -64,7 +64,7 @@ interface ParticipantTile {
 // ── 상수 ──────────────────────────────────────────────────────────
 
 const STT_CHUNK_INTERVAL_MS = 5000
-const STT_SPEECH_RMS_THRESHOLD = 0.018
+const STT_SPEECH_RMS_THRESHOLD = 0.025
 const STT_SPEECH_CHECK_INTERVAL_MS = 200
 const DEFAULT_LIVEKIT_URL = `${
   window.location.protocol === 'https:' ? 'wss' : 'ws'
