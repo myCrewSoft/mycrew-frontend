@@ -7,6 +7,7 @@ import {
   FileText,
   History,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Save,
@@ -344,6 +345,35 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
     }
   }
 
+  const handleStreamRecording = async () => {
+    if (meeting.vconfId === null || !meeting.rcrdgAtchFileId) return
+    const streamWindow = window.open('', '_blank')
+    if (streamWindow) streamWindow.opener = null
+
+    try {
+      const response = await meetingApi.streamRcrdg(
+        meeting.vconfId,
+        meeting.rcrdgAtchFileId,
+      )
+      const blob = new Blob([response.data as BlobPart], {
+        type: (response.data as Blob).type || 'audio/webm',
+      })
+      const blobUrl = URL.createObjectURL(blob)
+      if (streamWindow) {
+        streamWindow.location.href = blobUrl
+      } else {
+        window.location.assign(blobUrl)
+      }
+    } catch {
+      streamWindow?.close()
+      showToast({
+        title: '녹취록을 재생하지 못했습니다.',
+        description: '잠시 후 다시 시도해 주세요.',
+        variant: 'danger',
+      })
+    }
+  }
+
   return (
     <PageComponent
       title={meeting.mtngNm ?? '회의록'}
@@ -406,8 +436,33 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
               </div>
               <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
                 <dt>녹취록</dt>
-                <dd className="mt-1 text-emerald-700">
-                  {getRecordingLabel(meeting)}
+                <dd className="mt-1">
+                  {meeting.vconfId !== null && meeting.rcrdgAtchFileId ? (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        aria-label="녹취록 스트리밍"
+                        title="스트리밍"
+                        onClick={() => void handleStreamRecording()}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        <Play size={13} fill="currentColor" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="녹취록 다운로드"
+                        title="다운로드"
+                        onClick={() => void handleDownloadRecording()}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 transition-colors hover:bg-emerald-100"
+                      >
+                        <Download size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="font-bold text-slate-500">
+                      {getRecordingLabel(meeting)}
+                    </span>
+                  )}
                 </dd>
               </div>
             </dl>
@@ -664,15 +719,6 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                   onClick={() => void handleRegenerateAiDraft()}
                 >
                   AI 초안 재생성
-                </Button>
-              )}
-              {meeting.vconfId !== null && meeting.rcrdgAtchFileId && (
-                <Button
-                  variant="outline"
-                  leftIcon={<Download size={16} />}
-                  onClick={() => void handleDownloadRecording()}
-                >
-                  녹취록 다운로드
                 </Button>
               )}
             </div>

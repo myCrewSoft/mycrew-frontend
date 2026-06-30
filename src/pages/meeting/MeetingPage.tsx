@@ -274,7 +274,6 @@ const MeetingPage = () => {
       : null
 
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
-  const [rcrdgBlobUrl, setRcrdgBlobUrl] = useState<string | null>(null)
   const [meetingSearchKeyword, setMeetingSearchKeyword] = useState('')
   const [meetingDateFrom, setMeetingDateFrom] = useState('')
   const [meetingDateTo, setMeetingDateTo] = useState('')
@@ -408,11 +407,11 @@ const MeetingPage = () => {
     })
     .sort(
       (a: MeetingListItem, b: MeetingListItem) =>
-        new Date(a.beginDt ?? '').getTime() - new Date(b.beginDt ?? '').getTime(),
+        new Date(b.beginDt ?? '').getTime() - new Date(a.beginDt ?? '').getTime(),
     )
 
   const groupedMeetings = groupMeetingsByDate(filteredMeetings)
-  const dateKeys = Object.keys(groupedMeetings).sort()
+  const dateKeys = Object.keys(groupedMeetings).sort((a, b) => b.localeCompare(a))
 
   const calendarEvents = filteredMeetings.map((meeting) => ({
     id: String(meeting.mtngId),
@@ -844,28 +843,6 @@ const MeetingPage = () => {
     navigate,
     openMeetingDetail,
   ])
-
-  useEffect(() => {
-    if (!selectedMeeting?.vconfId || !selectedMeeting?.rcrdgAtchFileId) {
-      return
-    }
-    let active = true
-    let createdUrl: string | null = null
-    void meetingApi.streamRcrdg(selectedMeeting.vconfId, selectedMeeting.rcrdgAtchFileId)
-      .then((res) => {
-        if (!active) return
-        createdUrl = URL.createObjectURL(new Blob([res.data as BlobPart], { type: (res.data as Blob).type || 'audio/webm' }))
-        setRcrdgBlobUrl(createdUrl)
-      })
-      .catch(() => {
-        if (active) setRcrdgBlobUrl(null)
-      })
-    return () => {
-      active = false
-      if (createdUrl) URL.revokeObjectURL(createdUrl)
-      setRcrdgBlobUrl(null)
-    }
-  }, [selectedMeeting?.vconfId, selectedMeeting?.rcrdgAtchFileId])
 
   useEffect(() => {
     if (!schedulePanelOpen) return
@@ -1310,18 +1287,6 @@ const MeetingPage = () => {
                     )}
                 </div>
               </div>
-              {selectedMeeting.vconfId !== null &&
-                selectedMeeting.rcrdgAtchFileId &&
-                rcrdgBlobUrl && (
-                  <audio
-                    controls
-                    preload="metadata"
-                    className="mt-4 w-full"
-                    src={rcrdgBlobUrl}
-                  >
-                    브라우저가 오디오 재생을 지원하지 않습니다.
-                  </audio>
-                )}
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-8 py-5">

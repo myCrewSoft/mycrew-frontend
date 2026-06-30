@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Bell, Bot, Mail, MessageSquare, Search } from 'lucide-react'
 import { mailApi } from '../../api/mailApi'
 import { notificationApi } from '../../api/notificationApi'
@@ -27,6 +27,11 @@ const Header = () => {
     data: notificationUnreadCount,
     execute: fetchNotificationUnreadCount,
   } = useApi<NotificationUnreadCountResponse>(notificationApi.getUnreadCount)
+
+  const { execute: readAllNotifications } = useApi<null>(
+    notificationApi.readAllNotifications,
+    { immediate: false },
+  )
 
   const { data: mailUnread, execute: fetchMailUnread } = useApi(
     mailApi.getMailUnreadCount,
@@ -63,6 +68,15 @@ const Header = () => {
       )
     }
   }, [fetchNotificationUnreadCount])
+
+  const handleNotificationPopoverClose = useCallback(() => {
+    void readAllNotifications()
+      .then(() => {
+        setNotificationRefreshKey((current) => current + 1)
+        return fetchNotificationUnreadCount()
+      })
+      .catch(() => undefined)
+  }, [fetchNotificationUnreadCount, readAllNotifications])
 
   useEffect(() => {
     const handleMailNotification = (event: Event) => {
@@ -200,6 +214,7 @@ const Header = () => {
             title="알림"
             className="!w-[420px]"
             bodyClassName="overflow-visible"
+            onClose={handleNotificationPopoverClose}
             trigger={({ open, toggle }) => (
               <NotificationIconButton
                 active={open}

@@ -122,17 +122,8 @@ interface WidgetHeaderBadgeData {
 
 const isAdminDashboard = (variant: DashboardVariant): boolean => variant === 'admin'
 
-const formatWorkDuration = (minutes?: number | null) => {
-  const safeMinutes = Math.max(0, minutes ?? 0)
-  const hour = Math.floor(safeMinutes / 60)
-  const minute = safeMinutes % 60
-  if (hour === 0) return `${minute}분`
-  if (minute === 0) return `${hour}시간`
-  return `${hour}시간 ${minute}분`
-}
-
 const formatClockTime = (value?: string | null) => {
-  if (!value) return '-'
+  if (!value) return '--:--'
   if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5)
 
   const date = new Date(value)
@@ -148,9 +139,58 @@ const getTodayAttendanceStatus = (
   fallbackStatus?: AttendanceWidgetResponseDto['status'],
 ) => {
   if (!today) return getAttendanceStatus(fallbackStatus)
-  if (today.checkedOut) return '퇴근 완료'
-  if (today.checkedIn) return today.atndStatNm ?? '근무 중'
+  if (today.atndStatNm?.trim()) return today.atndStatNm.trim()
+  if (today.checkedIn) return '근무 중'
   return '출근 전'
+}
+
+const getAttendanceHeroStyle = (statusName: string) => {
+  if (statusName.includes('지각') || statusName.includes('결근')) {
+    return {
+      gradient: 'from-rose-500 to-red-600',
+      shadow: 'shadow-[0_8px_20px_rgba(225,29,72,0.25)]',
+    }
+  }
+
+  if (statusName.includes('조퇴')) {
+    return {
+      gradient: 'from-amber-400 to-orange-500',
+      shadow: 'shadow-[0_8px_20px_rgba(245,158,11,0.25)]',
+    }
+  }
+
+  if (statusName.includes('휴가') || statusName.includes('반차')) {
+    return {
+      gradient: 'from-violet-500 to-purple-600',
+      shadow: 'shadow-[0_8px_20px_rgba(124,58,237,0.25)]',
+    }
+  }
+
+  if (statusName.includes('정상')) {
+    return {
+      gradient: 'from-emerald-500 to-teal-600',
+      shadow: 'shadow-[0_8px_20px_rgba(16,185,129,0.25)]',
+    }
+  }
+
+  if (statusName.includes('연장') || statusName.includes('초과')) {
+    return {
+      gradient: 'from-cyan-500 to-blue-600',
+      shadow: 'shadow-[0_8px_20px_rgba(14,165,233,0.25)]',
+    }
+  }
+
+  if (statusName.includes('미출근') || statusName.includes('출근 전')) {
+    return {
+      gradient: 'from-slate-500 to-slate-700',
+      shadow: 'shadow-[0_8px_20px_rgba(71,85,105,0.22)]',
+    }
+  }
+
+  return {
+    gradient: 'from-blue-500 to-blue-700',
+    shadow: 'shadow-[0_8px_20px_rgba(37,99,235,0.25)]',
+  }
 }
 
 const getScheduleTarget = (
@@ -597,10 +637,11 @@ const AttendanceControlWidget = ({
     return today?.workMin ?? data.workDurationMinutes ?? 0
   }, [checkInAt, data.workDurationMinutes, now, today?.workMin, working])
   const progressPercent = Math.min(100, Math.round((elapsedMinutes / 480) * 100))
-  const statusCaption = checkedOut
-    ? '오늘 업무가 마무리됐어요'
-    : working
-      ? `${progressPercent}% 진행 중`
+  const attendanceStatus = getTodayAttendanceStatus(today, data.status)
+  const statusCaption = working
+    ? `${progressPercent}% 진행 중`
+    : checkedOut
+      ? `오늘 근태 상태: ${attendanceStatus}`
       : '출근을 기다리고 있어요'
 
   const handleCheck = async (kind: 'in' | 'out') => {
@@ -623,23 +664,13 @@ const AttendanceControlWidget = ({
     }
   }
 
-  const cardGradient = checkedOut
-    ? 'from-indigo-600 to-violet-700'
-    : working
-      ? 'from-emerald-500 to-teal-600'
-      : 'from-blue-500 to-blue-700'
-
-  const cardShadow = checkedOut
-    ? 'shadow-[0_8px_20px_rgba(99,60,220,0.25)]'
-    : working
-      ? 'shadow-[0_8px_20px_rgba(16,185,129,0.25)]'
-      : 'shadow-[0_8px_20px_rgba(37,99,235,0.25)]'
+  const heroStyle = getAttendanceHeroStyle(attendanceStatus)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* 상태 히어로 카드 */}
       <div
-        className={`relative shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${cardGradient} ${cardShadow} px-4 py-3 text-white`}
+        className={`relative shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${heroStyle.gradient} ${heroStyle.shadow} px-4 py-3 text-white`}
       >
         <div className="pointer-events-none absolute -right-5 -top-5 h-20 w-20 rounded-full bg-white/10" />
 
@@ -647,7 +678,7 @@ const AttendanceControlWidget = ({
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">현재 상태</p>
             <strong className="mt-0.5 block truncate text-[20px] font-black leading-tight text-white">
-              {getTodayAttendanceStatus(today, data.status)}
+              {attendanceStatus}
             </strong>
           </div>
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
@@ -666,24 +697,27 @@ const AttendanceControlWidget = ({
         </div>
       </div>
 
-      {/* 근무 지표 */}
-      <div className="flex gap-2">
-        <div className="flex flex-1 flex-col justify-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100/80">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400">출근</span>
-            <span className="text-[13px] font-black text-slate-900">{formatClockTime(checkInAt)}</span>
-          </div>
-          <div className="h-px bg-slate-200/70" />
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-400">퇴근</span>
-            <span className="text-[13px] font-black text-slate-900">{formatClockTime(checkOutAt)}</span>
-          </div>
+      {/* 출퇴근 기록 */}
+      <dl className="flex flex-col gap-3 text-sm">
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2.5">
+          <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
+            <LogIn size={14} className="text-emerald-500" />
+            출근
+          </dt>
+          <dd className="font-black tabular-nums text-slate-950">
+            {formatClockTime(checkInAt)}
+          </dd>
         </div>
-        <div className="flex min-w-[88px] flex-col items-center justify-center rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-100/80">
-          <span className="text-[10px] font-bold text-slate-400">근무 시간</span>
-          <span className="mt-0.5 text-[15px] font-black text-slate-900">{formatWorkDuration(elapsedMinutes)}</span>
+        <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2.5">
+          <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
+            <LogOut size={14} className="text-slate-400" />
+            퇴근
+          </dt>
+          <dd className="font-black tabular-nums text-slate-950">
+            {formatClockTime(checkOutAt)}
+          </dd>
         </div>
-      </div>
+      </dl>
 
       {/* 액션 버튼 */}
       <div className="mt-auto grid grid-cols-2 gap-2">
