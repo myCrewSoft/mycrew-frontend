@@ -27,12 +27,6 @@ const MEETING_TYPE_META: Record<string, { label: string; color: string }> = {
   '01': { label: '온라인', color: '#8b5cf6' },
   '02': { label: '오프라인', color: '#f59e0b' },
   '03': { label: '혼합', color: '#06b6d4' },
-  MT01: { label: '온라인', color: '#8b5cf6' },
-  MT02: { label: '오프라인', color: '#f59e0b' },
-  MT03: { label: '혼합', color: '#06b6d4' },
-  MT001: { label: '온라인', color: '#8b5cf6' },
-  MT002: { label: '오프라인', color: '#f59e0b' },
-  MT003: { label: '혼합', color: '#06b6d4' },
 }
 
 const TOOLTIP_STYLE = {
