@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Bell,
   ChevronRight,
-  Clock,
   GripVertical,
   LogIn,
   LogOut,
@@ -92,6 +91,18 @@ const statusLabel: Record<string, string> = {
   absent: '미출근',
 }
 
+const attendanceStatusNameLabel: Record<string, string> = {
+  NORMAL: '정상',
+  LATE: '지각',
+  EARLY: '조퇴',
+  EARLY_LEAVE: '조퇴',
+  WORKING: '근무 중',
+  VACATION: '휴가',
+  HALF_DAY: '반차',
+  OVERTIME: '연장 근무',
+  ABSENT: '미출근',
+}
+
 const boardTabs: { value: DashboardBoardType; label: string }[] = [
   { value: 'NOTICE', label: '공지' },
   { value: 'DEPT', label: '부서' },
@@ -139,57 +150,69 @@ const getTodayAttendanceStatus = (
   fallbackStatus?: AttendanceWidgetResponseDto['status'],
 ) => {
   if (!today) return getAttendanceStatus(fallbackStatus)
-  if (today.atndStatNm?.trim()) return today.atndStatNm.trim()
+  if (today.atndStatNm?.trim()) {
+    const statusName = today.atndStatNm.trim()
+    return attendanceStatusNameLabel[statusName.toUpperCase()] ?? statusName
+  }
   if (today.checkedIn) return '근무 중'
   return '출근 전'
 }
 
 const getAttendanceHeroStyle = (statusName: string) => {
-  if (statusName.includes('지각') || statusName.includes('결근')) {
+  const normalizedStatus = statusName.replace(/\s+/g, '')
+
+  if (normalizedStatus.includes('지각') || normalizedStatus.includes('결근')) {
     return {
-      gradient: 'from-rose-500 to-red-600',
+      gradient: 'from-rose-500 via-red-500 to-red-700',
       shadow: 'shadow-[0_8px_20px_rgba(225,29,72,0.25)]',
     }
   }
 
-  if (statusName.includes('조퇴')) {
+  if (normalizedStatus.includes('조퇴')) {
     return {
-      gradient: 'from-amber-400 to-orange-500',
+      gradient: 'from-amber-400 via-amber-500 to-orange-600',
       shadow: 'shadow-[0_8px_20px_rgba(245,158,11,0.25)]',
     }
   }
 
-  if (statusName.includes('휴가') || statusName.includes('반차')) {
+  if (normalizedStatus.includes('정상')) {
     return {
-      gradient: 'from-violet-500 to-purple-600',
-      shadow: 'shadow-[0_8px_20px_rgba(124,58,237,0.25)]',
-    }
-  }
-
-  if (statusName.includes('정상')) {
-    return {
-      gradient: 'from-emerald-500 to-teal-600',
+      gradient: 'from-emerald-500 via-emerald-600 to-teal-700',
       shadow: 'shadow-[0_8px_20px_rgba(16,185,129,0.25)]',
     }
   }
 
-  if (statusName.includes('연장') || statusName.includes('초과')) {
+  if (normalizedStatus.includes('근무중')) {
     return {
-      gradient: 'from-cyan-500 to-blue-600',
+      gradient: 'from-sky-500 via-blue-600 to-indigo-700',
+      shadow: 'shadow-[0_8px_20px_rgba(37,99,235,0.25)]',
+    }
+  }
+
+  if (normalizedStatus.includes('휴가') || normalizedStatus.includes('반차')) {
+    return {
+      gradient: 'from-violet-500 via-purple-600 to-fuchsia-700',
+      shadow: 'shadow-[0_8px_20px_rgba(124,58,237,0.25)]',
+    }
+  }
+
+  if (normalizedStatus.includes('연장') || normalizedStatus.includes('초과')) {
+    return {
+      gradient: 'from-cyan-500 via-sky-600 to-blue-700',
       shadow: 'shadow-[0_8px_20px_rgba(14,165,233,0.25)]',
     }
   }
 
-  if (statusName.includes('미출근') || statusName.includes('출근 전')) {
+  if (normalizedStatus.includes('미출근') || normalizedStatus.includes('출근전')) {
     return {
-      gradient: 'from-slate-500 to-slate-700',
+      gradient: 'from-slate-500 via-slate-600 to-slate-700',
       shadow: 'shadow-[0_8px_20px_rgba(71,85,105,0.22)]',
     }
   }
 
   return {
-    gradient: 'from-blue-500 to-blue-700',
-    shadow: 'shadow-[0_8px_20px_rgba(37,99,235,0.25)]',
+    gradient: 'from-slate-500 via-slate-600 to-slate-700',
+    shadow: 'shadow-[0_8px_20px_rgba(71,85,105,0.22)]',
   }
 }
 
@@ -293,67 +316,6 @@ const isUnreadNotification = (notification: NotificationWidgetItem) => {
   if (typeof record.unreadYn === 'string') return record.unreadYn === 'Y'
   if (typeof record.readAt === 'string' || record.readAt === null) return !record.readAt
   return true
-}
-
-const hasWidgetItems = (data: unknown, key: string) => {
-  const value = (data as Record<string, unknown>)[key]
-  return Array.isArray(value) && value.length > 0
-}
-
-const isWidgetBodyEmpty = (
-  widgetKey: DashboardWidgetKey,
-  widgetState: DashboardWidgetStateMap[DashboardWidgetKey] | undefined,
-  variant: DashboardVariant,
-) => {
-  if (!widgetState || widgetState.loading || widgetState.error) return false
-  const data = widgetState.data
-  if (isAdminDashboard(variant)) return false
-  if (!data) return true
-
-  if (variant === 'admin') {
-    switch (widgetKey) {
-      case 'attendance':
-        return !hasWidgetItems(data, 'employees')
-      case 'todaySchedule':
-        return !hasWidgetItems(data, 'schedules')
-      case 'projectProgress':
-        return !hasWidgetItems(data, 'statusCounts')
-      case 'board':
-        return !hasWidgetItems(data, 'notices')
-      default:
-        break
-    }
-  }
-
-  switch (widgetKey) {
-    case 'approval':
-      return !hasWidgetItems(data, 'documents')
-    case 'todaySchedule':
-      return !hasWidgetItems(data, 'schedules')
-    case 'meeting':
-      return !hasWidgetItems(data, 'meetings')
-    case 'reservation':
-      return !hasWidgetItems(data, 'reservations')
-    case 'task':
-      return !hasWidgetItems(data, 'tasks')
-    case 'projectProgress':
-      return !hasWidgetItems(data, 'projects')
-    case 'board':
-      return !hasWidgetItems(data, 'posts')
-    case 'mail':
-      return !hasWidgetItems(data, 'mails')
-    case 'messenger':
-      return !hasWidgetItems(data, 'rooms')
-    case 'notification': {
-      const notificationData = data as DashboardWidgetResponseMap['notification']
-      return (
-        notificationData.count <= 0 ||
-        !notificationData.notifications.filter(isUnreadNotification).length
-      )
-    }
-    default:
-      return false
-  }
 }
 
 const getBoardPostPath = (boardType: DashboardBoardType, postId: number) => {
@@ -508,7 +470,6 @@ const DashboardWidgetCard = ({
   const title =
     variant === 'admin' ? adminWidgetTitle[widgetKey] ?? config.title : config.title
   const headerBadge = getWidgetHeaderBadge(widgetKey, widgetState, variant)
-  const bodyEmpty = isWidgetBodyEmpty(widgetKey, widgetState, variant)
 
   return (
     <section className="dashboard-widget-card flex h-full flex-col overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)] ring-1 ring-white/70">
@@ -548,19 +509,17 @@ const DashboardWidgetCard = ({
         </div>
       </header>
 
-      {!bodyEmpty && (
-        <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
-          {renderWidgetBody(
-            widgetKey,
-            widgetState,
-            boardType,
-            onBoardTypeChange,
-            variant,
-            navigate,
-            onRefreshWidget,
-          )}
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col px-4 py-3">
+        {renderWidgetBody(
+          widgetKey,
+          widgetState,
+          boardType,
+          onBoardTypeChange,
+          variant,
+          navigate,
+          onRefreshWidget,
+        )}
+      </div>
     </section>
   )
 }
@@ -638,11 +597,10 @@ const AttendanceControlWidget = ({
   }, [checkInAt, data.workDurationMinutes, now, today?.workMin, working])
   const progressPercent = Math.min(100, Math.round((elapsedMinutes / 480) * 100))
   const attendanceStatus = getTodayAttendanceStatus(today, data.status)
-  const statusCaption = working
-    ? `${progressPercent}% 진행 중`
-    : checkedOut
-      ? `오늘 근태 상태: ${attendanceStatus}`
-      : '출근을 기다리고 있어요'
+  const statusCaption = `근무시간 ${elapsedMinutes}분 / 지각 ${today?.lateMin ?? 0}분`
+  const nextCheckKind = !checkedIn ? 'in' : !checkedOut ? 'out' : null
+  const checkButtonLabel =
+    nextCheckKind === 'in' ? '출근' : nextCheckKind === 'out' ? '퇴근' : '퇴근 완료'
 
   const handleCheck = async (kind: 'in' | 'out') => {
     setActing(true)
@@ -681,9 +639,21 @@ const AttendanceControlWidget = ({
               {attendanceStatus}
             </strong>
           </div>
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/20">
-            <Clock size={18} className={working ? 'animate-pulse' : ''} />
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={
+              nextCheckKind === 'out' ? <LogOut size={15} /> : <LogIn size={15} />
+            }
+            loading={acting}
+            disabled={!nextCheckKind}
+            onClick={() => {
+              if (nextCheckKind) void handleCheck(nextCheckKind)
+            }}
+            className="dashboard-widget-action h-9 min-w-[116px] flex-shrink-0 rounded-lg !border-white/80 !bg-white/95 !bg-none px-3 font-black !text-slate-800 shadow-[0_4px_12px_rgba(15,23,42,0.16)] hover:!bg-white disabled:!cursor-default disabled:!border-white/60 disabled:!bg-white/75 disabled:!text-slate-600 disabled:!opacity-90"
+          >
+            {checkButtonLabel}
+          </Button>
         </div>
 
         <div className="relative mt-2.5">
@@ -698,54 +668,28 @@ const AttendanceControlWidget = ({
       </div>
 
       {/* 출퇴근 기록 */}
-      <dl className="flex flex-col gap-3 text-sm">
-        <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2.5">
-          <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
-            <LogIn size={14} className="text-emerald-500" />
-            출근
-          </dt>
-          <dd className="font-black tabular-nums text-slate-950">
-            {formatClockTime(checkInAt)}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-3 py-2.5">
-          <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
-            <LogOut size={14} className="text-slate-400" />
-            퇴근
-          </dt>
-          <dd className="font-black tabular-nums text-slate-950">
-            {formatClockTime(checkOutAt)}
-          </dd>
+      <dl className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
+              <LogIn size={14} className="text-emerald-500" />
+              출근
+            </dt>
+            <dd className="font-black tabular-nums text-slate-950">
+              {formatClockTime(checkInAt)}
+            </dd>
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
+              <LogOut size={14} className="text-slate-400" />
+              퇴근
+            </dt>
+            <dd className="font-black tabular-nums text-slate-950">
+              {formatClockTime(checkOutAt)}
+            </dd>
+          </div>
         </div>
       </dl>
-
-      {/* 액션 버튼 */}
-      <div className="mt-auto grid grid-cols-2 gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          fullWidth
-          leftIcon={<LogIn size={15} />}
-          loading={acting}
-          disabled={checkedIn}
-          onClick={() => void handleCheck('in')}
-          className="dashboard-widget-action h-10 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 font-black shadow-[0_6px_16px_rgba(37,99,235,0.22)] hover:from-blue-700 hover:to-sky-600 disabled:opacity-40"
-        >
-          출근
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          fullWidth
-          leftIcon={<LogOut size={15} />}
-          loading={acting}
-          disabled={!checkedIn || checkedOut}
-          onClick={() => void handleCheck('out')}
-          className="dashboard-widget-action h-10 rounded-xl border-slate-200 bg-white font-black text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40"
-        >
-          퇴근
-        </Button>
-      </div>
 
       {message && (
         <div className="rounded-xl bg-slate-50 px-3 py-2 text-center text-[12px] font-bold text-slate-600 ring-1 ring-slate-100">
