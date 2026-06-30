@@ -19,6 +19,7 @@ import { ApiError } from '../../../api/axiosInstance'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
 import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 import EmployeeSearchPicker from '../../../components/common/employeeSearch/EmployeeSearchPicker'
+import type { EmployeeSearchItem } from '../../../components/common/employeeSearch/EmployeeSearchPicker'
 import type { ConfRmListItem } from '../../../types'
 
 const PAGE_SIZE = 10
@@ -37,6 +38,7 @@ export default function RoomManagementPage() {
     const [isActive, setIsActive] = useState(true)
     const [mngrId, setMngrId] = useState<number>(0)
     const [mngrSelectedIds, setMngrSelectedIds] = useState<Array<string | number>>([])
+    const [mngrSelectedItems, setMngrSelectedItems] = useState<EmployeeSearchItem[]>([])
 
     const handleMngrChange = (ids: Array<string | number>) => {
         if (ids.length === 0) {
@@ -47,6 +49,10 @@ export default function RoomManagementPage() {
             setMngrSelectedIds([latest])
             setMngrId(Number(latest))
         }
+    }
+
+    const handleMngrSelectedItemsChange = (items: EmployeeSearchItem[]) => {
+        setMngrSelectedItems(items.slice(-1))
     }
 
     const {
@@ -94,8 +100,20 @@ export default function RoomManagementPage() {
         setFloor(String(room.confRmFlr ?? '1'))
         setRoomNumber(room.confRmHo ?? '')
         setIsActive(room.useYn === 'Y')
-        setMngrId(0)
-        setMngrSelectedIds([])
+        const managerId = room.confRmMngrId ?? 0
+        setMngrId(managerId)
+        setMngrSelectedIds(managerId ? [managerId] : [])
+        setMngrSelectedItems(
+            managerId && room.mngrNm
+                ? [{
+                    id: managerId,
+                    name: room.mngrNm,
+                    department: room.mngrDeptNm ?? '',
+                    position: room.mngrJobGrdNm ?? '',
+                    profileImageFileId: room.mngrPrflImgFileId,
+                }]
+                : [],
+        )
         setIsEditOpen(true)
     }
 
@@ -107,10 +125,15 @@ export default function RoomManagementPage() {
         setIsActive(true)
         setMngrId(0)
         setMngrSelectedIds([])
+        setMngrSelectedItems([])
     }
 
     const handleCreateSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!mngrId) {
+            alert('관리 담당자를 선택해 주세요.')
+            return
+        }
         try {
             await createRoom({
               confRmNm: roomName,
@@ -132,6 +155,10 @@ export default function RoomManagementPage() {
     const handleUpdateSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedRoom?.confRmId) return
+        if (!mngrId) {
+            alert('관리 담당자를 선택해 주세요.')
+            return
+        }
         try {
             await updateRoom(selectedRoom.confRmId!, {
               confRmId: selectedRoom.confRmId!,
@@ -265,7 +292,7 @@ export default function RoomManagementPage() {
                                         <th className="px-6 py-4">위치</th>
                                         <th className="px-6 py-4 text-center">지정 색상</th>
                                         <th className="px-6 py-4">상태</th>
-                                        <th className="px-6 py-4">관리자</th>
+                                        <th className="min-w-56 px-6 py-4">관리 담당자</th>
                                         <th className="px-6 py-4 text-right">관리</th>
                                     </tr>
                                 </thead>
@@ -299,18 +326,22 @@ export default function RoomManagementPage() {
                                                     </Badge>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-3">
                                                         <ProfileAvatar
                                                             fileId={room.mngrPrflImgFileId}
                                                             name={room.mngrNm}
-                                                            size={28}
+                                                            size={36}
+                                                            rounded="xl"
+                                                            className="ring-1 ring-slate-200"
                                                         />
-                                                        <div className="flex flex-col">
-                                                            <span className="text-[#191c1e] text-sm font-semibold">
-                                                                {room.mngrNm}
+                                                        <div className="flex min-w-0 flex-col">
+                                                            <span className="truncate text-sm font-bold text-slate-900">
+                                                                {room.mngrNm || '담당자 미지정'}
                                                             </span>
-                                                            <span className="text-[#717785] text-xs">
-                                                                {room.mngrDeptNm} · {room.mngrJobGrdNm}
+                                                            <span className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                                                                {room.mngrJobGrdNm && room.mngrDeptNm
+                                                                    ? `${room.mngrJobGrdNm} · ${room.mngrDeptNm}`
+                                                                    : room.mngrJobGrdNm ?? room.mngrDeptNm ?? '직급/부서 정보 없음'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -447,7 +478,10 @@ export default function RoomManagementPage() {
                                             variant="compact"
                                             remoteSearch
                                             selectedEmployeeIds={mngrSelectedIds}
+                                            selectedEmployeeItems={mngrSelectedItems}
                                             onChange={handleMngrChange}
+                                            onSelectedItemsChange={handleMngrSelectedItemsChange}
+                                            targetLabel="담당자"
                                             emptyText="이름을 검색하세요."
                                         />
                                     </div>
@@ -539,7 +573,10 @@ export default function RoomManagementPage() {
                                         variant="compact"
                                         remoteSearch
                                         selectedEmployeeIds={mngrSelectedIds}
+                                        selectedEmployeeItems={mngrSelectedItems}
                                         onChange={handleMngrChange}
+                                        onSelectedItemsChange={handleMngrSelectedItemsChange}
+                                        targetLabel="담당자"
                                         emptyText="이름을 검색하세요."
                                     />
                                 </div>

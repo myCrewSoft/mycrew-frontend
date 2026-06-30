@@ -44,6 +44,7 @@ interface EmployeeSearchPickerProps {
   fixedParams?: Partial<EmployeeLookupParams>
   onSelectedItemsChange?: (items: EmployeeSearchItem[]) => void 
   renderSelectedEmployeeAction?: (employee: EmployeeSearchItem) => ReactNode
+  targetLabel?: string
 }
 
 const containsKorean = (keyword: string) =>
@@ -126,6 +127,7 @@ const EmployeeSearchPicker = ({
   fixedParams,
   onSelectedItemsChange,
   renderSelectedEmployeeAction,
+  targetLabel: targetLabelProp,
 }: EmployeeSearchPickerProps) => {
   const [internalKeyword, setInternalKeyword] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
@@ -138,7 +140,7 @@ const EmployeeSearchPicker = ({
   const canSearchCurrentKeyword = canSearchByKeyword(trimmedKeyword)
   const remoteDeptCd =
     remoteSearch && selectedDepartment !== 'all' ? selectedDepartment : undefined
-  const targetLabel = variant === 'detailed' ? '참석자' : '참여자'
+  const targetLabel = targetLabelProp ?? (variant === 'detailed' ? '참석자' : '참여자')
 
   const {
     data: remoteEmployees,

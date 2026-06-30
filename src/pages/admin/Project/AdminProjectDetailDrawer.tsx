@@ -20,20 +20,7 @@ import Button from '../../../components/common/button/Button'
 import { projectApi } from '../../../api/projectApi'
 import { ApiError } from '../../../api/axiosInstance'
 import chatbotApi from '../../../api/chatBotApi'
-
-// ── 타입 ──────────────────────────────────
-interface AdminProjectListResponseDto {
-  projId: number
-  projNm: string
-  projBgngYmd: string
-  projEndYmd: string
-  projStatCd: string
-  projLdrNm: string
-  projLdrEmpId: number
-  projPrgrsRt: number
-  memberCnt: number
-  deadlineRisk: 'Y' | 'N'
-}
+import type { AdminProjectListResponseDto } from '../../../types/project'
 
 interface AdminProjectDetailDrawerProps {
   project: AdminProjectListResponseDto | null
@@ -172,15 +159,11 @@ export default function AdminProjectDetailDrawer({
   const navigate = useNavigate()
   const isOpen = project !== null
 
-  const [memberList, setMemberList] = useState<
-    {
-      empId: number
-      empNm: string
-      deptNm?: string
-      profileImageFileId?: number | null
-      projLdrYn?: string
-    }[]
-  >([])
+  const [memberList, setMemberList] = useState<{
+    empId: number
+    empNm: string
+    deptNm?: string | null
+  }[]>([])
   const [memberLoading, setMemberLoading] = useState(false)
 
   const [summary, setSummary] = useState<{
@@ -213,8 +196,8 @@ export default function AdminProjectDetailDrawer({
           projectApi.getTaskDashboard(project.projId),
         ])
         if (cancelled) return
-        const taskSummary = dashboardRes.data.data?.summary
         setMemberList(projectRes.data.data?.projMemberList ?? [])
+        const taskSummary = dashboardRes.data.data?.summary
         setSummary(
           taskSummary
             ? {
@@ -356,7 +339,6 @@ export default function AdminProjectDetailDrawer({
                       <div key={member.empId} className="flex items-center gap-3">
                         <ProfileAvatar
                           name={member.empNm}
-                          fileId={member.profileImageFileId}
                           size={32}
                         />
                         <div className="min-w-0">
@@ -364,7 +346,7 @@ export default function AdminProjectDetailDrawer({
                             <span className="text-sm font-semibold text-slate-800">
                               {member.empNm}
                             </span>
-                            {member.projLdrYn === 'Y' && (
+                            {project.projLdrEmpId === member.empId && (
                               <Badge variant="primary" className="text-[10px]">리더</Badge>
                             )}
                           </div>

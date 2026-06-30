@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Play,
@@ -10,22 +10,40 @@ import {
   ChevronRight,
   X,
   Edit3,
+  MapPin,
+  Users,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { AdminMtngDetailResponse, AdminMtngListRequest, AdminMtngListResponse } from '../../../types'
+import type { AdminEmployeeListItem } from '../../../types/adminEmployee'
 import { useApi } from '../../../hooks/useApi'
 import { adminMtngApi } from '../../../api/adminMtngApi'
+import { adminApi } from '../../../api/adminApi'
+import Badge, { type BadgeVariant } from '../../../components/common/dataDisplay/badge/Badge'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 
 const MTNG_TYPE_LABEL: Record<string, string> = {
   '01': '온라인',
   '02': '오프라인',
-  '03': '복합',
+  '03': '혼합',
+  MT01: '온라인',
+  MT02: '오프라인',
+  MT03: '혼합',
+  MT001: '온라인',
+  MT002: '오프라인',
+  MT003: '혼합',
 }
 
-const VCONF_STTUS: Record<string, { label: string; className: string }> = {
-  VC001: { label: '예정', className: 'bg-[#dae2fd] text-[#005cad]' },
-  VC002: { label: '진행중', className: 'bg-[#d3f4e3] text-[#1a7a4a]' },
-  VC003: { label: '완료', className: 'bg-[#f2f4f6] text-[#717785]' },
+const MTNG_TYPE_BADGE: Record<string, BadgeVariant> = {
+  '01': 'violet',
+  '02': 'warning',
+  '03': 'info',
+  MT01: 'violet',
+  MT02: 'warning',
+  MT03: 'info',
+  MT001: 'violet',
+  MT002: 'warning',
+  MT003: 'info',
 }
 
 const MOM_STTUS_LABEL: Record<string, string> = {
@@ -33,6 +51,49 @@ const MOM_STTUS_LABEL: Record<string, string> = {
   '02': '편집중',
   '03': '결재요청',
   '04': '확정',
+  MM001: 'AI초안',
+  MM002: '편집중',
+  MM003: '결재요청',
+  MM004: '확정',
+}
+
+const getMinutesStatusLabel = (code?: string | null) =>
+  code ? (MOM_STTUS_LABEL[code] ?? '처리 중') : '미생성'
+
+type MeetingStatus = 'scheduled' | 'live' | 'ended'
+
+const MEETING_STATUS: Record<MeetingStatus, { label: string; variant: BadgeVariant }> = {
+  scheduled: { label: '예약됨', variant: 'primary' },
+  live: { label: '진행 중', variant: 'success' },
+  ended: { label: '종료', variant: 'neutral' },
+}
+
+const VCONF_STATUS_KEY: Record<string, MeetingStatus> = {
+  VC001: 'scheduled',
+  VC002: 'live',
+  VC003: 'ended',
+}
+
+const getMeetingTypeLabel = (code?: string | null) =>
+  code ? (MTNG_TYPE_LABEL[code] ?? '기타') : '미지정'
+
+const getMeetingTypeBadge = (code?: string | null) =>
+  code ? (MTNG_TYPE_BADGE[code] ?? 'outline') : 'outline'
+
+const getMeetingStatus = (
+  meeting: Pick<AdminMtngListResponse, 'vconfSttus' | 'beginDt' | 'endDt'>,
+): MeetingStatus => {
+  if (meeting.vconfSttus && VCONF_STATUS_KEY[meeting.vconfSttus]) {
+    return VCONF_STATUS_KEY[meeting.vconfSttus]
+  }
+
+  const now = Date.now()
+  const begin = new Date(meeting.beginDt).getTime()
+  const end = new Date(meeting.endDt).getTime()
+
+  if (!Number.isNaN(begin) && now < begin) return 'scheduled'
+  if (!Number.isNaN(end) && now <= end) return 'live'
+  return 'ended'
 }
 
 const INITIAL_FILTER: AdminMtngListRequest = {
@@ -63,6 +124,11 @@ export default function AdminMtngPage() {
     { immediate: true },
   )
 
+  const { data: employees, execute: fetchEmployees } = useApi(
+    adminApi.getEmployees,
+    { immediate: false },
+  )
+
   const { execute: fetchDetail } = useApi(
     adminMtngApi.getAdminMtngDetail,
     { immediate: false },
@@ -76,6 +142,10 @@ export default function AdminMtngPage() {
   useEffect(() => {
     void fetchList(filter)
   }, [filter, fetchList])
+
+  useEffect(() => {
+    void fetchEmployees({ page: 0, size: 1000 }).catch(() => undefined)
+  }, [fetchEmployees])
 
   const handleFilterChange = useCallback(
     (key: keyof AdminMtngListRequest, value: string) => {
@@ -113,6 +183,10 @@ export default function AdminMtngPage() {
   const currentPage = filter.page ?? 1
   const totalCount = pageData?.totalCount ?? 0
   const meetings = pageData?.meetings ?? []
+  const employeesById = useMemo(
+    () => new Map((employees ?? []).map((employee) => [employee.empId, employee])),
+    [employees],
+  )
 
   return (
     <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
@@ -251,20 +325,20 @@ export default function AdminMtngPage() {
               {listLoading ? (
                 <div className="py-16 text-center text-sm text-[#414753]">데이터 로딩 중...</div>
               ) : (
-                <table className="w-full border-collapse text-left text-sm">
+                <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#c0c6d5] bg-[#f2f4f6]/50 text-xs font-semibold uppercase tracking-wider text-[#717785]">
-                      <th className="px-6 py-4">회의명</th>
-                      <th className="px-6 py-4">유형</th>
-                      <th className="px-6 py-4">진행 상태</th>
-                      <th className="px-6 py-4">일시</th>
-                      <th className="px-6 py-4">생성자</th>
-                      <th className="px-6 py-4">참석/장소</th>
-                      <th className="px-6 py-4">회의록</th>
-                      <th className="px-6 py-4 text-right">관리</th>
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-500">
+                      <th className="w-[26%] px-6 py-3.5">회의명</th>
+                      <th className="px-5 py-3.5">유형</th>
+                      <th className="px-5 py-3.5">진행 상태</th>
+                      <th className="px-5 py-3.5">일시</th>
+                      <th className="min-w-52 px-5 py-3.5">생성자</th>
+                      <th className="min-w-40 px-5 py-3.5">참석/장소</th>
+                      <th className="px-5 py-3.5">회의록</th>
+                      <th className="px-5 py-3.5 text-right">관리</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#c0c6d5]">
+                  <tbody className="divide-y divide-slate-200">
                     {meetings.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-16 text-center text-sm text-[#414753]">
@@ -276,6 +350,7 @@ export default function AdminMtngPage() {
                         <MtngTableRow
                           key={mtng.mtngId}
                           mtng={mtng}
+                          creator={employeesById.get(mtng.crtrId)}
                           onDetail={handleOpenDetail}
                         />
                       ))
@@ -333,11 +408,9 @@ export default function AdminMtngPage() {
               <div className="flex items-center justify-between border-b border-[#c0c6d5] bg-gray-50 p-5">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-[#191c1e]">{selectedMtng.mtngNm}</h3>
-                  {selectedMtng.vconfSttus && (
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${VCONF_STTUS[selectedMtng.vconfSttus]?.className}`}>
-                      {VCONF_STTUS[selectedMtng.vconfSttus]?.label}
-                    </span>
-                  )}
+                  <Badge variant={MEETING_STATUS[getMeetingStatus(selectedMtng)].variant}>
+                    {MEETING_STATUS[getMeetingStatus(selectedMtng)].label}
+                  </Badge>
                 </div>
                 <button
                   onClick={() => setSelectedMtng(null)}
@@ -376,7 +449,7 @@ export default function AdminMtngPage() {
 
                 {selectedMtng.momSttusCd && (
                   <div className="rounded-lg bg-[#dae2fd] px-3 py-2 text-xs font-medium text-[#005cad]">
-                    회의록 상태: {MOM_STTUS_LABEL[selectedMtng.momSttusCd] ?? selectedMtng.momSttusCd}
+                    회의록 상태: {getMinutesStatusLabel(selectedMtng.momSttusCd)}
                   </div>
                 )}
               </div>
@@ -435,42 +508,86 @@ function FilterSelect({ value, onChange, options }: {
   )
 }
 
-function MtngTableRow({ mtng, onDetail }: {
+function MtngTableRow({ mtng, creator, onDetail }: {
   mtng: AdminMtngListResponse
+  creator?: AdminEmployeeListItem
   onDetail: (id: number) => void
 }) {
-  const sttus = mtng.vconfSttus ? VCONF_STTUS[mtng.vconfSttus] : null
+  const status = MEETING_STATUS[getMeetingStatus(mtng)]
+  const creatorPosition = creator?.jobGrade?.jobGrdNm ?? creator?.jobPosition?.jobPstnNm
+  const creatorDepartment = creator?.department?.deptNm
+  const location = mtng.confRmNm?.trim() || '회의실 없음'
 
   return (
-    <tr className="transition-colors hover:bg-[#f2f4f6]">
-      <td className="px-6 py-4 font-semibold text-[#191c1e]">{mtng.mtngNm}</td>
+    <tr className="group transition-colors hover:bg-blue-50/40">
       <td className="px-6 py-4">
-        <span className="rounded-full border border-[#c0c6d5] px-2.5 py-0.5 text-xs text-[#414753]">
-          {MTNG_TYPE_LABEL[mtng.mtngTypeCd] ?? mtng.mtngTypeCd}
-        </span>
+        <button
+          type="button"
+          onClick={() => onDetail(mtng.mtngId)}
+          className="max-w-md text-left font-bold text-slate-900 transition-colors hover:text-blue-700"
+        >
+          {mtng.mtngNm}
+        </button>
       </td>
-      <td className="px-6 py-4">
-        {sttus ? (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sttus.className}`}>
-            {sttus.label}
-          </span>
-        ) : (
-          <span className="text-[#c0c6d5]">-</span>
-        )}
+      <td className="px-5 py-4">
+        <Badge variant={getMeetingTypeBadge(mtng.mtngTypeCd)}>
+          {getMeetingTypeLabel(mtng.mtngTypeCd)}
+        </Badge>
       </td>
-      <td className="px-6 py-4 text-xs text-[#414753]">{formatDt(mtng.beginDt)}</td>
-      <td className="px-6 py-4 text-sm text-[#414753]">{mtng.crtrNm}</td>
-      <td className="px-6 py-4">
-        <p className="text-xs text-[#414753]">{mtng.ptcptCnt}명</p>
-        {mtng.confRmNm && <p className="text-xs text-[#717785]">{mtng.confRmNm}</p>}
+      <td className="px-5 py-4">
+        <Badge variant={status.variant}>{status.label}</Badge>
       </td>
-      <td className="px-6 py-4 text-xs text-[#414753]">
-        {mtng.momSttusCd ? MOM_STTUS_LABEL[mtng.momSttusCd] ?? mtng.momSttusCd : '-'}
+      <td className="px-5 py-4">
+        <p className="whitespace-nowrap text-xs font-bold text-slate-700">
+          {formatDate(mtng.beginDt)}
+        </p>
+        <p className="mt-1 whitespace-nowrap text-xs font-semibold text-slate-500">
+          {formatTimeRange(mtng.beginDt, mtng.endDt)}
+        </p>
       </td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <ProfileAvatar
+            fileId={creator?.prflImgFileId}
+            name={creator?.empNm ?? mtng.crtrNm}
+            size={36}
+            rounded="xl"
+            className="ring-1 ring-slate-200"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">
+              {creator?.empNm ?? mtng.crtrNm}
+            </p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+              {creatorPosition && creatorDepartment
+                ? `${creatorPosition} · ${creatorDepartment}`
+                : creatorPosition ?? creatorDepartment ?? '직급/부서 정보 없음'}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Users size={14} className="text-slate-400" />
+          {mtng.ptcptCnt}명
+        </p>
+        <p
+          className={`mt-1.5 flex items-center gap-1.5 text-xs font-semibold ${
+            mtng.confRmNm ? 'text-slate-500' : 'text-slate-400'
+          }`}
+        >
+          <MapPin size={14} className="shrink-0" />
+          {location}
+        </p>
+      </td>
+      <td className="px-5 py-4 text-xs font-semibold text-slate-600">
+        {getMinutesStatusLabel(mtng.momSttusCd)}
+      </td>
+      <td className="px-5 py-4 text-right">
         <button
           onClick={() => onDetail(mtng.mtngId)}
-          className="rounded-lg p-2 text-[#6f8f76] transition-all hover:bg-[#e5efe8]"
+          className="rounded-lg p-2 text-slate-400 transition-all hover:bg-blue-100 hover:text-blue-700"
+          aria-label={`${mtng.mtngNm} 상세 보기`}
           title="상세 보기"
         >
           <Edit3 size={18} />
@@ -491,5 +608,37 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
 
 function formatDt(dt: string) {
   const d = new Date(dt)
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (Number.isNaN(d.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d)
+}
+
+function formatDate(dt: string) {
+  const date = new Date(dt)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).format(date)
+}
+
+function formatTimeRange(beginDt: string, endDt: string) {
+  const formatTime = (dt: string) => {
+    const date = new Date(dt)
+    if (Number.isNaN(date.getTime())) return '-'
+    return new Intl.DateTimeFormat('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date)
+  }
+
+  return `${formatTime(beginDt)} - ${formatTime(endDt)}`
 }
