@@ -36,7 +36,6 @@ const DASHBOARD_GRID_CONTAINER_PADDING = [0, 0] as const
 const DASHBOARD_GRID_RESIZE_HANDLES = ['se'] as const
 const DASHBOARD_GRID_DRAG_CANCEL =
   '.dashboard-widget-action, a, button, input, textarea, select'
-const EMPTY_WIDGET_MIN_HEIGHT = 1
 
 interface DashboardPageProps {
   defaultLayout?: DashboardLayoutItem[]
@@ -149,106 +148,6 @@ const getNextPosition = (layout: DashboardLayoutItem[]) => {
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : '위젯 데이터를 불러오지 못했습니다.'
 
-const isAdminDashboard = (variant: DashboardVariant): boolean => variant === 'admin'
-
-const hasItems = (data: DashboardWidgetData, key: string) => {
-  const value = (data as unknown as Record<string, unknown>)[key]
-  return Array.isArray(value) && value.length > 0
-}
-
-const isWidgetDataEmpty = (
-  widgetKey: DashboardWidgetKey,
-  data: DashboardWidgetData | null | undefined,
-  variant: DashboardVariant,
-) => {
-  if (isAdminDashboard(variant)) return false
-  if (!data) return true
-
-  if (variant === 'admin') {
-    switch (widgetKey) {
-      case 'attendance':
-        return !hasItems(data, 'employees')
-      case 'todaySchedule':
-        return !hasItems(data, 'schedules')
-      case 'projectProgress':
-        return !hasItems(data, 'statusCounts')
-      case 'board':
-        return !hasItems(data, 'notices')
-      default:
-        break
-    }
-  }
-
-  switch (widgetKey) {
-    case 'approval':
-      return !hasItems(data, 'documents')
-    case 'todaySchedule':
-      return !hasItems(data, 'schedules')
-    case 'meeting':
-      return !hasItems(data, 'meetings')
-    case 'reservation':
-      return !hasItems(data, 'reservations')
-    case 'task':
-      return !hasItems(data, 'tasks')
-    case 'projectProgress':
-      return !hasItems(data, 'projects')
-    case 'board':
-      return !hasItems(data, 'posts')
-    case 'mail':
-      return !hasItems(data, 'mails')
-    case 'messenger':
-      return !hasItems(data, 'rooms')
-    case 'notification': {
-      const notificationData = data as DashboardWidgetData & { count?: number }
-      return !hasItems(data, 'notifications') || (notificationData.count ?? 0) <= 0
-    }
-    default:
-      return false
-  }
-}
-
-const getResolvedLayoutItem = (
-  item: DashboardLayoutItem,
-  widgetStates: DashboardWidgetStateMap,
-  variant: DashboardVariant,
-  collapseEmpty: boolean,
-): DashboardLayoutItem => {
-  const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
-  const widgetState = widgetStates[item.i]
-
-  if (!widgetState || widgetState.error) {
-    return withWidgetConstraints(item)
-  }
-
-  if (widgetState.data && isWidgetDataEmpty(item.i, widgetState.data, variant)) {
-    return {
-      ...item,
-      h: collapseEmpty ? EMPTY_WIDGET_MIN_HEIGHT : Math.max(item.h, EMPTY_WIDGET_MIN_HEIGHT),
-      minH: EMPTY_WIDGET_MIN_HEIGHT,
-      minW: config.defaultSize.minW,
-      maxW: config.defaultSize.maxW,
-      maxH: config.defaultSize.maxH,
-    }
-  }
-
-  if (widgetState.loading) {
-    return withWidgetConstraints(item)
-  }
-
-  if (!widgetState.data) {
-    return {
-      ...item,
-      h: collapseEmpty ? EMPTY_WIDGET_MIN_HEIGHT : Math.max(item.h, EMPTY_WIDGET_MIN_HEIGHT),
-      minH: EMPTY_WIDGET_MIN_HEIGHT,
-      minW: config.defaultSize.minW,
-      maxW: config.defaultSize.maxW,
-      maxH: config.defaultSize.maxH,
-    }
-  }
-
-  return withWidgetConstraints(item)
-}
-
 const useDashboardWidgetData = (
   activeWidgetKeys: DashboardWidgetKey[],
   boardType: DashboardBoardType,
@@ -349,11 +248,8 @@ const DashboardPage = ({
     variant,
   )
   const displayLayout = useMemo(
-    () =>
-      layout.map((item) =>
-        getResolvedLayoutItem(item, widgetStates, variant, !editMode),
-      ),
-    [editMode, layout, widgetStates, variant],
+    () => layout.map((item) => withWidgetConstraints(item)),
+    [layout],
   )
 
   const availableWidgets = useMemo(
@@ -400,23 +296,15 @@ const DashboardPage = ({
         if (!isDashboardWidgetKey(item.i)) return []
 
         const config = DASHBOARD_WIDGET_CONFIG_MAP[item.i]
-        const widgetState = widgetStates[item.i]
-        const emptyWidget =
-          widgetState &&
-          !widgetState.loading &&
-          !widgetState.error &&
-          isWidgetDataEmpty(item.i, widgetState.data, variant)
-        const minH = emptyWidget ? EMPTY_WIDGET_MIN_HEIGHT : config.defaultSize.minH
-
         return [
           {
             i: item.i,
             x: item.x,
             y: item.y,
             w: Math.max(item.w, config.defaultSize.minW),
-            h: Math.max(item.h, minH),
+            h: Math.max(item.h, config.defaultSize.minH),
             minW: config.defaultSize.minW,
-            minH,
+            minH: config.defaultSize.minH,
             maxW: config.defaultSize.maxW,
             maxH: config.defaultSize.maxH,
           },
@@ -563,8 +451,8 @@ const DashboardPage = ({
             width={gridWidth}
             layout={displayLayout}
             gridConfig={{
-              cols: 12,
-              rowHeight: 76,
+              cols: 20,
+              rowHeight: 68,
               margin: DASHBOARD_GRID_MARGIN,
               containerPadding: DASHBOARD_GRID_CONTAINER_PADDING,
             }}
