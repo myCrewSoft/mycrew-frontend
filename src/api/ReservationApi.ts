@@ -15,11 +15,6 @@ const formatDateKey = (date: Date) =>
     date.getDate(),
   ).padStart(2, '0')}`
 
-// 회의실 목록 조회 API입니다.
-const getMeetingRooms = () => {
-  return axiosInstance.get<ApiResponse<RoomResponse[]>>('/api/meeting-rooms')
-}
-
 // 회의실 단건 조회 API입니다.
 const getMeetingRoom = (roomId: number) => {
   return axiosInstance.get<ApiResponse<RoomResponse>>(

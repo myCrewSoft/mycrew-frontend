@@ -33,6 +33,8 @@ import type {
   DashboardWidgetResponseMap,
   DashboardWidgetStateMap,
 } from '../../types/dashboard-widget'
+import { formatDateTime } from '../../utils/date'
+import { getTaskStatusConfig } from '../project/task/task.config'
 
 interface DashboardWidgetCardProps {
   widgetKey: DashboardWidgetKey
@@ -67,6 +69,7 @@ interface ListRowProps {
   badgeTone?: 'blue' | 'green' | 'amber' | 'red' | 'slate'
   leading?: 'dot' | 'checkbox'
   trailing?: string
+  muted?: boolean
   onClick?: () => void
 }
 
@@ -81,6 +84,12 @@ interface ApprovalWidgetDocumentItem {
 type ScheduleWidgetItem = ScheduleWidgetResponse['schedules'][number]
 type NotificationWidgetItem =
   DashboardWidgetResponseMap['notification']['notifications'][number]
+
+type DashboardNotificationTarget = NotificationWidgetItem & {
+  targetType?: 'APPROVAL' | 'SCHEDULE' | 'MEETING' | 'PROJECT' | 'TASK' | null
+  targetId?: number | null
+  parentTargetId?: number | null
+}
 
 const statusLabel: Record<string, string> = {
   beforeWork: '출근 전',
@@ -324,8 +333,32 @@ const getBoardPostPath = (boardType: DashboardBoardType, postId: number) => {
   return `/boards/notices/${postId}`
 }
 
-const getNotificationPath = (type: string) => {
-  const normalizedType = type.toLowerCase()
+const getNotificationPath = (notification: DashboardNotificationTarget) => {
+  const { targetType, targetId, parentTargetId } = notification
+
+  if (targetType && Number.isInteger(targetId) && Number(targetId) > 0) {
+    switch (targetType) {
+      case 'APPROVAL':
+        return `/approval/received/requests?documentId=${targetId}`
+      case 'SCHEDULE':
+        return `/calendar?scheduleId=${targetId}`
+      case 'MEETING':
+        return `/meeting/list?detailMeetingId=${targetId}`
+      case 'PROJECT':
+        return `/project/${targetId}`
+      case 'TASK':
+        if (Number.isInteger(parentTargetId) && Number(parentTargetId) > 0) {
+          return `/project/${parentTargetId}?tab=tasks&taskId=${targetId}`
+        }
+        return '/project'
+    }
+  }
+
+  const normalizedType = notification.type.toLowerCase()
+  if (normalizedType === '02') return '/approval/received/requests'
+  if (normalizedType === '01' || normalizedType === '03') return '/calendar'
+  if (normalizedType === '04' || normalizedType === '05') return '/project'
+  if (normalizedType === '06') return '/meeting/list'
   if (normalizedType.includes('approval')) return '/approval/received/requests'
   if (normalizedType.includes('schedule')) return '/calendar'
   if (normalizedType.includes('meeting')) return '/meeting/scheduled'
@@ -344,12 +377,13 @@ const ListRow = ({
   badgeTone = 'blue',
   leading = 'dot',
   trailing,
+  muted = false,
   onClick,
 }: ListRowProps) => (
   <li
     className={`group flex min-w-0 items-center justify-between gap-3 rounded-md px-1.5 py-2 transition-colors hover:bg-slate-50 ${
       onClick ? 'cursor-pointer focus-within:bg-slate-50' : ''
-    }`}
+    } ${muted ? 'bg-slate-50/80 opacity-60' : 'bg-white'}`}
     onClick={onClick}
     role={onClick ? 'button' : undefined}
     tabIndex={onClick ? 0 : undefined}
@@ -369,11 +403,21 @@ const ListRow = ({
         <span className="h-4 w-4 flex-shrink-0 rounded border border-slate-300 bg-white" />
       )}
       {leading === 'dot' && (
-        <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)]" />
+        <span
+          className={`h-2 w-2 flex-shrink-0 rounded-full ${
+            muted
+              ? 'bg-slate-300'
+              : 'bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.12)]'
+          }`}
+        />
       )}
 
       <div className="min-w-0">
-        <p className="truncate text-[14px] font-bold leading-5 text-slate-900">
+        <p
+          className={`truncate text-[14px] font-bold leading-5 ${
+            muted ? 'text-slate-600' : 'text-slate-900'
+          }`}
+        >
           {title || '-'}
         </p>
         {meta && (
@@ -530,9 +574,28 @@ const attendanceDetail = (emp: AdminAttendanceWidgetItem) => {
   return emp.checkInAt ?? undefined
 }
 
+const formatWidgetDateTime = (value?: string | null) => {
+  if (!value) return undefined
+  const formatted = formatDateTime(value)
+  return formatted === '-' ? undefined : formatted
+}
+
+const formatWidgetDate = (value?: string | null) => {
+  if (!value) return undefined
+  return value.split('T')[0] || undefined
+}
+
+const formatWidgetRange = (start?: string | null, end?: string | null) => {
+  const formattedStart = formatWidgetDateTime(start)
+  const formattedEnd = formatWidgetDateTime(end)
+
+  if (formattedStart && formattedEnd) return `${formattedStart} - ${formattedEnd}`
+  return formattedStart ?? formattedEnd
+}
+
 const scheduleRange = (schedule: AdminImportantScheduleWidgetItem) => {
-  if (schedule.allDay) return `${schedule.startAt ?? ''} · 종일`
-  return `${schedule.startAt ?? ''} - ${schedule.endAt ?? ''}`
+  if (schedule.allDay) return joinMeta([formatWidgetDate(schedule.startAt), '종일'])
+  return formatWidgetRange(schedule.startAt, schedule.endAt)
 }
 
 const joinMeta = (parts: (string | null | undefined)[]) => {
@@ -802,7 +865,10 @@ const renderAdminWidgetBody = (
                 <ListRow
                   key={notice.id}
                   title={notice.title}
-                  meta={joinMeta([notice.writerName, notice.createdAt])}
+                  meta={joinMeta([
+                    notice.writerName,
+                    formatWidgetDateTime(notice.createdAt),
+                  ])}
                 />
               ))}
             </ul>
@@ -867,7 +933,10 @@ const renderWidgetBody = (
                 <ListRow
                   key={document.id}
                   title={document.title}
-                  meta={`${document.requesterName} · ${document.requestedAt}`}
+                  meta={joinMeta([
+                    document.requesterName,
+                    formatWidgetDateTime(document.requestedAt),
+                  ])}
                   badge={document.dday}
                   badgeTone={document.dday === 'D-Day' ? 'red' : 'amber'}
                   onClick={() => navigate('/approval/received/requests')}
@@ -888,11 +957,12 @@ const renderWidgetBody = (
           <ul className="space-y-1">
             {data.schedules.map((schedule: ScheduleWidgetItem) => {
               const target = getScheduleTarget(schedule)
+              const range = formatWidgetRange(schedule.startAt, schedule.endAt)
               return (
                 <ListRow
                   key={schedule.id}
                   title={schedule.title}
-                  meta={`${schedule.startAt} - ${schedule.endAt}${target ? ` · ${target}` : ''}`}
+                  meta={joinMeta([range, target])}
                   badge="오늘"
                   badgeTone="blue"
                   onClick={() => navigate('/calendar')}
@@ -916,7 +986,10 @@ const renderWidgetBody = (
               <ListRow
                 key={meeting.id}
                 title={meeting.title}
-                meta={`${meeting.startAt} - ${meeting.endAt}${meeting.location ? ` · ${meeting.location}` : ''}`}
+                meta={joinMeta([
+                  formatWidgetRange(meeting.startAt, meeting.endAt),
+                  meeting.location,
+                ])}
                 onClick={() => navigate(`/meeting/scheduled?detailMeetingId=${meeting.id}`)}
               />
             ))}
@@ -937,7 +1010,7 @@ const renderWidgetBody = (
               <ListRow
                 key={reservation.id}
                 title={reservation.resourceName}
-                meta={`${reservation.startAt} - ${reservation.endAt}`}
+                meta={formatWidgetRange(reservation.startAt, reservation.endAt)}
                 badge={reservation.status === 'confirmed' ? '확정' : '대기'}
                 badgeTone={reservation.status === 'confirmed' ? 'green' : 'amber'}
                 onClick={() => navigate('/reservations')}
@@ -955,17 +1028,31 @@ const renderWidgetBody = (
       const data = widgetState.data as DashboardWidgetResponseMap['task']
       return data.tasks.length ? (
         <ul className="space-y-1">
-          {data.tasks.map((task) => (
-            <ListRow
-              key={task.id}
-              title={task.title}
-              meta={`마감일 ${task.dueDate}`}
-              badge={task.status}
-              badgeTone="slate"
-              leading="checkbox"
-              onClick={() => navigate('/project')}
-            />
-          ))}
+          {data.tasks.map((task) => {
+            const status = getTaskStatusConfig(task.status)
+            const badgeTone =
+              task.status === '01'
+                ? 'blue'
+                : task.status === '02'
+                  ? 'green'
+                  : task.status === '03'
+                    ? 'amber'
+                    : task.status === '04'
+                      ? 'red'
+                      : 'slate'
+
+            return (
+              <ListRow
+                key={task.id}
+                title={task.title}
+                meta={task.dueDate ? `마감일 ${formatWidgetDate(task.dueDate)}` : undefined}
+                badge={status.label}
+                badgeTone={badgeTone}
+                leading="checkbox"
+                onClick={() => navigate('/project')}
+              />
+            )
+          })}
         </ul>
       ) : (
         <EmptyState label="표시할 업무가 없습니다." />
@@ -1004,9 +1091,11 @@ const renderWidgetBody = (
                   style={{ width: `${Math.min(project.progressRate, 100)}%` }}
                 />
               </div>
-              <p className="mt-1 text-[12px] font-semibold text-slate-500">
-                마감일 {project.dueDate}
-              </p>
+              {project.dueDate ? (
+                <p className="mt-1 text-[12px] font-semibold text-slate-500">
+                  마감일 {formatWidgetDate(project.dueDate)}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -1041,7 +1130,10 @@ const renderWidgetBody = (
                 <ListRow
                   key={post.id}
                   title={post.title}
-                  meta={`${post.writerName} · ${post.createdAt}`}
+                  meta={joinMeta([
+                    post.writerName,
+                    formatWidgetDateTime(post.createdAt),
+                  ])}
                   badge={post.new ? 'NEW' : undefined}
                   badgeTone="blue"
                   onClick={() => navigate(getBoardPostPath(boardType, post.id))}
@@ -1074,7 +1166,10 @@ const renderWidgetBody = (
                 <ListRow
                   key={mail.id}
                   title={mail.subject}
-                  meta={`${mail.senderName} · ${mail.receivedAt}`}
+                  meta={joinMeta([
+                    mail.senderName,
+                    formatWidgetDateTime(mail.receivedAt),
+                  ])}
                   badge={mail.read ? undefined : '미읽음'}
                   badgeTone="blue"
                   onClick={() => navigate(`/mail/inbox?mailId=${mail.id}`)}
@@ -1108,8 +1203,8 @@ const renderWidgetBody = (
                 <ListRow
                   key={room.roomId}
                   title={room.roomName}
-                  meta={room.lastMessage}
-                  trailing={room.lastMessageAt}
+                  meta={room.lastMessage || undefined}
+                  trailing={formatWidgetDateTime(room.lastMessageAt)}
                   badge={room.unreadCount ? String(room.unreadCount) : undefined}
                   badgeTone="blue"
                 />
@@ -1124,7 +1219,6 @@ const renderWidgetBody = (
 
     case 'notification': {
       const data = widgetState.data as DashboardWidgetResponseMap['notification']
-      const unreadNotifications = data.notifications.filter(isUnreadNotification)
       return (
         <>
           <div className="hidden">
@@ -1136,18 +1230,26 @@ const renderWidgetBody = (
               {data.count}
             </strong>
           </div>
-          {unreadNotifications.length ? (
+          {data.notifications.length ? (
             <ul className="space-y-1">
-              {unreadNotifications.map((notification) => (
-                <ListRow
-                  key={notification.id}
-                  title={notification.title}
-                  meta={`${notification.content} · ${notification.createdAt}`}
-                  badge={notification.type}
-                  badgeTone="slate"
-                  onClick={() => navigate(getNotificationPath(notification.type))}
-                />
-              ))}
+              {data.notifications.map((notification) => {
+                const unread = isUnreadNotification(notification)
+
+                return (
+                  <ListRow
+                    key={notification.id}
+                    title={notification.title}
+                    meta={joinMeta([
+                      notification.content,
+                      formatWidgetDateTime(notification.createdAt),
+                    ])}
+                    badge={unread ? '안 읽음' : '읽음'}
+                    badgeTone={unread ? 'blue' : 'slate'}
+                    muted={!unread}
+                    onClick={() => navigate(getNotificationPath(notification))}
+                  />
+                )
+              })}
             </ul>
           ) : (
             <EmptyState label="알림이 없습니다." />

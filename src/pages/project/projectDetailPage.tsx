@@ -1,7 +1,7 @@
 ﻿// src/pages/project/ProjectDetailPage.tsx
 import { projectApi } from '../../api/projectApi'
 import { useApi } from '../../hooks/useApi'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Share2,
@@ -28,6 +28,7 @@ import ProjectEditDrawer from './ProjectEditDrawer'
 import { employeeApi } from '../../api/employeeApi'
 import ProjectDriveTab from './ProjectDriveTab'
 import ProjectGanttTab from './ProjectGanttTab'
+import ProjectMeetingCreateDrawer from './ProjectMeetingCreateDrawer'
 
 const STATUS_LABEL: Record<string, string> = {
   '01': '예정',
@@ -53,6 +54,7 @@ const ProjectDetailPage = () => {
   const [taskCreateModalOpen, setTaskCreateModalOpen] = useState(false)
   const [taskCreateStatus, setTaskCreateStatus] = useState<ProjectTaskStatusCode>('00')
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
+  const [meetingDrawerOpen, setMeetingDrawerOpen] = useState(false)
   const projectId = Number(projId)
 
   const { data: project, loading, execute: refetchProject } = useApi(
@@ -73,8 +75,16 @@ const ProjectDetailPage = () => {
   const upcomingTasks = taskDashboard?.upcomingTasks ?? []
 
   // ✅ employees, departments 변환
-  const employees = employeeList ?? []
+  const employees = useMemo(() => employeeList ?? [], [employeeList])
   const departments = [...new Set(employees.map((e) => e.department).filter(Boolean))]
+  const projectMemberIdSet = useMemo(
+    () => new Set(project?.projMemberList.map((member) => member.empId) ?? []),
+    [project?.projMemberList],
+  )
+  const projectMemberEmployees = useMemo(
+    () => employees.filter((employee) => projectMemberIdSet.has(Number(employee.id))),
+    [employees, projectMemberIdSet],
+  )
 
   const tabItems = [
     { value: 'overview', label: '개요' },
@@ -123,7 +133,11 @@ const ProjectDetailPage = () => {
       description={project.projCn}
       actions={
         <>
-          <Button variant="outline" leftIcon={<Share2 size={15} />}>
+          <Button
+            variant="outline"
+            leftIcon={<Share2 size={15} />}
+            onClick={() => setMeetingDrawerOpen(true)}
+          >
             회의 생성
           </Button>
           {tab === 'tasks' ? (
@@ -213,7 +227,12 @@ const ProjectDetailPage = () => {
 
       {tab === 'drive' && <ProjectDriveTab projId={project.projId} />}
 
-      {tab === 'gantt' && <ProjectGanttTab projectId={project.projId}/>}
+      {tab === 'gantt' && (
+        <ProjectGanttTab
+          projectId={project.projId}
+          projectProgress={project.projPrgrsRt}
+        />
+      )}
 
       {/* 다른 탭: 빈 상태 (실제 구현 시 채움) */}
       {tab !== 'overview' && tab !== 'tasks' && tab !== 'board' && tab !== 'drive' && tab !== 'gantt' &&(
@@ -233,6 +252,17 @@ const ProjectDetailPage = () => {
         onClose={() => setEditDrawerOpen(false)}
         project={project}
         onSuccess={() => refetchProject(projectId)}
+      />
+      <ProjectMeetingCreateDrawer
+        key={meetingDrawerOpen ? `meeting-${project.projId}` : 'meeting-closed'}
+        open={meetingDrawerOpen}
+        projectName={project.projNm}
+        projectMembers={projectMemberEmployees}
+        onClose={() => setMeetingDrawerOpen(false)}
+        onCreated={() => {
+          setMeetingDrawerOpen(false)
+          navigate('/meeting/scheduled')
+        }}
       />
 
     </PageComponent>

@@ -47,7 +47,7 @@ const MeetingSubSidebarContent = () => {
 
       <section className="flex flex-col gap-2.5">
         <Button
-          variant="outline"
+          variant="primary"
           leftIcon={<CalendarClock size={15} />}
           onClick={openSchedulePanel}
           className="h-11 w-full px-3 text-sm"

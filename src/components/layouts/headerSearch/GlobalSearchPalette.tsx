@@ -287,17 +287,7 @@ const SearchPreviewDetails = ({ item }: { item: SearchResponseDto }) => {
               : undefined
           }
         />
-        <PreviewField
-          label="진행 방식"
-          value={
-            typeof details.online === 'boolean'
-              ? details.online
-                ? '온라인'
-                : '오프라인'
-              : undefined
-          }
-        />
-        <PreviewField label="회의 유형" value={details.meetingTypeName} />
+        <PreviewField label="진행 방식" value={details.meetingTypeName} />
       </>
     )
   }

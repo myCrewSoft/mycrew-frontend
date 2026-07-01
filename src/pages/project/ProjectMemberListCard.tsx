@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import ContentCard from '../../components/common/dataDisplay/card/ContentCard'
 import type { ProjectMemberResponseDto } from '../../types/project'
@@ -6,6 +6,7 @@ import { useAuth } from '../../store/AuthContext'
 import InviteMemberModal from './InviteMemberModal'
 import type { EmployeeSearchItem } from '../../components/common/employeeSearch/EmployeeSearchPicker'
 import { projectApi } from '../../api/projectApi'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 
 interface ProjectMemberCardProps {
   projId: number
@@ -16,13 +17,12 @@ interface ProjectMemberCardProps {
   onSuccess: () => void
 }
 
-const AVATAR_COLORS = [
-  '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b',
-  '#ef4444', '#06b6d4', '#84cc16', '#f97316',
-]
+const getProfileFileId = (employee?: EmployeeSearchItem) => {
+  if (employee?.profileImageFileId) return employee.profileImageFileId
 
-const getAvatarColor = (empId: number) =>
-  AVATAR_COLORS[empId % AVATAR_COLORS.length]
+  const urlFileId = employee?.profileImageUrl?.match(/\/images\/(\d+)/)?.[1]
+  return urlFileId ? Number(urlFileId) : null
+}
 
 const ProjectMemberCard = ({
   projId,
@@ -37,6 +37,10 @@ const ProjectMemberCard = ({
   const isLeader = projLdrEmpId === currentEmpId
 
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
+  const employeeMap = useMemo(
+    () => new Map(employees.map((employee) => [String(employee.id), employee])),
+    [employees],
+  )
   const handleRemove = async (empId: number) => {
     if(!confirm('정말 퇴출하시겠습니까?')) return
     try{
@@ -54,12 +58,11 @@ const ProjectMemberCard = ({
         {memberList.map((member) => (
           <div key={member.empId} className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ backgroundColor: getAvatarColor(member.empId) }}
-              >
-                {member.empNm[0]}
-              </div>
+              <ProfileAvatar
+                fileId={getProfileFileId(employeeMap.get(String(member.empId)))}
+                name={member.empNm}
+                size={36}
+              />
               <div>
                 <p className="text-sm font-semibold text-slate-800">
                   {member.empNm}

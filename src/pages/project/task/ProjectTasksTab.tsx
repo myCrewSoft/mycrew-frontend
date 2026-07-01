@@ -27,6 +27,8 @@ interface ProjectTasksTabProps {
   onCloseCreateModal: () => void
 }
 
+type QuickFilter = 'all' | 'highPriority' | 'incomplete'
+
 const ProjectTasksTab = ({
   projectId,
   focusTaskId,
@@ -38,6 +40,7 @@ const ProjectTasksTab = ({
   onCloseCreateModal,
 }: ProjectTasksTabProps) => {
   const [query, setQuery] = useState('')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null)
   const [editingTask, setEditingTask] = useState<ProjectTaskDetail | null>(null)
@@ -77,21 +80,43 @@ const ProjectTasksTab = ({
     setSelectedTask(targetTask)
   }, [focusTaskId, tasks])
 
-  const filteredTasks = useMemo(() => {
+  const searchedTasks = useMemo(() => {
     const keyword = query.trim().toLowerCase()
     if (!keyword) return tasks
 
     return tasks.filter((task) =>
-      `${task.taskNm} ${task.taskCn} ${task.taskMngrNm} ${task.taskId}`
+      `${task.taskNm} ${task.taskCn} ${task.taskMngrNm}`
         .toLowerCase()
         .includes(keyword),
     )
   }, [query, tasks])
 
-  const highPriorityCount = filteredTasks.filter((task) => task.taskPriorityCd === '01').length
-  const incompleteTaskCount = filteredTasks.filter(
+  const highPriorityCount = searchedTasks.filter(
+    (task) => task.taskPriorityCd === '01',
+  ).length
+  const incompleteTaskCount = searchedTasks.filter(
     (task) => task.taskStatCd !== '02' && task.taskStatCd !== '04',
   ).length
+  const filteredTasks = useMemo(() => {
+    if (quickFilter === 'highPriority') {
+      return searchedTasks.filter((task) => task.taskPriorityCd === '01')
+    }
+
+    if (quickFilter === 'incomplete') {
+      return searchedTasks.filter(
+        (task) => task.taskStatCd !== '02' && task.taskStatCd !== '04',
+      )
+    }
+
+    return searchedTasks
+  }, [quickFilter, searchedTasks])
+
+  const quickFilterButtonClass = (filter: QuickFilter) =>
+    `inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-bold transition-colors ${
+      quickFilter === filter
+        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:text-blue-600'
+    }`
 
   return (
     <div className="mt-5 space-y-4">
@@ -99,17 +124,21 @@ const ProjectTasksTab = ({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-600"
+            onClick={() => setQuickFilter('all')}
+            aria-pressed={quickFilter === 'all'}
+            className={quickFilterButtonClass('all')}
           >
             <LayoutGrid size={15} />
             전체
             <Badge size="count" variant="neutral">
-              {filteredTasks.length}
+              {searchedTasks.length}
             </Badge>
           </button>
           <button
             type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-600"
+            onClick={() => setQuickFilter('highPriority')}
+            aria-pressed={quickFilter === 'highPriority'}
+            className={quickFilterButtonClass('highPriority')}
           >
             <SlidersHorizontal size={15} />
             높은 우선순위
@@ -119,7 +148,9 @@ const ProjectTasksTab = ({
           </button>
           <button
             type="button"
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 hover:border-blue-200 hover:text-blue-600"
+            onClick={() => setQuickFilter('incomplete')}
+            aria-pressed={quickFilter === 'incomplete'}
+            className={quickFilterButtonClass('incomplete')}
           >
             <CalendarDays size={15} />
             미완료
@@ -139,7 +170,7 @@ const ProjectTasksTab = ({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="업무명, 상세내용, 담당자, 업무 ID 검색"
+            placeholder="업무명, 상세 내용, 담당자 검색"
             className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium text-slate-700 outline-none transition-colors placeholder:text-slate-400 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>

@@ -251,7 +251,7 @@ const EmployeeSearchPicker = ({
       !trimmedKeyword &&
       (!showDepartmentFilter || selectedDepartment === 'all')
     ) {
-      return []
+      return showAllOnEmpty ? employeeOptions : []
     }
 
     return employeeOptions.filter((employee) => {
@@ -271,12 +271,14 @@ const EmployeeSearchPicker = ({
     remoteSearch,
     selectedDepartment,
     showDepartmentFilter,
+    showAllOnEmpty,
     trimmedKeyword,
     uniqueDepartmentOptions,
   ])
 
   const shouldShowResults =
-    (remoteSearch ? showAllOnEmpty || canSearchCurrentKeyword : trimmedKeyword) ||
+    showAllOnEmpty ||
+    (remoteSearch ? canSearchCurrentKeyword : Boolean(trimmedKeyword)) ||
     (showDepartmentFilter && selectedDepartment !== 'all')
 
   const groupedVisibleEmployees = useMemo(() => {

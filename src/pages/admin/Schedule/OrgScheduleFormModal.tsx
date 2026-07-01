@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useApi } from '../../../hooks/useApi'
 import { adminScheduleApi } from '../../../api/adminScheduleApi'
-import type { AdminSchdRequest, AdminSchdResponse } from '../../../types'
+import { departmentApi } from '../../../api/departmentApi'
+import type {
+  AdminSchdRequest,
+  AdminSchdResponse,
+  DepartmentLookupResponse,
+} from '../../../types'
 import { ApiError } from '../../../api/axiosInstance'
-import EmployeeSearchPicker from '../../../components/common/employeeSearch/EmployeeSearchPicker'
 
 const CLSF_OPTIONS = [
   { value: 'C001', label: '전사 일정' },
@@ -51,12 +55,9 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
   const [reptYn, setReptYn] = useState(editData?.reptYn ?? 'N')
   const [reptTypeCd, setReptTypeCd] = useState(editData?.reptTypeCd ?? '01')
   const [reptEndDt, setReptEndDt] = useState(toDateTimeLocal(editData?.reptEndDt))
-  const [targetEmpIds, setTargetEmpIds] = useState<Array<string | number>>(() => {
-    if (!editData?.targets) return []
-    return editData.targets
-      .filter((t) => t.targetTypeCd === '02')
-      .map((t) => t.targetId ?? '')
-      .filter(Boolean)
+  const [selectedDeptCd, setSelectedDeptCd] = useState(() => {
+    if (editData?.schdClsfCd !== 'C003') return ''
+    return editData.targets?.find((target) => target.targetTypeCd === '04')?.targetId ?? ''
   })
 
   const { execute: createSchd, loading: createLoading } = useApi(
@@ -67,6 +68,13 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
     adminScheduleApi.modifySchd,
     { immediate: false }
   )
+  const {
+    data: departments,
+    loading: departmentsLoading,
+    error: departmentsError,
+  } = useApi<DepartmentLookupResponse[]>(departmentApi.lookupDepartments, {
+    initialData: [],
+  })
 
   const loading = createLoading || modifyLoading
 
@@ -74,10 +82,7 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
     if (schdClsfCd === 'C001') {
       return [{ targetTypeCd: '01', targetId: '0' }]
     }
-    return targetEmpIds.map((id) => ({
-      targetTypeCd: '02',
-      targetId: String(id),
-    }))
+    return []
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,8 +93,14 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
       return
     }
 
+    if (schdClsfCd === 'C003' && !selectedDeptCd) {
+      alert('부서를 선택해주세요.')
+      return
+    }
+
     const body: AdminSchdRequest = {
       schdClsfCd,
+      deptCd: schdClsfCd === 'C003' ? selectedDeptCd : '',
       schdNm,
       schdDetailCn: schdDetailCn || '',
       beginDt: toApiDateTime(beginDt),
@@ -113,8 +124,6 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
       if (err instanceof ApiError) alert(err.message)
     }
   }
-
-  const needsTargetPicker = schdClsfCd === 'C003' || schdClsfCd === 'C004'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -193,7 +202,16 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
                 type={allDayYn === 'Y' ? 'date' : 'datetime-local'}
                 required
                 value={allDayYn === 'Y' ? beginDt.slice(0, 10) : beginDt}
-                onChange={(e) => setBeginDt(allDayYn === 'Y' ? `${e.target.value}T00:00` : e.target.value)}
+                onChange={(e) => {
+                  const newBeginDt = allDayYn === 'Y' ? `${e.target.value}T00:00` : e.target.value
+                  setBeginDt(newBeginDt)
+                  if (!endDt && allDayYn !== 'Y') {
+                    const d = new Date(newBeginDt)
+                    d.setTime(d.getTime() + 60 * 60 * 1000)
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    setEndDt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+                  }
+                }}
                 className="w-full px-3 py-2 bg-white border border-[#c0c6d5] rounded-lg text-sm focus:ring-2 focus:ring-[#005cad] outline-none"
               />
             </div>
@@ -263,18 +281,32 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
             </div>
           )}
 
-          {needsTargetPicker && (
+          {schdClsfCd === 'C003' && (
             <div>
               <label className="block text-xs font-bold mb-1 text-[#414753]">
-                공유 대상 *
+                부서 선택 *
               </label>
-              <EmployeeSearchPicker
-                variant="compact"
-                remoteSearch
-                selectedEmployeeIds={targetEmpIds}
-                onChange={setTargetEmpIds}
-                emptyText="이름을 검색하세요."
-              />
+              <select
+                required
+                value={selectedDeptCd}
+                onChange={(event) => setSelectedDeptCd(event.target.value)}
+                disabled={departmentsLoading || !!departmentsError}
+                className="w-full px-4 py-2 bg-white border border-[#c0c6d5] rounded-lg text-sm focus:ring-2 focus:ring-[#005cad] outline-none disabled:bg-[#f2f4f6] disabled:text-[#717785]"
+              >
+                <option value="">
+                  {departmentsLoading ? '부서 목록을 불러오는 중...' : '부서를 선택해주세요.'}
+                </option>
+                {(departments ?? []).map((department) => (
+                  <option key={department.deptCd} value={department.deptCd}>
+                    {department.deptNm}
+                  </option>
+                ))}
+              </select>
+              {departmentsError && (
+                <p className="mt-1 text-xs font-medium text-red-600">
+                  부서 목록을 불러오지 못했습니다.
+                </p>
+              )}
             </div>
           )}
 
