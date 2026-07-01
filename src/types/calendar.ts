@@ -3,12 +3,14 @@ import type { ScheduleTargetResponseDto } from './index'
 export type ScheduleTypeCode =
   | 'C001' // 사내 전체 일정
   | 'C002' // 개인(휴가 등) 일정
-  | 'C003' // 부서 일정
-  | 'C004' // 간부 일정
+  | 'C003' // 간부 일정
+  | 'C004' // 부서 일정
   | 'C005' // 프로젝트 일정
   | 'C006' // 프로젝트 내 업무 일정
   | 'C007' // 화상회의 일정
   | 'C008' // 회의실 일정
+  | 'PUBLIC_HOLIDAY' // 법정 공휴일
+  | 'ANNIVERSARY' // 기념일
 
 export type RepeatTypeCode = '01' | '02' | '03'
 
@@ -82,12 +84,14 @@ export interface CalendarEventItem {
 export const scheduleTypeLabelMap: Record<ScheduleTypeCode, string> = {
   C001: '전체일정',
   C002: '개인 일정',
-  C003: '부서일정',
-  C004: '간부일정',
+  C003: '간부일정',
+  C004: '부서일정',
   C005: '프로젝트 일정',
   C006: '프로젝트 업무 일정',
   C007: '화상회의 일정',
   C008: '회의실 일정',
+  PUBLIC_HOLIDAY: '법정 공휴일',
+  ANNIVERSARY: '기념일',
 }
 
 interface ScheduleTypeColorToken {
@@ -103,12 +107,14 @@ export const scheduleTypeColorTokenMap: Record<
 > = {
   C001: { background: '#E8EFFF', border: '#3377FF', text: '#0044CC' },
   C002: { background: '#FFF1E8', border: '#FF8C42', text: '#B34B00' },
-  C003: { background: '#E6F4EA', border: '#34A853', text: '#137333' },
-  C004: { background: '#F3E8FF', border: '#A855F7', text: '#6B21A8' },
+  C003: { background: '#F3E8FF', border: '#A855F7', text: '#6B21A8' },
+  C004: { background: '#E6F4EA', border: '#34A853', text: '#137333' },
   C005: { background: '#E0F7FA', border: '#26C6DA', text: '#00838F' },
   C006: { background: '#F1F3F4', border: '#9AA0A6', text: '#3C4043' },
-  C007: { background: '#FCE8E6', border: '#EA4335', text: '#C5221F' },
+  C007: { background: '#FCE4EC', border: '#E91E63', text: '#AD1457' },
   C008: { background: '#E2F2F1', border: '#00BFA5', text: '#00695C' },
+  PUBLIC_HOLIDAY: { background: '#FDECEC', border: '#E53935', text: '#B71C1C' },
+  ANNIVERSARY: { background: '#FFF3E0', border: '#FB8C00', text: '#E65100' },
 }
 
 // 체크박스, 아바타 점처럼 단일 대표색이 필요한 곳에서는 border 색상을 씁니다.
@@ -121,7 +127,12 @@ export const scheduleTypeColorMap: Record<ScheduleTypeCode, string> = {
   C006: scheduleTypeColorTokenMap.C006.border,
   C007: scheduleTypeColorTokenMap.C007.border,
   C008: scheduleTypeColorTokenMap.C008.border,
+  PUBLIC_HOLIDAY: scheduleTypeColorTokenMap.PUBLIC_HOLIDAY.border,
+  ANNIVERSARY: scheduleTypeColorTokenMap.ANNIVERSARY.border,
 }
+
+export const isCalendarSystemEvent = (scheduleTypeCode: ScheduleTypeCode) =>
+  scheduleTypeCode === 'PUBLIC_HOLIDAY' || scheduleTypeCode === 'ANNIVERSARY'
 
 // 반복 타입 코드를 한글로 변환
 export const repeatTypeLabelMap: Record<RepeatTypeCode, string> = {
