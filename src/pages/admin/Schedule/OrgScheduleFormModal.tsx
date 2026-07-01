@@ -203,7 +203,16 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
                 type={allDayYn === 'Y' ? 'date' : 'datetime-local'}
                 required
                 value={allDayYn === 'Y' ? beginDt.slice(0, 10) : beginDt}
-                onChange={(e) => setBeginDt(allDayYn === 'Y' ? `${e.target.value}T00:00` : e.target.value)}
+                onChange={(e) => {
+                  const newBeginDt = allDayYn === 'Y' ? `${e.target.value}T00:00` : e.target.value
+                  setBeginDt(newBeginDt)
+                  if (!endDt && allDayYn !== 'Y') {
+                    const d = new Date(newBeginDt)
+                    d.setTime(d.getTime() + 60 * 60 * 1000)
+                    const pad = (n: number) => String(n).padStart(2, '0')
+                    setEndDt(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`)
+                  }
+                }}
                 className="w-full px-3 py-2 bg-white border border-[#c0c6d5] rounded-lg text-sm focus:ring-2 focus:ring-[#005cad] outline-none"
               />
             </div>

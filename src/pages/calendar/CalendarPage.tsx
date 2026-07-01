@@ -410,20 +410,24 @@ const CalendarPage = () => {
     return true as never;
   };
 
-  const handleScheduleClick = (info: EventClickArg) => {
+  const openScheduleDetail = (event: EventApi) => {
     const schedule = visibleCalendarEvents.find(
-      (event) => event.id === info.event.id,
+      (calendarEvent) => calendarEvent.id === event.id,
     )
 
     if (!schedule || isCalendarSystemEvent(schedule.scheduleTypeCode)) return
 
-    setSelectedDate(formatDateKey(info.event.start ?? new Date(schedule.start)))
+    setSelectedDate(formatDateKey(event.start ?? new Date(schedule.start)))
     setSelectedSchedule(schedule)
     setSelectedRange(null)
     calendarRef.current?.getApi().unselect()
     setScheduleDrawerOpen(false)
     setScheduleDetailOpen(true)
     setMorePopover(null)
+  }
+
+  const handleScheduleClick = (info: EventClickArg) => {
+    openScheduleDetail(info.event)
   }
 
   const handleDateSelect = (selectInfo: DateSelectArg) => {
@@ -627,7 +631,14 @@ const CalendarPage = () => {
                 </header>
                 <div className="calendar-custom-more-popover-body">
                   {morePopover.events.map((event) => (
-                    <CalendarEventLabel key={event.id} event={event} />
+                    <button
+                      key={event.id}
+                      type="button"
+                      className="w-full rounded-md text-left outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      onClick={() => openScheduleDetail(event)}
+                    >
+                      <CalendarEventLabel event={event} />
+                    </button>
                   ))}
                 </div>
               </div>

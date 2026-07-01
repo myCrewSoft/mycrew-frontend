@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid,
@@ -10,18 +10,28 @@ import {
 } from 'lucide-react'
 import SubSidebarSection from './SubSidebarSection'
 import SubSidebarMenuItem from './SubSidebarMenuItem'
+import { projectApi } from '../../../api/projectApi'
+import { useApiList } from '../../../hooks/useApi'
 
-// 더미 프로젝트 목록 (실제 연동 시 API로 교체)
-const recentProjects = [
-  { id: 1, name: '글로벌 통합 정산 플랫폼 고도화', color: '#3b82f6' },
-  { id: 2, name: '사내 HR 시스템 리뉴얼', color: '#8b5cf6' },
-  { id: 3, name: '모바일 앱 v3.0 출시', color: '#10b981' },
-]
+const projectStatusColor: Record<string, string> = {
+  '01': '#94A3B8',
+  '02': '#3B82F6',
+  '03': '#10B981',
+  '04': '#F59E0B',
+}
 
 const ProjectSubSidebarContent = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [projectsOpen, setProjectsOpen] = useState(true)
+  const { data: projects, loading, error } = useApiList(projectApi.getProjectList)
+  const recentProjects = useMemo(
+    () =>
+      [...(projects ?? [])]
+        .sort((a, b) => b.projBgngYmd.localeCompare(a.projBgngYmd))
+        .slice(0, 3),
+    [projects],
+  )
 
   return (
     <div className="flex h-full w-full flex-col gap-6">
@@ -77,18 +87,35 @@ const ProjectSubSidebarContent = () => {
           <div className="flex flex-col gap-0.5">
             {recentProjects.map((project) => (
               <button
-                key={project.id}
+                key={project.projId}
                 type="button"
-                onClick={() => navigate(`/project/${project.id}`)}
+                onClick={() => navigate(`/project/${project.projId}`)}
                 className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
               >
                 <span
                   className="h-2 w-2 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: project.color }}
+                  style={{
+                    backgroundColor: projectStatusColor[project.projStatCd] ?? '#94A3B8',
+                  }}
                 />
-                <span className="truncate">{project.name}</span>
+                <span className="truncate">{project.projNm}</span>
               </button>
             ))}
+            {loading && (
+              <p className="px-2 py-2 text-xs font-medium text-slate-400">
+                프로젝트를 불러오는 중입니다.
+              </p>
+            )}
+            {!loading && !error && recentProjects.length === 0 && (
+              <p className="px-2 py-2 text-xs font-medium text-slate-400">
+                표시할 프로젝트가 없습니다.
+              </p>
+            )}
+            {!loading && error && (
+              <p className="px-2 py-2 text-xs font-medium text-rose-500">
+                프로젝트를 불러오지 못했습니다.
+              </p>
+            )}
           </div>
         )}
       </div>

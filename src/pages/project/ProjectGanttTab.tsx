@@ -16,6 +16,7 @@ import type { TaskListResponse } from '../../types'
 
 interface ProjectGanttTabProps {
   projectId: string | number
+  projectProgress: number
 }
 
 type ScaleMode = 'day' | 'week' | 'month' | 'quarter'
@@ -258,7 +259,7 @@ const toGanttTask = (task: TaskListResponse): GanttTask | null => {
   }
 }
 
-const ProjectGanttTab = ({ projectId }: ProjectGanttTabProps) => {
+const ProjectGanttTab = ({ projectId, projectProgress }: ProjectGanttTabProps) => {
   const [tasks, setTasks] = useState<TaskListResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -344,13 +345,10 @@ const ProjectGanttTab = ({ projectId }: ProjectGanttTabProps) => {
 
   const skippedCount = tasks.length - ganttTasks.length
   const completedCount = ganttTasks.filter((task) => task.statusCode === '02').length
-  const averageProgress =
-    ganttTasks.length === 0
-      ? 0
-      : Math.round(
-          ganttTasks.reduce((sum, task) => sum + task.progress, 0) /
-            ganttTasks.length,
-        )
+  const normalizedProjectProgress = Math.min(
+    100,
+    Math.max(0, projectProgress ?? 0),
+  )
   const today = startOfDay(new Date())
   const tomorrow = addDays(today, 1)
   const todayInTimeline =
@@ -420,9 +418,9 @@ const ProjectGanttTab = ({ projectId }: ProjectGanttTabProps) => {
                 </p>
               </div>
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-                <p className="text-xs font-medium text-blue-700">평균 진행률</p>
+                <p className="text-xs font-medium text-blue-700">프로젝트 진척률</p>
                 <p className="mt-1 text-xl font-bold text-blue-800">
-                  {averageProgress}%
+                  {normalizedProjectProgress}%
                 </p>
               </div>
             </div>

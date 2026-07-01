@@ -184,6 +184,13 @@ const formatDateTime = (dateTime?: string | null) => {
   }).format(date)
 }
 
+const addOneHourToDatetimeLocal = (dt: string): string => {
+  const d = new Date(dt)
+  d.setTime(d.getTime() + 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 const toDateTimeInputValue = (dateTime?: string | null) => {
   if (!dateTime) return ''
   const date = new Date(dateTime)
@@ -632,6 +639,10 @@ const MeetingPage = () => {
 
     setScheduleForm((current: ScheduleForm) => {
       const next = { ...current, [field]: value }
+
+      if (field === 'beginDt' && value && !current.endDt) {
+        next.endDt = addOneHourToDatetimeLocal(value as string)
+      }
 
       if (next.useMeetingRoom) {
         const roomId = field === 'confRmId' ? (value as number | null) : current.confRmId
@@ -1497,6 +1508,11 @@ const MeetingPage = () => {
                   remoteSearch
                   showDepartmentFilter
                   showAllOnEmpty
+                  fixedParams={
+                    currentEmpId !== null
+                      ? { excludeEmpId: currentEmpId }
+                      : undefined
+                  }
                   selectedEmployeeIds={selectedEmployeeIds}
                   onChange={setSelectedEmployeeIds}
                   emptyText="검색된 직원이 없습니다."

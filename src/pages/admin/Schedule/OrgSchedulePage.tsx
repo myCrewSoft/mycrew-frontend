@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type FullCalendarComponent from '@fullcalendar/react'
 import type { EventClickArg, EventContentArg } from '@fullcalendar/core'
@@ -17,7 +17,9 @@ import {
 } from 'lucide-react'
 import { useApi } from '../../../hooks/useApi'
 import { adminScheduleApi } from '../../../api/adminScheduleApi'
+import { departmentApi } from '../../../api/departmentApi'
 import { ApiError } from '../../../api/axiosInstance'
+import type { DepartmentLookupResponse } from '../../../types'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
 import { formatMonthTitle } from '../../../utils/date'
 import '../../../pages/calendar/calendar.css'
@@ -63,6 +65,21 @@ export default function OrgSchedulePage() {
   const { execute: deleteSchd, loading: deleteLoading } = useApi(
     adminScheduleApi.deleteSchd,
     { immediate: false }
+  )
+
+  const { data: departments } = useApi<DepartmentLookupResponse[]>(
+    departmentApi.lookupDepartments,
+    { initialData: [] },
+  )
+  const departmentNameMap = useMemo(
+    () =>
+      new Map(
+        (departments ?? []).map((department) => [
+          department.deptCd,
+          department.deptNm,
+        ]),
+      ),
+    [departments],
   )
 
   useEffect(() => {
@@ -411,16 +428,23 @@ export default function OrgSchedulePage() {
                   <p className="text-sm text-[#191c1e]">{detailData.endDt?.slice(0, 16).replace('T', ' ')}</p>
                 </div>
               </div>
-              {detailData.targets && detailData.targets.length > 0 && (
+              {detailData.schdClsfCd === 'C003' &&
+                detailData.targets &&
+                detailData.targets.length > 0 && (
                 <div>
                   <p className="text-xs text-[#717785] mb-2">공유 대상</p>
                   <div className="flex flex-wrap gap-1">
                     {detailData.targets.map((t, i) => (
-                      <Badge key={i} variant="neutral">{t.targetNm ?? t.targetId}</Badge>
+                      <Badge key={i} variant="neutral">
+                        {t.deptNm ||
+                          departmentNameMap.get(t.targetId) ||
+                          t.targetNm ||
+                          t.targetId}
+                      </Badge>
                     ))}
                   </div>
                 </div>
-              )}
+                )}
             </div>
             <div className="p-5 border-t border-[#c0c6d5] flex justify-end gap-2">
               <button
