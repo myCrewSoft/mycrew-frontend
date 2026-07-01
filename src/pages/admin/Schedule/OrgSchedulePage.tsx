@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type FullCalendarComponent from '@fullcalendar/react'
 import type { EventClickArg, EventContentArg } from '@fullcalendar/core'
 import FullCalendar from '@fullcalendar/react'
@@ -126,14 +127,26 @@ export default function OrgSchedulePage() {
   }
 
   const renderEvent = (info: EventContentArg) => {
-    const color = CLSF_COLOR_MAP[info.event.extendedProps.raw?.schdClsfCd ?? '']
+    const color = CLSF_COLOR_MAP[info.event.extendedProps.raw?.schdClsfCd ?? ''] ?? {
+      bg: '#f1f3f4',
+      border: '#9aa0a6',
+      text: '#3c4043',
+    }
+
     return (
-      <div className="flex items-center gap-1 px-1 truncate text-xs">
-        <span
-          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-          style={{ backgroundColor: color?.border ?? '#9aa0a6' }}
-        />
-        <span className="truncate">{info.event.title}</span>
+      <div
+        className={`calendar-main-event${info.event.allDay ? ' calendar-main-event-all-day' : ''}`}
+        style={
+          {
+            '--calendar-event-bg': color.bg,
+            '--calendar-event-border': color.border,
+            '--calendar-event-color': color.text,
+            width: '100%',
+          } as CSSProperties
+        }
+      >
+        <span className="calendar-main-event-dot" />
+        <span className="calendar-main-event-title">{info.event.title}</span>
       </div>
     )
   }
@@ -240,22 +253,32 @@ export default function OrgSchedulePage() {
             })}
           </div>
 
-          <div className="p-4">
+          <div className="p-0">
             {viewMode === 'calendar' ? (
-              <FullCalendar
-                ref={calendarRef}
-                plugins={[dayGridPlugin, interactionPlugin]}
-                initialView="dayGridMonth"
-                locale="ko"
-                headerToolbar={false}
-                events={calendarEvents}
-                eventContent={renderEvent}
-                eventClick={handleEventClick}
-                height="auto"
-                dayMaxEvents={3}
-              />
+              <div className="calendar-main w-full">
+                <FullCalendar
+                  ref={calendarRef}
+                  plugins={[dayGridPlugin, interactionPlugin]}
+                  initialView="dayGridMonth"
+                  locale="ko"
+                  headerToolbar={false}
+                  events={calendarEvents}
+                  eventContent={renderEvent}
+                  eventClick={handleEventClick}
+                  height="auto"
+                  dayMaxEvents={3}
+                  moreLinkContent={(args) => `+${args.num} 더보기`}
+                  eventOrder="schdClsfCd,title"
+                  dayCellClassNames={(info) => {
+                    const day = info.date.getDay()
+                    if (day === 0) return ['fc-day-sun']
+                    if (day === 6) return ['fc-day-sat']
+                    return []
+                  }}
+                />
+              </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto p-4">
                 {listLoading ? (
                   <div className="p-10 text-center text-sm text-[#414753]">로딩 중...</div>
                 ) : scheduleList.length === 0 ? (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Bell, Bot, Mail, MessageSquare, Search } from 'lucide-react'
 import { mailApi } from '../../api/mailApi'
 import { notificationApi } from '../../api/notificationApi'
@@ -12,7 +12,10 @@ import { useMessengerSocketContext } from './headerPopover/messenger/MessengerSo
 import AIChatbotPopoverContent from './headerPopover/AIChatbotPopoverContent'
 import MailPopoverContent from './headerPopover/MailPopoverContent'
 import NotificationPopoverContent from './headerPopover/NotificationPopoverContent'
-import { NOTIFICATION_RECEIVED_EVENT } from './headerPopover/useNotificationStream'
+import {
+  NOTIFICATION_RECEIVED_EVENT,
+  type NotificationReceivedEventDetail,
+} from './headerPopover/useNotificationStream'
 import HeaderProfileStatusMenu from './headerPopover/profile/HeaderProfileStatusMenu'
 
 const firstLoginNotificationRefreshKey = 'firstLoginNotificationRefresh'
@@ -27,6 +30,18 @@ const Header = () => {
     data: notificationUnreadCount,
     execute: fetchNotificationUnreadCount,
   } = useApi<NotificationUnreadCountResponse>(notificationApi.getUnreadCount)
+
+  // SSE 도착 시 즉각 반영을 위한 낙관적 카운트 (서버 응답이 늦을 때 대비)
+  const [optimisticCount, setOptimisticCount] = useState(0)
+  const lastServerCountRef = useRef(0)
+
+  useEffect(() => {
+    const serverCount = notificationUnreadCount?.unreadCount ?? 0
+    if (serverCount > lastServerCountRef.current) {
+      setOptimisticCount(0)
+    }
+    lastServerCountRef.current = serverCount
+  }, [notificationUnreadCount])
 
   const { execute: readAllNotifications } = useApi<null>(
     notificationApi.readAllNotifications,
@@ -51,7 +66,14 @@ const Header = () => {
   }, [])
 
   useEffect(() => {
-    const handleNotificationReceived = () => {
+    const handleNotificationReceived = (event: Event) => {
+      const { notification } = (event as CustomEvent<NotificationReceivedEventDetail>).detail
+
+      // 유효한 알림이면 서버 응답 전에 즉시 카운트 증가 (race condition 대비)
+      if (notification) {
+        setOptimisticCount((prev) => prev + 1)
+      }
+
       setNotificationRefreshKey((current) => current + 1)
       void fetchNotificationUnreadCount().catch(() => undefined)
     }
@@ -69,7 +91,16 @@ const Header = () => {
     }
   }, [fetchNotificationUnreadCount])
 
+  // SSE가 동작하지 않는 경우를 대비한 30초 폴링 fallback
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void fetchNotificationUnreadCount().catch(() => undefined)
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [fetchNotificationUnreadCount])
+
   const handleNotificationPopoverClose = useCallback(() => {
+    setOptimisticCount(0)
     void readAllNotifications()
       .then(() => {
         setNotificationRefreshKey((current) => current + 1)
@@ -219,7 +250,7 @@ const Header = () => {
               <NotificationIconButton
                 active={open}
                 label="알림"
-                count={notificationUnreadCount?.unreadCount ?? 0}
+                count={(notificationUnreadCount?.unreadCount ?? 0) + optimisticCount}
                 badgeVariant="danger"
                 onClick={toggle}
                 icon={

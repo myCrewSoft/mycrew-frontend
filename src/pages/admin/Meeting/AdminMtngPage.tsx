@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Calendar,
   Play,
@@ -10,22 +10,31 @@ import {
   ChevronRight,
   X,
   Edit3,
+  MapPin,
+  Users,
+  CalendarClock,
+  FileText,
+  Video,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { AdminMtngDetailResponse, AdminMtngListRequest, AdminMtngListResponse } from '../../../types'
+import type { AdminEmployeeListItem } from '../../../types/adminEmployee'
 import { useApi } from '../../../hooks/useApi'
 import { adminMtngApi } from '../../../api/adminMtngApi'
+import { adminApi } from '../../../api/adminApi'
+import Badge, { type BadgeVariant } from '../../../components/common/dataDisplay/badge/Badge'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 
 const MTNG_TYPE_LABEL: Record<string, string> = {
   '01': '온라인',
   '02': '오프라인',
-  '03': '복합',
+  '03': '혼합',
 }
 
-const VCONF_STTUS: Record<string, { label: string; className: string }> = {
-  VC001: { label: '예정', className: 'bg-[#dae2fd] text-[#005cad]' },
-  VC002: { label: '진행중', className: 'bg-[#d3f4e3] text-[#1a7a4a]' },
-  VC003: { label: '완료', className: 'bg-[#f2f4f6] text-[#717785]' },
+const MTNG_TYPE_BADGE: Record<string, BadgeVariant> = {
+  '01': 'violet',
+  '02': 'warning',
+  '03': 'info',
 }
 
 const MOM_STTUS_LABEL: Record<string, string> = {
@@ -33,6 +42,55 @@ const MOM_STTUS_LABEL: Record<string, string> = {
   '02': '편집중',
   '03': '결재요청',
   '04': '확정',
+  MM001: 'AI초안',
+  MM002: '편집중',
+  MM003: '결재요청',
+  MM004: '확정',
+}
+
+const getMinutesStatusLabel = (code?: string | null) =>
+  code ? (MOM_STTUS_LABEL[code] ?? '처리 중') : '미생성'
+
+type MeetingStatus = 'scheduled' | 'live' | 'ended'
+
+const MEETING_STATUS: Record<MeetingStatus, { label: string; variant: BadgeVariant }> = {
+  scheduled: { label: '예약됨', variant: 'primary' },
+  live: { label: '진행 중', variant: 'success' },
+  ended: { label: '종료', variant: 'neutral' },
+}
+
+const VCONF_STATUS_KEY: Record<string, MeetingStatus> = {
+  VC001: 'scheduled',
+  VC002: 'live',
+  VC003: 'ended',
+}
+
+const PARTICIPANT_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
+  PT001: { label: '참여 중', variant: 'success' },
+  PT002: { label: '미입장', variant: 'neutral' },
+  PT003: { label: '퇴장', variant: 'outline' },
+}
+
+const getMeetingTypeLabel = (code?: string | null) =>
+  (code ? MTNG_TYPE_LABEL[code] : null) ?? '오프라인'
+
+const getMeetingTypeBadge = (code?: string | null): BadgeVariant =>
+  (code ? MTNG_TYPE_BADGE[code] : null) ?? 'warning'
+
+const getMeetingStatus = (
+  meeting: Pick<AdminMtngListResponse, 'vconfSttus' | 'beginDt' | 'endDt'>,
+): MeetingStatus => {
+  if (meeting.vconfSttus && VCONF_STATUS_KEY[meeting.vconfSttus]) {
+    return VCONF_STATUS_KEY[meeting.vconfSttus]
+  }
+
+  const now = Date.now()
+  const begin = new Date(meeting.beginDt).getTime()
+  const end = new Date(meeting.endDt).getTime()
+
+  if (!Number.isNaN(begin) && now < begin) return 'scheduled'
+  if (!Number.isNaN(end) && now <= end) return 'live'
+  return 'ended'
 }
 
 const INITIAL_FILTER: AdminMtngListRequest = {
@@ -63,6 +121,11 @@ export default function AdminMtngPage() {
     { immediate: true },
   )
 
+  const { data: employees, execute: fetchEmployees } = useApi(
+    adminApi.getEmployees,
+    { immediate: false },
+  )
+
   const { execute: fetchDetail } = useApi(
     adminMtngApi.getAdminMtngDetail,
     { immediate: false },
@@ -76,6 +139,10 @@ export default function AdminMtngPage() {
   useEffect(() => {
     void fetchList(filter)
   }, [filter, fetchList])
+
+  useEffect(() => {
+    void fetchEmployees({ page: 0, size: 1000 }).catch(() => undefined)
+  }, [fetchEmployees])
 
   const handleFilterChange = useCallback(
     (key: keyof AdminMtngListRequest, value: string) => {
@@ -113,6 +180,13 @@ export default function AdminMtngPage() {
   const currentPage = filter.page ?? 1
   const totalCount = pageData?.totalCount ?? 0
   const meetings = pageData?.meetings ?? []
+  const employeesById = useMemo(
+    () => new Map((employees ?? []).map((employee) => [employee.empId, employee])),
+    [employees],
+  )
+  const selectedCreator = selectedMtng
+    ? employeesById.get(selectedMtng.crtrId)
+    : undefined
 
   return (
     <section className="flex w-full flex-col gap-6 font-sans text-[#191c1e]">
@@ -251,20 +325,20 @@ export default function AdminMtngPage() {
               {listLoading ? (
                 <div className="py-16 text-center text-sm text-[#414753]">데이터 로딩 중...</div>
               ) : (
-                <table className="w-full border-collapse text-left text-sm">
+                <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
                   <thead>
-                    <tr className="border-b border-[#c0c6d5] bg-[#f2f4f6]/50 text-xs font-semibold uppercase tracking-wider text-[#717785]">
-                      <th className="px-6 py-4">회의명</th>
-                      <th className="px-6 py-4">유형</th>
-                      <th className="px-6 py-4">진행 상태</th>
-                      <th className="px-6 py-4">일시</th>
-                      <th className="px-6 py-4">생성자</th>
-                      <th className="px-6 py-4">참석/장소</th>
-                      <th className="px-6 py-4">회의록</th>
-                      <th className="px-6 py-4 text-right">관리</th>
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-500">
+                      <th className="w-[26%] px-6 py-3.5">회의명</th>
+                      <th className="px-5 py-3.5">유형</th>
+                      <th className="px-5 py-3.5">진행 상태</th>
+                      <th className="px-5 py-3.5">일시</th>
+                      <th className="min-w-52 px-5 py-3.5">생성자</th>
+                      <th className="min-w-40 px-5 py-3.5">참석/장소</th>
+                      <th className="px-5 py-3.5">회의록</th>
+                      <th className="px-5 py-3.5 text-right">관리</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#c0c6d5]">
+                  <tbody className="divide-y divide-slate-200">
                     {meetings.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-16 text-center text-sm text-[#414753]">
@@ -276,6 +350,7 @@ export default function AdminMtngPage() {
                         <MtngTableRow
                           key={mtng.mtngId}
                           mtng={mtng}
+                          creator={employeesById.get(mtng.crtrId)}
                           onDetail={handleOpenDetail}
                         />
                       ))
@@ -329,68 +404,154 @@ export default function AdminMtngPage() {
               className="fixed inset-0 bg-[#2d3133]/40 backdrop-blur-sm"
               onClick={() => setSelectedMtng(null)}
             />
-            <div className="relative w-full max-w-lg overflow-hidden rounded-xl border border-[#c0c6d5] bg-white shadow-2xl">
-              <div className="flex items-center justify-between border-b border-[#c0c6d5] bg-gray-50 p-5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-[#191c1e]">{selectedMtng.mtngNm}</h3>
-                  {selectedMtng.vconfSttus && (
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${VCONF_STTUS[selectedMtng.vconfSttus]?.className}`}>
-                      {VCONF_STTUS[selectedMtng.vconfSttus]?.label}
-                    </span>
-                  )}
-                </div>
+            <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+              <div className="border-b border-slate-200 px-6 pb-5 pt-6">
                 <button
                   onClick={() => setSelectedMtng(null)}
-                  className="rounded-full p-1 hover:bg-[#f2f4f6]"
+                  className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                  aria-label="회의 상세 닫기"
                 >
                   <X size={20} />
                 </button>
+                <div className="flex flex-wrap items-center gap-2 pr-12">
+                  <Badge variant={MEETING_STATUS[getMeetingStatus(selectedMtng)].variant}>
+                    {MEETING_STATUS[getMeetingStatus(selectedMtng)].label}
+                  </Badge>
+                  <Badge variant={getMeetingTypeBadge(selectedMtng.mtngTypeCd)}>
+                    {getMeetingTypeLabel(selectedMtng.mtngTypeCd)}
+                  </Badge>
+                </div>
+                <h2 className="mt-3 pr-12 text-xl font-black leading-snug text-slate-950">
+                  {selectedMtng.mtngNm}
+                </h2>
               </div>
 
-              <div className="space-y-4 p-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <InfoBlock label="회의 시간" value={`${formatDt(selectedMtng.beginDt)} ~ ${formatDt(selectedMtng.endDt)}`} />
-                  <InfoBlock label="개설자" value={selectedMtng.crtrNm} />
-                  {selectedMtng.confRmNm && <InfoBlock label="회의실" value={selectedMtng.confRmNm} />}
-                  {selectedMtng.roomNm && <InfoBlock label="온라인 링크" value={selectedMtng.roomNm} />}
-                </div>
+              <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MeetingInfoCard
+                    icon={<CalendarClock size={18} />}
+                    label="회의 일시"
+                    className="sm:col-span-2"
+                  >
+                    <p className="text-sm font-bold leading-6 text-slate-900">
+                      {formatDt(selectedMtng.beginDt)}
+                      <span className="mx-2 text-slate-300">→</span>
+                      {formatDt(selectedMtng.endDt)}
+                    </p>
+                  </MeetingInfoCard>
 
-                <div>
-                  <p className="mb-2 text-xs font-bold text-[#414753]">
-                    참석자 현황 ({selectedMtng.ptcpts.length}명)
-                  </p>
-                  <div className="flex max-h-44 flex-col gap-1.5 overflow-y-auto">
-                    {selectedMtng.ptcpts.map((p) => (
-                      <div key={p.empId} className="flex items-center gap-3 rounded-lg bg-[#f2f4f6] px-3 py-2">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#c0c6d5] text-xs font-bold text-[#414753]">
-                          {p.empNm[0]}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-[#191c1e]">{p.empNm}</p>
-                          <p className="text-xs text-[#717785]">{p.deptNm} · {p.jbgdNm}</p>
-                        </div>
+                  <MeetingInfoCard icon={<Users size={18} />} label="개설자">
+                    <div className="flex items-center gap-3">
+                      <ProfileAvatar
+                        fileId={selectedCreator?.prflImgFileId}
+                        name={selectedCreator?.empNm ?? selectedMtng.crtrNm}
+                        size={38}
+                        rounded="xl"
+                        className="ring-1 ring-slate-200"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-900">
+                          {selectedCreator?.empNm ?? selectedMtng.crtrNm}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                          {formatEmployeeMeta(selectedCreator)}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  </MeetingInfoCard>
+
+                  <MeetingInfoCard
+                    icon={selectedMtng.confRmNm ? <MapPin size={18} /> : <Video size={18} />}
+                    label={selectedMtng.confRmNm ? '회의 장소' : '온라인 회의'}
+                  >
+                    <p className="truncate text-sm font-bold text-slate-900">
+                      {selectedMtng.confRmNm ?? selectedMtng.roomNm ?? '장소 정보 없음'}
+                    </p>
+                  </MeetingInfoCard>
                 </div>
 
-                {selectedMtng.momSttusCd && (
-                  <div className="rounded-lg bg-[#dae2fd] px-3 py-2 text-xs font-medium text-[#005cad]">
-                    회의록 상태: {MOM_STTUS_LABEL[selectedMtng.momSttusCd] ?? selectedMtng.momSttusCd}
+                <section>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-black text-slate-950">참석자 현황</h3>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        총 {selectedMtng.ptcpts.length}명의 참석자가 등록되어 있습니다.
+                      </p>
+                    </div>
+                    <Badge variant="outline">{selectedMtng.ptcpts.length}명</Badge>
                   </div>
-                )}
+
+                  {selectedMtng.ptcpts.length > 0 ? (
+                    <div className="grid max-h-64 gap-2 overflow-y-auto rounded-xl bg-slate-50 p-2 sm:grid-cols-2">
+                      {selectedMtng.ptcpts.map((participant) => {
+                        const employee = employeesById.get(participant.empId)
+                        const participantStatus = PARTICIPANT_STATUS[participant.ptcptSttusCd]
+                        return (
+                          <div
+                            key={participant.empId}
+                            className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5"
+                          >
+                            <ProfileAvatar
+                              fileId={employee?.prflImgFileId}
+                              name={participant.empNm}
+                              size={36}
+                              rounded="xl"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-bold text-slate-900">
+                                {participant.empNm}
+                              </p>
+                              <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                                {participant.jbgdNm} · {participant.deptNm}
+                              </p>
+                            </div>
+                            {participantStatus ? (
+                              <Badge variant={participantStatus.variant} className="shrink-0">
+                                {participantStatus.label}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-slate-50 px-4 py-8 text-center text-sm font-semibold text-slate-400">
+                      등록된 참석자가 없습니다.
+                    </div>
+                  )}
+                </section>
+
+                <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-700 shadow-sm">
+                      <FileText size={18} />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-500">회의록 상태</p>
+                      <p className="mt-0.5 text-sm font-black text-blue-800">
+                        {getMinutesStatusLabel(selectedMtng.momSttusCd)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {selectedMtng.vconfSttus === 'VC002' && (
-                <div className="border-t border-[#c0c6d5] p-5 pt-4">
+              <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-6 py-4">
+                <button
+                  onClick={() => setSelectedMtng(null)}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-100"
+                >
+                  닫기
+                </button>
+                {selectedMtng.vconfSttus === 'VC002' && (
                   <button
                     onClick={() => void handleForceEnd(selectedMtng.mtngId)}
-                    className="w-full rounded-lg bg-red-500 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
+                    className="rounded-lg bg-red-500 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-600"
                   >
                     회의 강제 종료
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -435,42 +596,86 @@ function FilterSelect({ value, onChange, options }: {
   )
 }
 
-function MtngTableRow({ mtng, onDetail }: {
+function MtngTableRow({ mtng, creator, onDetail }: {
   mtng: AdminMtngListResponse
+  creator?: AdminEmployeeListItem
   onDetail: (id: number) => void
 }) {
-  const sttus = mtng.vconfSttus ? VCONF_STTUS[mtng.vconfSttus] : null
+  const status = MEETING_STATUS[getMeetingStatus(mtng)]
+  const creatorPosition = creator?.jobGrade?.jobGrdNm ?? creator?.jobPosition?.jobPstnNm
+  const creatorDepartment = creator?.department?.deptNm
+  const location = mtng.confRmNm?.trim() || '회의실 없음'
 
   return (
-    <tr className="transition-colors hover:bg-[#f2f4f6]">
-      <td className="px-6 py-4 font-semibold text-[#191c1e]">{mtng.mtngNm}</td>
+    <tr className="group bg-[#f2f4f6] transition-colors hover:bg-[#e5efe8]">
       <td className="px-6 py-4">
-        <span className="rounded-full border border-[#c0c6d5] px-2.5 py-0.5 text-xs text-[#414753]">
-          {MTNG_TYPE_LABEL[mtng.mtngTypeCd] ?? mtng.mtngTypeCd}
-        </span>
+        <button
+          type="button"
+          onClick={() => onDetail(mtng.mtngId)}
+          className="max-w-md text-left font-bold text-slate-900 transition-colors hover:text-blue-700"
+        >
+          {mtng.mtngNm}
+        </button>
       </td>
-      <td className="px-6 py-4">
-        {sttus ? (
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${sttus.className}`}>
-            {sttus.label}
-          </span>
-        ) : (
-          <span className="text-[#c0c6d5]">-</span>
-        )}
+      <td className="px-5 py-4">
+        <Badge variant={getMeetingTypeBadge(mtng.mtngTypeCd)}>
+          {getMeetingTypeLabel(mtng.mtngTypeCd)}
+        </Badge>
       </td>
-      <td className="px-6 py-4 text-xs text-[#414753]">{formatDt(mtng.beginDt)}</td>
-      <td className="px-6 py-4 text-sm text-[#414753]">{mtng.crtrNm}</td>
-      <td className="px-6 py-4">
-        <p className="text-xs text-[#414753]">{mtng.ptcptCnt}명</p>
-        {mtng.confRmNm && <p className="text-xs text-[#717785]">{mtng.confRmNm}</p>}
+      <td className="px-5 py-4">
+        <Badge variant={status.variant}>{status.label}</Badge>
       </td>
-      <td className="px-6 py-4 text-xs text-[#414753]">
-        {mtng.momSttusCd ? MOM_STTUS_LABEL[mtng.momSttusCd] ?? mtng.momSttusCd : '-'}
+      <td className="px-5 py-4">
+        <p className="whitespace-nowrap text-xs font-bold text-slate-700">
+          {formatDate(mtng.beginDt)}
+        </p>
+        <p className="mt-1 whitespace-nowrap text-xs font-semibold text-slate-500">
+          {formatTimeRange(mtng.beginDt, mtng.endDt)}
+        </p>
       </td>
-      <td className="px-6 py-4 text-right">
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <ProfileAvatar
+            fileId={creator?.prflImgFileId}
+            name={creator?.empNm ?? mtng.crtrNm}
+            size={36}
+            rounded="xl"
+            className="ring-1 ring-slate-200"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-900">
+              {creator?.empNm ?? mtng.crtrNm}
+            </p>
+            <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+              {creatorPosition && creatorDepartment
+                ? `${creatorPosition} · ${creatorDepartment}`
+                : creatorPosition ?? creatorDepartment ?? '직급/부서 정보 없음'}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <Users size={14} className="text-slate-400" />
+          {mtng.ptcptCnt}명
+        </p>
+        <p
+          className={`mt-1.5 flex items-center gap-1.5 text-xs font-semibold ${
+            mtng.confRmNm ? 'text-slate-500' : 'text-slate-400'
+          }`}
+        >
+          <MapPin size={14} className="shrink-0" />
+          {location}
+        </p>
+      </td>
+      <td className="px-5 py-4 text-xs font-semibold text-slate-600">
+        {getMinutesStatusLabel(mtng.momSttusCd)}
+      </td>
+      <td className="px-5 py-4 text-right">
         <button
           onClick={() => onDetail(mtng.mtngId)}
-          className="rounded-lg p-2 text-[#6f8f76] transition-all hover:bg-[#e5efe8]"
+          className="rounded-lg p-2 text-slate-400 transition-all hover:bg-blue-100 hover:text-blue-700"
+          aria-label={`${mtng.mtngNm} 상세 보기`}
           title="상세 보기"
         >
           <Edit3 size={18} />
@@ -480,16 +685,69 @@ function MtngTableRow({ mtng, onDetail }: {
   )
 }
 
-function InfoBlock({ label, value }: { label: string; value: string }) {
+function MeetingInfoCard({
+  icon,
+  label,
+  className = '',
+  children,
+}: {
+  icon: React.ReactNode
+  label: string
+  className?: string
+  children: React.ReactNode
+}) {
   return (
-    <div className="rounded-lg border border-[#c0c6d5] px-3 py-2.5">
-      <p className="text-xs font-bold text-[#717785]">{label}</p>
-      <p className="mt-0.5 text-sm text-[#191c1e]">{value}</p>
+    <div className={`rounded-xl border border-slate-200 bg-white p-4 ${className}`}>
+      <p className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+        <span className="text-blue-700">{icon}</span>
+        {label}
+      </p>
+      {children}
     </div>
   )
 }
 
+function formatEmployeeMeta(employee?: AdminEmployeeListItem) {
+  const position = employee?.jobGrade?.jobGrdNm ?? employee?.jobPosition?.jobPstnNm
+  const department = employee?.department?.deptNm
+
+  if (position && department) return `${position} · ${department}`
+  return position ?? department ?? '직급/부서 정보 없음'
+}
+
 function formatDt(dt: string) {
   const d = new Date(dt)
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  if (Number.isNaN(d.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d)
+}
+
+function formatDate(dt: string) {
+  const date = new Date(dt)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).format(date)
+}
+
+function formatTimeRange(beginDt: string, endDt: string) {
+  const formatTime = (dt: string) => {
+    const date = new Date(dt)
+    if (Number.isNaN(date.getTime())) return '-'
+    return new Intl.DateTimeFormat('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date)
+  }
+
+  return `${formatTime(beginDt)} - ${formatTime(endDt)}`
 }

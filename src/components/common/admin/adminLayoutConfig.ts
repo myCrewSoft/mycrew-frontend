@@ -35,7 +35,7 @@ export const adminNavItems: AdminNavItem[] = [
   { label: '양식', path: '/admin/templates', icon: FileText },
   { label: '조직도', path: '/admin/org', icon: Network },
   { label: '근태', path: '/admin/attendance', icon: CalendarClock },
-  { label: '일정', path: '/admin/schedules', icon: CalendarDays },
+  { label: '일정', path: '/admin/schedule', icon: CalendarDays },
   { label: '회의', path: '/admin/meeting', icon: Users },
   { label: '회의실예약', path: '/admin/reservations', icon: DoorOpen },
 ];

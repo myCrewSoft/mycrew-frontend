@@ -17,6 +17,7 @@ export const adminHolidayApi = {
   syncHolidays: (year: number) =>
     axiosInstance.post<ApiResponse<number>>(`${ADMIN_HOLIDAY_PREFIX}/sync`, null, {
       params: { year },
+      timeout: 60_000,
     }),
 
   createHoliday: (body: HolidayManualRequest) =>

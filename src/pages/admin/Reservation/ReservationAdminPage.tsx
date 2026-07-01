@@ -1,8 +1,11 @@
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { PopularRmItem, RsrvListItem, RsrvSearchRequest, RsrvStatsSummary } from '../../../types'
+import type { AdminEmployeeListItem } from '../../../types/adminEmployee'
 import { useApi } from '../../../hooks/useApi'
 import { cancelReservation, getReservationList, getReservationStats } from '../../../api/ReservationAdminApi'
+import { adminApi } from '../../../api/adminApi'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
 
 
 export default function ReservationAdminPage() {
@@ -19,9 +22,27 @@ export default function ReservationAdminPage() {
         execute: fetchList,
     } = useApi(getReservationList, { immediate: false })
 
+    const { data: employees, execute: fetchEmployees } = useApi(
+        adminApi.getEmployees,
+        { immediate: false },
+    )
+
     useEffect(() => {
         void fetchList(params)
     }, [params, fetchList])
+
+    useEffect(() => {
+        void fetchEmployees({ page: 0, size: 1000 }).catch(() => undefined)
+    }, [fetchEmployees])
+
+    const employeesByName = useMemo(() => {
+        const directory = new Map<string, AdminEmployeeListItem>()
+        for (const employee of employees ?? []) {
+            const name = employee.empNm.trim()
+            if (name && !directory.has(name)) directory.set(name, employee)
+        }
+        return directory
+    }, [employees])
 
     const handleCancel = async (rsrvId: number) => {
         if (!confirm('해당 예약을 강제 취소하시겠습니까?')) return
@@ -113,13 +134,14 @@ export default function ReservationAdminPage() {
                             예약 목록을 불러오는 중입니다.
                         </p>
                     ) : (
-                        <table className="w-full text-sm">
+                        <div className="overflow-x-auto">
+                        <table className="w-full min-w-[1180px] text-sm">
                             <thead>
                                 <tr className="border-b border-slate-200 text-left text-xs font-bold text-slate-500">
                                     <th className="pb-3 pr-4">회의실명</th>
                                     <th className="pb-3 pr-4">위치</th>
                                     <th className="pb-3 pr-4">예약 목적</th>
-                                    <th className="pb-3 pr-4">예약자</th>
+                                    <th className="min-w-56 pb-3 pr-4">예약자</th>
                                     <th className="pb-3 pr-4">시작 일시</th>
                                     <th className="pb-3 pr-4">종료 일시</th>
                                     <th className="pb-3 pr-4">종일</th>
@@ -137,7 +159,12 @@ export default function ReservationAdminPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    rsrvList.map((rsrv:RsrvListItem) => (
+                                    rsrvList.map((rsrv:RsrvListItem) => {
+                                        const reserver = rsrv.rsrvEmpNm
+                                            ? employeesByName.get(rsrv.rsrvEmpNm.trim())
+                                            : undefined
+
+                                        return (
                                         <tr
                                             key={rsrv.rsrvId}
                                             onClick={() => setSelectedRsrv(rsrv)}
@@ -156,8 +183,11 @@ export default function ReservationAdminPage() {
                                             <td className="py-3 pr-4 text-slate-600">
                                                 {rsrv.rsrvPurps || '-'}
                                             </td>
-                                            <td className="py-3 pr-4 text-slate-600">
-                                                {rsrv.rsrvEmpNm}
+                                            <td className="py-3 pr-4">
+                                                <EmployeeIdentity
+                                                    employee={reserver}
+                                                    fallbackName={rsrv.rsrvEmpNm}
+                                                />
                                             </td>
                                             <td className="py-3 pr-4 text-slate-600">
                                                 {rsrv.beginDt?.replace('T', ' ').slice(0, 16)}
@@ -194,10 +224,12 @@ export default function ReservationAdminPage() {
                                                 )}
                                             </td>
                                         </tr>
-                                    ))
+                                        )
+                                    })
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     )}
                 </section>
             </div>
@@ -220,7 +252,18 @@ export default function ReservationAdminPage() {
                             label="위치"
                             value={`${selectedRsrv.confRmFlr ?? '-'}층 / ${selectedRsrv.confRmHo ?? '-'}호`}
                         />
-                        <DetailRow label="예약자" value={selectedRsrv.rsrvEmpNm ?? '-'} />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="mb-2 text-xs font-bold text-slate-500">예약자</p>
+                            <EmployeeIdentity
+                                employee={
+                                    selectedRsrv.rsrvEmpNm
+                                        ? employeesByName.get(selectedRsrv.rsrvEmpNm.trim())
+                                        : undefined
+                                }
+                                fallbackName={selectedRsrv.rsrvEmpNm}
+                                avatarSize={40}
+                            />
+                        </div>
                         <DetailRow label="예약 목적" value={selectedRsrv.rsrvPurps || '-'} />
                         <DetailRow
                             label="시작 일시"
@@ -288,6 +331,40 @@ function PopularRmCard({ stats }: { stats: RsrvStatsSummary }) {
                     </div>
                 ))
             )}
+        </div>
+    )
+}
+
+function EmployeeIdentity({
+    employee,
+    fallbackName,
+    avatarSize = 36,
+}: {
+    employee?: AdminEmployeeListItem
+    fallbackName?: string
+    avatarSize?: number
+}) {
+    const name = employee?.empNm ?? fallbackName ?? '알 수 없음'
+    const position = employee?.jobGrade?.jobGrdNm ?? employee?.jobPosition?.jobPstnNm
+    const department = employee?.department?.deptNm
+    const meta =
+        position && department
+            ? `${position} · ${department}`
+            : position ?? department ?? '직급/부서 정보 없음'
+
+    return (
+        <div className="flex min-w-0 items-center gap-3">
+            <ProfileAvatar
+                fileId={employee?.prflImgFileId}
+                name={name}
+                size={avatarSize}
+                rounded="xl"
+                className="ring-1 ring-slate-200"
+            />
+            <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">{name}</p>
+                <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{meta}</p>
+            </div>
         </div>
     )
 }
