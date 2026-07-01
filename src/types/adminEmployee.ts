@@ -15,9 +15,7 @@ export type AdminEmployeeStatusCode =
   | 'EMP_ACTIVE'
   | 'EMP_INACTIVE'
   | 'EMP_RETIRED'
-  | 'EMP_VACATION'
-  | 'EMP_LOGIN'
-  | 'EMP_LOGOUT';
+  | 'EMP_VACATION';
 
 export interface AdminEmployeeStatusOption {
   code: AdminEmployeeStatusCode;
@@ -30,8 +28,6 @@ export const adminEmployeeStatusOptions: AdminEmployeeStatusOption[] = [
   { code: 'EMP_INACTIVE', label: '비활성' },
   { code: 'EMP_RETIRED', label: '퇴사' },
   { code: 'EMP_VACATION', label: '휴가' },
-  { code: 'EMP_LOGIN', label: '출근' },
-  { code: 'EMP_LOGOUT', label: '퇴근' },
 ];
 
 export interface AdminEmployeeStatusUpdateRequest {

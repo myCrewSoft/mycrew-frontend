@@ -102,8 +102,6 @@ const employeeStatusVariants: Record<
   EMP_INACTIVE: 'neutral',
   EMP_RETIRED: 'neutral',
   EMP_VACATION: 'warning',
-  EMP_LOGIN: 'success',
-  EMP_LOGOUT: 'neutral',
 };
 
 const isAdminEmployeeStatusCode = (
@@ -406,11 +404,11 @@ export default function AdminEmployeesPage() {
 
   const summary = useMemo(() => {
     const total = pagination?.totalElements ?? employees.length;
-    const login = employees.filter(
-      (employee) => employee.empStatCd === 'EMP_LOGIN',
+    const active = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_ACTIVE',
     ).length;
-    const logout = employees.filter(
-      (employee) => employee.empStatCd === 'EMP_LOGOUT',
+    const inactive = employees.filter(
+      (employee) => employee.empStatCd === 'EMP_INACTIVE',
     ).length;
     const vacation = employees.filter(
       (employee) => employee.empStatCd === 'EMP_VACATION',
@@ -418,9 +416,9 @@ export default function AdminEmployeesPage() {
 
     return [
       { label: '전체 사원', value: total, caption: '조회된 구성원' },
-      { label: '출근', value: login, caption: '현재 근무 중' },
-      { label: '퇴근', value: logout, caption: '근무 종료' },
-      { label: '휴가', value: vacation, caption: '휴가 등록' },
+      { label: '정상 재직', value: active, caption: '활성 재직자' },
+      { label: '비활성', value: inactive, caption: '비활성 계정' },
+      { label: '휴가', value: vacation, caption: '휴가 상태' },
     ];
   }, [employees, pagination]);
 
