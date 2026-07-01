@@ -1,6 +1,7 @@
 import type { ScheduleResponseDto } from '../../types'
 import {
   scheduleTypeColorTokenMap,
+  isCalendarSystemEvent,
   type CalendarEventItem,
   type ScheduleTypeCode,
 } from '../../types/calendar'
@@ -13,7 +14,11 @@ const isScheduleTypeCode = (value?: string): value is ScheduleTypeCode => {
 export const toCalendarEvent = (
   schedule: ScheduleResponseDto,
 ): CalendarEventItem | null => {
-  if (!schedule.id || !schedule.title || !schedule.start) {
+  const isSystemEvent = isScheduleTypeCode(schedule.scheduleTypeCode)
+    ? isCalendarSystemEvent(schedule.scheduleTypeCode)
+    : false
+
+  if ((!schedule.id && !isSystemEvent) || !schedule.title || !schedule.start) {
     return null
   }
 
@@ -30,7 +35,9 @@ export const toCalendarEvent = (
   const colorToken = scheduleTypeColorTokenMap[scheduleTypeCode]
 
   return {
-    id: String(schedule.id),
+    id: isSystemEvent
+      ? `${scheduleTypeCode.toLowerCase()}-${schedule.start}-${schedule.title}`
+      : String(schedule.id),
     title: schedule.title,
     start: schedule.start,
     end: schedule.end,

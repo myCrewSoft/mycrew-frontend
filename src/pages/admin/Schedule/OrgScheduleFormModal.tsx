@@ -12,8 +12,8 @@ import { ApiError } from '../../../api/axiosInstance'
 
 const CLSF_OPTIONS = [
   { value: 'C001', label: '전사 일정' },
-  { value: 'C003', label: '부서 일정' },
-  { value: 'C004', label: '간부 일정' },
+  { value: 'C003', label: '간부 일정' },
+  { value: 'C004', label: '부서 일정' },
 ]
 
 const REPT_TYPE_OPTIONS = [
@@ -56,7 +56,7 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
   const [reptTypeCd, setReptTypeCd] = useState(editData?.reptTypeCd ?? '01')
   const [reptEndDt, setReptEndDt] = useState(toDateTimeLocal(editData?.reptEndDt))
   const [selectedDeptCd, setSelectedDeptCd] = useState(() => {
-    if (editData?.schdClsfCd !== 'C003') return ''
+    if (editData?.schdClsfCd !== 'C004') return ''
     return editData.targets?.find((target) => target.targetTypeCd === '04')?.targetId ?? ''
   })
 
@@ -82,6 +82,7 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
     if (schdClsfCd === 'C001') {
       return [{ targetTypeCd: '01', targetId: '0' }]
     }
+
     return []
   }
 
@@ -93,14 +94,14 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
       return
     }
 
-    if (schdClsfCd === 'C003' && !selectedDeptCd) {
+    if (schdClsfCd === 'C004' && !selectedDeptCd) {
       alert('부서를 선택해주세요.')
       return
     }
 
     const body: AdminSchdRequest = {
       schdClsfCd,
-      deptCd: schdClsfCd === 'C003' ? selectedDeptCd : '',
+      deptCd: schdClsfCd === 'C004' ? selectedDeptCd : '',
       schdNm,
       schdDetailCn: schdDetailCn || '',
       beginDt: toApiDateTime(beginDt),
@@ -281,7 +282,7 @@ export default function OrgScheduleFormModal({ editData, onClose, onSuccess }: P
             </div>
           )}
 
-          {schdClsfCd === 'C003' && (
+          {schdClsfCd === 'C004' && (
             <div>
               <label className="block text-xs font-bold mb-1 text-[#414753]">
                 부서 선택 *

@@ -38,7 +38,7 @@ interface OptionItem {
 
 const scheduleTypeOptions: OptionItem[] = [
   { value: 'C002', label: scheduleTypeLabelMap.C002 },
-  { value: 'C003', label: scheduleTypeLabelMap.C003 },
+  { value: 'C004', label: scheduleTypeLabelMap.C004 },
 ]
 
 const repeatTypeOptions: OptionItem[] = [
@@ -151,7 +151,7 @@ const getScheduleScopeNotice = (
     }
   }
 
-  if (scheduleTypeCode === 'C003') {
+  if (scheduleTypeCode === 'C004') {
     return {
       icon: <Building2 size={18} />,
       title: `${options.deptCd ?? '선택한 부서'} 일정`,

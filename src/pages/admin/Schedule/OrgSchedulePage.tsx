@@ -29,14 +29,14 @@ const ORG_CLSF_CODES = ['C001', 'C003', 'C004']
 
 const CLSF_COLOR_MAP: Record<string, { bg: string; border: string; text: string }> = {
   C001: { bg: '#E8EFFF', border: '#3377FF', text: '#0044CC' },
-  C003: { bg: '#E6F4EA', border: '#34A853', text: '#137333' },
-  C004: { bg: '#F3E8FF', border: '#A855F7', text: '#6B21A8' },
+  C003: { bg: '#F3E8FF', border: '#A855F7', text: '#6B21A8' },
+  C004: { bg: '#E6F4EA', border: '#34A853', text: '#137333' },
 }
 
 const CLSF_LABEL_MAP: Record<string, string> = {
   C001: '전사 일정',
-  C003: '부서 일정',
-  C004: '간부 일정',
+  C003: '간부 일정',
+  C004: '부서 일정',
 }
 
 type ViewMode = 'calendar' | 'list'
