@@ -63,8 +63,8 @@ const calendarFilterGroups: CalendarFilterGroup[] = [
         scheduleTypeCode: 'C001',
       },
       {
-        id: 'department',
-        label: '부서 일정',
+        id: 'executive',
+        label: '간부 일정',
         color: scheduleTypeColorMap.C003,
         scheduleTypeCode: 'C003',
       },
@@ -75,8 +75,8 @@ const calendarFilterGroups: CalendarFilterGroup[] = [
         scheduleTypeCode: 'C002',
       },
       {
-        id: 'executive',
-        label: '간부 일정',
+        id: 'department',
+        label: '부서 일정',
         color: scheduleTypeColorMap.C004,
         scheduleTypeCode: 'C004',
       },

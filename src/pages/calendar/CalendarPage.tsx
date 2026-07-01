@@ -34,6 +34,7 @@ import type {
   CalendarEventItem,
   CalendarSelectedRange,
 } from '../../types/calendar'
+import { isCalendarSystemEvent } from '../../types/calendar'
 import { toCalendarEvent } from './calendar.mapper'
 
 type CalendarView = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listMonth';
@@ -231,7 +232,7 @@ const CalendarPage = () => {
         }
       }
 
-      if (cancelled || !schedule) return
+      if (cancelled || !schedule || isCalendarSystemEvent(schedule.scheduleTypeCode)) return
 
       setSelectedDate(formatDateKey(new Date(schedule.start)))
       setSelectedSchedule(schedule)
@@ -414,7 +415,7 @@ const CalendarPage = () => {
       (event) => event.id === info.event.id,
     )
 
-    if (!schedule) return
+    if (!schedule || isCalendarSystemEvent(schedule.scheduleTypeCode)) return
 
     setSelectedDate(formatDateKey(info.event.start ?? new Date(schedule.start)))
     setSelectedSchedule(schedule)

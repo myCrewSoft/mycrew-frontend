@@ -53,12 +53,14 @@ interface TargetGroup {
 const scheduleTypeDisplayLabelMap: Record<ScheduleTypeCode, string> = {
   C001: '전사 일정',
   C002: '개인 일정',
-  C003: '부서 일정',
-  C004: '간부 일정',
+  C003: '간부 일정',
+  C004: '부서 일정',
   C005: '프로젝트 일정',
   C006: '업무 일정',
   C007: '화상회의',
   C008: '회의실 예약',
+  PUBLIC_HOLIDAY: '법정 공휴일',
+  ANNIVERSARY: '기념일',
 }
 
 const formatDate = (value?: string) => {
@@ -138,7 +140,7 @@ const getScheduleScopeInfo = (schedule: ScopeSchedule) => {
     }
   }
 
-  if (schedule.scheduleTypeCode === 'C003') {
+  if (schedule.scheduleTypeCode === 'C004') {
     const departmentName =
       schedule.deptName ??
       schedule.deptNm ??

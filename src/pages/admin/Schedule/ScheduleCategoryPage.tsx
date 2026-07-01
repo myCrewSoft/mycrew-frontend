@@ -4,28 +4,33 @@ import type { ScheduleTypeCode } from '../../../types/calendar'
 
 const CATEGORY_CODES: ScheduleTypeCode[] = [
   'C001', 'C002', 'C003', 'C004', 'C005', 'C006', 'C007', 'C008',
+  'PUBLIC_HOLIDAY', 'ANNIVERSARY',
 ]
 
 const GEN_TYPE_MAP: Record<ScheduleTypeCode, string> = {
   C001: 'Manual',
   C002: 'Manual',
-  C003: 'Auto',
+  C003: 'Manual',
   C004: 'Manual',
   C005: 'Auto',
   C006: 'Auto',
   C007: 'Auto',
   C008: 'Auto',
+  PUBLIC_HOLIDAY: 'API',
+  ANNIVERSARY: 'API',
 }
 
 const PRIVACY_MAP: Record<ScheduleTypeCode, string> = {
   C001: '전사 공개',
-  C002: '본인만',
-  C003: '부서 공개',
-  C004: '간부 공개',
+  C002: '본인 + 원하는 대상',
+  C003: '간부 공개',
+  C004: '부서 공개',
   C005: '프로젝트 참여자',
   C006: '프로젝트 참여자',
   C007: '회의 참여자',
   C008: '전사 공개',
+  PUBLIC_HOLIDAY: '전사 공개',
+  ANNIVERSARY: '전사 공개',
 }
 
 export default function ScheduleCategoryPage() {
@@ -122,9 +127,11 @@ export default function ScheduleCategoryPage() {
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              GEN_TYPE_MAP[cd] === 'Auto'
+                              GEN_TYPE_MAP[cd] === 'API'
                                 ? 'bg-[#E0F7FA] text-[#00838F]'
-                                : 'bg-[#f1f3f4] text-[#565e74]'
+                                : GEN_TYPE_MAP[cd] === 'Auto'
+                                  ? 'bg-[#EEF2FF] text-[#1D4ED8]'
+                                  : 'bg-[#F1F3F4] text-[#565E74]'
                             }`}
                           >
                             {GEN_TYPE_MAP[cd]}

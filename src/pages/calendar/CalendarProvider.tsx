@@ -7,7 +7,11 @@ const loadCheckedTypes = (fallback: ScheduleTypeCode[]): ScheduleTypeCode[] => {
     const stored = localStorage.getItem(STORAGE_KEY_CHECKED_TYPES)
     if (!stored) return fallback
     const parsed = JSON.parse(stored) as unknown
-    if (Array.isArray(parsed) && parsed.length > 0) return parsed as ScheduleTypeCode[]
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return Array.from(
+        new Set([...parsed, 'PUBLIC_HOLIDAY', 'ANNIVERSARY']),
+      ) as ScheduleTypeCode[]
+    }
   } catch {
     // ignore parse errors
   }
@@ -37,6 +41,8 @@ const defaultCheckedScheduleTypeCodes: ScheduleTypeCode[] = [
   'C006',
   'C007',
   'C008',
+  'PUBLIC_HOLIDAY',
+  'ANNIVERSARY',
 ]
 
 export const CalendarProvider = ({ children }: CalendarProviderProps) => {
@@ -104,6 +110,8 @@ export const CalendarProvider = ({ children }: CalendarProviderProps) => {
   const visibleCalendarEvents = useMemo(
     () =>
       calendarEvents.filter((event) =>
+        event.scheduleTypeCode === 'PUBLIC_HOLIDAY' ||
+        event.scheduleTypeCode === 'ANNIVERSARY' ||
         checkedScheduleTypeCodes.includes(event.scheduleTypeCode),
       ),
     [calendarEvents, checkedScheduleTypeCodes],

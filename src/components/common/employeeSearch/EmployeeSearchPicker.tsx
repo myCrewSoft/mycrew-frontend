@@ -141,6 +141,24 @@ const EmployeeSearchPicker = ({
   const remoteDeptCd =
     remoteSearch && selectedDepartment !== 'all' ? selectedDepartment : undefined
   const targetLabel = targetLabelProp ?? (variant === 'detailed' ? '참석자' : '참여자')
+  const stableFixedParams = useMemo<EmployeeLookupParams>(
+    () => ({
+      keyword: fixedParams?.keyword,
+      deptCd: fixedParams?.deptCd,
+      projId: fixedParams?.projId,
+      excludeProjId: fixedParams?.excludeProjId,
+      excludeEmpId: fixedParams?.excludeEmpId,
+      fixedDeptCd: fixedParams?.fixedDeptCd,
+    }),
+    [
+      fixedParams?.deptCd,
+      fixedParams?.excludeEmpId,
+      fixedParams?.excludeProjId,
+      fixedParams?.fixedDeptCd,
+      fixedParams?.keyword,
+      fixedParams?.projId,
+    ],
+  )
 
   const {
     data: remoteEmployees,
@@ -174,21 +192,23 @@ const EmployeeSearchPicker = ({
 
     const timer = window.setTimeout(() => {
       void lookupEmployees({
-        keyword: canSearchCurrentKeyword ? trimmedKeyword : undefined,
-        deptCd: remoteDeptCd,
-        ...fixedParams,
+        ...stableFixedParams,
+        keyword: canSearchCurrentKeyword
+          ? trimmedKeyword
+          : stableFixedParams.keyword,
+        deptCd: remoteDeptCd ?? stableFixedParams.deptCd,
       })
     }, 250)
 
     return () => window.clearTimeout(timer)
   }, [
     canSearchCurrentKeyword,
-    fixedParams,
     lookupEmployees,
     remoteDeptCd,
     remoteSearch,
     resetLookupEmployees,
     showAllOnEmpty,
+    stableFixedParams,
     trimmedKeyword,
   ])
 
