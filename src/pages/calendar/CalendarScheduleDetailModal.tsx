@@ -337,7 +337,7 @@ const CalendarScheduleDetailModal = ({
 
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose}>
-              취소
+              닫기
             </Button>
             <Button onClick={() => onEdit(detailSchedule)}>일정 수정</Button>
           </div>

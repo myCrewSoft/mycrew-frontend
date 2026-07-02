@@ -414,11 +414,11 @@ const MeetingPage = () => {
     })
     .sort(
       (a: MeetingListItem, b: MeetingListItem) =>
-        new Date(b.beginDt ?? '').getTime() - new Date(a.beginDt ?? '').getTime(),
+        new Date(a.beginDt ?? '').getTime() - new Date(b.beginDt ?? '').getTime(),
     )
 
   const groupedMeetings = groupMeetingsByDate(filteredMeetings)
-  const dateKeys = Object.keys(groupedMeetings).sort((a, b) => b.localeCompare(a))
+  const dateKeys = Object.keys(groupedMeetings).sort((a, b) => a.localeCompare(b))
 
   const calendarEvents = filteredMeetings.map((meeting) => ({
     id: String(meeting.mtngId),
@@ -1076,13 +1076,23 @@ const MeetingPage = () => {
                               </div>
                             </div>
                             <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                              {isLive && meeting.vconfId !== null ? (
+                                <Button
+                                  variant="primary"
+                                  leftIcon={<Video size={16} />}
+                                  className="w-full lg:w-32"
+                                  onClick={() => void handleJoinMeeting(meeting)}
+                                >
+                                  회의 입장
+                                </Button>
+                              ) : null}
                               <Button
-                                variant={isLive && meeting.vconfId !== null ? 'primary' : 'outline'}
-                                leftIcon={isLive && meeting.vconfId !== null ? <Video size={16} /> : <FileText size={16} />}
+                                variant="outline"
+                                leftIcon={<FileText size={16} />}
                                 className="w-full lg:w-32"
-                                onClick={() => handlePrimaryMeetingAction(meeting)}
+                                onClick={() => void openMeetingDetail(meeting.mtngId)}
                               >
-                                {isLive && meeting.vconfId !== null ? '회의 입장' : '상세 보기'}
+                                상세 보기
                               </Button>
                               {isLive && meeting.vconfId !== null && meeting.canEnd && (
                                 <Button

@@ -54,9 +54,22 @@ const ProjectTaskDetailModal = ({
   const employeeList = Array.isArray(resolvedDetail?.employeeList)
     ? resolvedDetail.employeeList
     : []
+  const managerEmployee = employeeList.find(
+    (employee) =>
+      String(employee.empId) === String(visibleTask.taskMngrId) ||
+      employee.empNm.trim() === visibleTask.taskMngrNm.trim(),
+  )
   const managerPosition =
-    resolvedDetail?.jobPstnNm || resolvedDetail?.jobGrdNm || '직급 정보 없음'
-  const managerDepartment = resolvedDetail?.deptNm || '부서 정보 없음'
+    resolvedDetail?.jobPstnNm ||
+    resolvedDetail?.jobGrdNm ||
+    managerEmployee?.jobPstnNm ||
+    managerEmployee?.jobGrdNm ||
+    '직급 정보 없음'
+  const managerDepartment =
+    resolvedDetail?.deptNm || managerEmployee?.deptNm || '부서 정보 없음'
+  const managerName = managerEmployee?.empNm || visibleTask.taskMngrNm
+  const managerProfileFileId =
+    visibleTask.prflImgFileId ?? managerEmployee?.prflImgFileId
   const progress = Math.min(Math.max(visibleTask.taskPrgrsSmry, 0), 100)
 
   return (
@@ -133,13 +146,13 @@ const ProjectTaskDetailModal = ({
             </div>
             <div className="flex items-center gap-3">
               <ProfileAvatar
-                fileId={visibleTask.prflImgFileId}
-                name={visibleTask.taskMngrNm}
+                fileId={managerProfileFileId}
+                name={managerName}
                 size={44}
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-black text-slate-900">
-                  {visibleTask.taskMngrNm}
+                  {managerName}
                 </p>
                 <p className="mt-1 truncate text-xs text-slate-500">
                   {managerDepartment} · {managerPosition}
@@ -182,11 +195,12 @@ const ProjectTaskDetailModal = ({
                       <p className="truncate text-sm font-black text-slate-900">
                         {employee.empNm}
                       </p>
-                      {employee.empId === visibleTask.taskMngrId && (
+                      {employee.empId === visibleTask.taskMngrId ||
+                      employee.empNm.trim() === visibleTask.taskMngrNm.trim() ? (
                         <span className="shrink-0 rounded-md bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
                           담당자
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-xs text-slate-500">
                       {employee.deptNm || '부서 정보 없음'} ·{' '}

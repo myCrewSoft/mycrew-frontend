@@ -5,11 +5,20 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  ArrowUpRight,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Plus,
+  Video,
+} from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
 import Modal from '../../components/common/overlay/modal/Modal'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import PageComponent from '../../components/layouts/PageComponent'
 import { meetingRoomReservationApi } from '../../api/ReservationApi'
 import { useApi } from '../../hooks/useApi'
@@ -93,6 +102,7 @@ const formatReservationDateTime = (dateTime: string) => {
 }
 
 const ReservationPage = () => {
+  const navigate = useNavigate()
   const {
     selectedDate,
     setSelectedDate,
@@ -106,10 +116,6 @@ const ReservationPage = () => {
   const [selectedReservation, setSelectedReservation] =
     useState<ReservationResponse | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [handledDateParam, setHandledDateParam] = useState<string | null>(null)
-  const [handledReservationParam, setHandledReservationParam] = useState<
-    string | null
-  >(null)
 
   const [formValues, setFormValues] = useState<ReservationCreateRequest>({
     roomId: 0,
@@ -169,29 +175,28 @@ const ReservationPage = () => {
     void refreshReservations()
   }, [refreshReservations])
 
-  // 캘린더 등 다른 화면에서 ?reservationId=&date= 로 들어오면 해당 날짜로 이동하고 예약 상세를 자동으로 엽니다.
-  // useEffect 대신 렌더 중 setState 패턴으로 처리해 cascading render를 방지합니다.
   const dateParam = searchParams.get('date')
-  if (dateParam && dateParam !== handledDateParam) {
-    setHandledDateParam(dateParam)
-    setSelectedDate(dateParam)
-  }
-
   const reservationIdParam = searchParams.get('reservationId')
-  if (
-    reservationIdParam &&
-    reservationIdParam !== handledReservationParam &&
-    reservations
-  ) {
-    const matchedReservation = reservations.find(
-      (reservation) => String(reservation.reservationId) === reservationIdParam,
-    )
 
-    if (matchedReservation) {
-      setHandledReservationParam(reservationIdParam)
-      setSelectedReservation(matchedReservation)
+  // 캘린더나 사이드바에서 전달한 날짜로 이동합니다.
+  useEffect(() => {
+    if (dateParam && dateParam !== selectedDate) {
+      setSelectedDate(dateParam)
     }
-  }
+  }, [dateParam, selectedDate, setSelectedDate])
+
+  // 해당 날짜의 예약 목록을 불러오면 URL의 예약을 상세 대상으로 사용합니다.
+  const reservationFromQuery = useMemo(
+    () =>
+      reservationIdParam
+        ? (reservations ?? []).find(
+            (reservation) =>
+              String(reservation.reservationId) === reservationIdParam,
+          ) ?? null
+        : null,
+    [reservationIdParam, reservations],
+  )
+  const detailReservation = reservationFromQuery ?? selectedReservation
 
   const openCreateModal = (roomId?: number, startDateTime?: string) => {
     const resolvedStartDateTime = startDateTime || `${selectedDate}T09:00:00`
@@ -254,8 +259,8 @@ const ReservationPage = () => {
     await refreshReservations()
   }
 
-  const selectedReservationRoom = selectedReservation
-    ? rooms.find((room) => room.roomId === selectedReservation.roomId)
+  const selectedReservationRoom = detailReservation
+    ? rooms.find((room) => room.roomId === detailReservation.roomId)
     : null
 
   return (
@@ -366,7 +371,7 @@ const ReservationPage = () => {
                           {room.roomName}
                         </p>
                         <p className="text-xs font-semibold text-slate-500">
-                          {room.floor}층{room.ho ? ` · ${room.ho}` : ''}
+                          {room.floor}층{room.ho ? ` · ${room.ho}` : ''}호
                         </p>
                       </div>
 
@@ -425,8 +430,8 @@ const ReservationPage = () => {
       />
 
       <Modal
-        open={selectedReservation !== null}
-        title={selectedReservation?.title || '회의실 예약'}
+        open={detailReservation !== null}
+        title={detailReservation?.title || '회의실 예약'}
         description="예약된 회의실 정보를 확인합니다."
         onClose={closeReservationDetailModal}
         footer={
@@ -435,51 +440,73 @@ const ReservationPage = () => {
           </Button>
         }
       >
-        {selectedReservation && (
-          <dl className="grid gap-4 text-sm">
-            <div>
-              <dt className="font-bold text-slate-500">회의실</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {selectedReservationRoom
-                  ? `${selectedReservationRoom.floor}층 ${selectedReservationRoom.roomName}${
-                      selectedReservationRoom.ho ? ` · ${selectedReservationRoom.ho}` : ''
-                    }`
-                  : `회의실 ID ${selectedReservation.roomId}`}
-              </dd>
+        {detailReservation && (
+          <div className="flex flex-col gap-3 text-sm">
+            <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                <MapPin size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase text-slate-400">회의실</p>
+                <p className="mt-0.5 truncate font-bold text-slate-900">
+                  {selectedReservationRoom
+                    ? `${selectedReservationRoom.floor}층 ${selectedReservationRoom.roomName}${
+                        selectedReservationRoom.ho ? ` · ${selectedReservationRoom.ho}` : ''
+                      }`
+                    : `회의실 ID ${detailReservation.roomId}`}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <dt className="font-bold text-slate-500">예약자</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {selectedReservation.reserverName}
-              </dd>
+            <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+              <ProfileAvatar
+                fileId={detailReservation.rsrvEmpPrflImgFileId}
+                name={detailReservation.reserverName}
+                size={40}
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase text-slate-400">예약자</p>
+                <p className="mt-0.5 truncate font-bold text-slate-900">
+                  {detailReservation.reserverName}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <dt className="font-bold text-slate-500">예약 시간</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {formatReservationDateTime(selectedReservation.startDateTime)}
-                {' - '}
-                {formatReservationDateTime(selectedReservation.endDateTime)}
-              </dd>
+            <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                <CalendarClock size={18} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase text-slate-400">예약 시간</p>
+                <p className="mt-0.5 font-bold text-slate-900">
+                  {detailReservation.allDayYn === 'Y'
+                    ? '종일'
+                    : `${formatReservationDateTime(detailReservation.startDateTime)} - ${formatReservationDateTime(detailReservation.endDateTime)}`}
+                </p>
+              </div>
             </div>
 
-            <div>
-              <dt className="font-bold text-slate-500">예약 유형</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {selectedReservation.allDayYn === 'Y' ? '종일 예약' : '시간 예약'}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="font-bold text-slate-500">연결된 회의</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {selectedReservation.mtngId
-                  ? `회의 ID ${selectedReservation.mtngId}`
-                  : '없음'}
-              </dd>
-            </div>
-          </dl>
+            {detailReservation.mtngId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const mtngId = detailReservation.mtngId
+                  closeReservationDetailModal()
+                  navigate(`/meeting/list?detailMeetingId=${mtngId}`)
+                }}
+                className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-left transition-opacity hover:opacity-80"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+                  <Video size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold uppercase text-blue-400">연결된 회의</p>
+                  <p className="mt-0.5 font-bold text-blue-700">회의 상세 보기</p>
+                </div>
+                <ArrowUpRight size={18} className="shrink-0 text-blue-600" />
+              </button>
+            ) : null}
+          </div>
         )}
       </Modal>
     </PageComponent>
