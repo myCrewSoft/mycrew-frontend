@@ -1,20 +1,27 @@
 import { useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
+  ArrowUpRight,
   Building2,
   ClipboardList,
   Clock,
+  Crown,
+  DoorOpen,
   FileText,
   FolderKanban,
   Globe2,
   Trash2,
   Users,
+  Video,
 } from 'lucide-react'
 import { ApiError } from '../../api/axiosInstance'
 import { scheduleApi } from '../../api/scheduleApi'
 import Button from '../../components/common/button/Button'
 import Modal from '../../components/common/overlay/modal/Modal'
+import ProfileAvatar from '../../components/common/avatar/ProfileAvatar'
 import { useToast } from '../../components/common/toast/useToast'
 import { useApi } from '../../hooks/useApi'
+import { formatDateKey } from '../../utils/date'
 import type { ScheduleResponseDto } from '../../types'
 import type { CalendarEventItem, ScheduleTypeCode } from '../../types/calendar'
 import { useCalendar } from './CalendarContext'
@@ -36,20 +43,6 @@ type ScheduleTargetDisplayItem = NonNullable<
   profileImgUrl?: string
 }
 
-type ScopeSchedule = CalendarEventItem & {
-  deptName?: string
-  deptNm?: string
-  departmentName?: string
-  projectName?: string
-  projName?: string
-  taskName?: string
-}
-
-interface TargetGroup {
-  departmentName: string
-  members: ScheduleTargetDisplayItem[]
-}
-
 const scheduleTypeDisplayLabelMap: Record<ScheduleTypeCode, string> = {
   C001: '전사 일정',
   C002: '개인 일정',
@@ -57,7 +50,7 @@ const scheduleTypeDisplayLabelMap: Record<ScheduleTypeCode, string> = {
   C004: '부서 일정',
   C005: '프로젝트 일정',
   C006: '업무 일정',
-  C007: '화상회의',
+  C007: '회의',
   C008: '회의실 예약',
   PUBLIC_HOLIDAY: '법정 공휴일',
   ANNIVERSARY: '기념일',
@@ -78,10 +71,9 @@ const formatDate = (value?: string) => {
   }).format(date)
 }
 
-const hasUsableProfileImageUrl = (profileImageUrl?: string) => {
-  if (!profileImageUrl) return false
-  const normalizedUrl = profileImageUrl.trim().toLowerCase()
-  return normalizedUrl !== 'null' && normalizedUrl !== 'undefined'
+const getTargetProfileFileId = (target: ScheduleTargetDisplayItem) => {
+  const fileId = target.profileImgUrl?.match(/\/images\/(\d+)/)?.[1]
+  return fileId ? Number(fileId) : null
 }
 
 const formatDateTime = (value?: string) => {
@@ -111,25 +103,20 @@ const getTargetDepartmentName = (target: ScheduleTargetDisplayItem) =>
 const getTargetPositionName = (target: ScheduleTargetDisplayItem) =>
   target.jobGrdNm
 
-const groupTargetsByDepartment = (
-  targets: ScheduleTargetDisplayItem[],
-): TargetGroup[] => {
-  const groupMap = new Map<string, ScheduleTargetDisplayItem[]>()
+const isSelfTarget = (target: ScheduleTargetDisplayItem, writerId?: number) =>
+  writerId != null && String(writerId) === String(target.targetId)
 
-  targets.forEach((target) => {
-    const departmentName = getTargetDepartmentName(target)
-    const currentMembers = groupMap.get(departmentName) ?? []
+const getScheduleScopeInfo = (schedule: CalendarEventItem) => {
+  if (schedule.scheduleTypeCode === 'C003') {
+    return {
+      icon: <Crown size={18} />,
+      title: '간부 일정',
+      description: '간부 구성원에게 공유되는 일정입니다.',
+      className: 'border-purple-100 bg-purple-50 text-purple-700',
+      titleClassName: 'text-purple-950',
+    }
+  }
 
-    groupMap.set(departmentName, [...currentMembers, target])
-  })
-
-  return Array.from(groupMap.entries()).map(([departmentName, members]) => ({
-    departmentName,
-    members,
-  }))
-}
-
-const getScheduleScopeInfo = (schedule: ScopeSchedule) => {
   if (schedule.scheduleTypeCode === 'C001') {
     return {
       icon: <Globe2 size={18} />,
@@ -141,31 +128,21 @@ const getScheduleScopeInfo = (schedule: ScopeSchedule) => {
   }
 
   if (schedule.scheduleTypeCode === 'C004') {
-    const departmentName =
-      schedule.deptName ??
-      schedule.deptNm ??
-      schedule.departmentName ??
-      schedule.deptCd ??
-      '선택한 부서'
+    const departmentName = schedule.deptNm ?? schedule.deptCd ?? '선택한 부서'
 
     return {
       icon: <Building2 size={18} />,
       title: `${departmentName} 일정`,
-      description: '해당 부서 구성원에게 공유되는 일정입니다.',
+      description: `${departmentName} 구성원에게 공유되는 일정입니다.`,
       className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
       titleClassName: 'text-emerald-950',
     }
   }
 
   if (schedule.scheduleTypeCode === 'C005') {
-    const projectName =
-      schedule.projectName ??
-      schedule.projName ??
-      (schedule.projId ? `프로젝트 #${schedule.projId}` : '선택한 프로젝트')
-
     return {
       icon: <FolderKanban size={18} />,
-      title: `${projectName} 일정`,
+      title: '프로젝트 일정',
       description: '해당 프로젝트 참여자에게 공유되는 일정입니다.',
       className: 'border-cyan-100 bg-cyan-50 text-cyan-700',
       titleClassName: 'text-cyan-950',
@@ -173,16 +150,60 @@ const getScheduleScopeInfo = (schedule: ScopeSchedule) => {
   }
 
   if (schedule.scheduleTypeCode === 'C006') {
-    const taskName =
-      schedule.taskName ??
-      (schedule.taskId ? `업무 #${schedule.taskId}` : '선택한 업무')
-
     return {
       icon: <ClipboardList size={18} />,
-      title: `${taskName} 일정`,
+      title: '업무 일정',
       description: '해당 업무 담당자와 관련 구성원에게 공유되는 일정입니다.',
       className: 'border-slate-200 bg-slate-50 text-slate-600',
       titleClassName: 'text-slate-950',
+    }
+  }
+
+  if (schedule.scheduleTypeCode === 'C007') {
+    return {
+      icon: <Video size={18} />,
+      title: '회의 일정',
+      description: '해당 회의 구성원에게 공유되는 일정입니다.',
+      className: 'border-rose-100 bg-rose-50 text-rose-700',
+      titleClassName: 'text-rose-950',
+    }
+  }
+
+  if (schedule.scheduleTypeCode === 'C008') {
+    return {
+      icon: <DoorOpen size={18} />,
+      title: '회의실 예약 일정',
+      description: '해당 회의실 예약 구성원에게 공유되는 일정입니다.',
+      className: 'border-teal-100 bg-teal-50 text-teal-700',
+      titleClassName: 'text-teal-950',
+    }
+  }
+
+  return null
+}
+
+const getScheduleNavigationTarget = (schedule: CalendarEventItem) => {
+  if (schedule.scheduleTypeCode === 'C005' && schedule.projId) {
+    return { label: '프로젝트로 이동', path: `/project/${schedule.projId}` }
+  }
+
+  if (schedule.scheduleTypeCode === 'C006' && schedule.projId && schedule.taskId) {
+    return {
+      label: '업무로 이동',
+      path: `/project/${schedule.projId}?tab=tasks&taskId=${schedule.taskId}`,
+    }
+  }
+
+  if (schedule.scheduleTypeCode === 'C007' && schedule.mtngId) {
+    return { label: '회의록으로 이동', path: `/meeting/minutes/${schedule.mtngId}` }
+  }
+
+  if (schedule.scheduleTypeCode === 'C008' && schedule.rsrvId) {
+    const dateKey = formatDateKey(new Date(schedule.start))
+
+    return {
+      label: '예약 확인하기',
+      path: `/reservations?reservationId=${schedule.rsrvId}&date=${dateKey}`,
     }
   }
 
@@ -195,6 +216,7 @@ const CalendarScheduleDetailModal = ({
   onClose,
   onEdit,
 }: CalendarScheduleDetailModalProps) => {
+  const navigate = useNavigate()
   const { refreshSchedules } = useCalendar()
   const { showToast } = useToast()
   const {
@@ -240,13 +262,20 @@ const CalendarScheduleDetailModal = ({
     scheduleTypeDisplayLabelMap[detailSchedule.scheduleTypeCode]
   const targetItems =
     (detailSchedule.targets as ScheduleTargetDisplayItem[] | undefined) ?? []
-  const scheduleScopeInfo = getScheduleScopeInfo(detailSchedule as ScopeSchedule)
-  const departmentTargets = targetItems.filter(
-    (target) => target.targetTypeCd === '02',
-  )
-  const personalTargetGroups = groupTargetsByDepartment(
-    targetItems.filter((target) => target.targetTypeCd !== '02'),
-  )
+  const scheduleScopeInfo = getScheduleScopeInfo(detailSchedule)
+  const isPersonalScheduleType = detailSchedule.scheduleTypeCode === 'C002'
+  const visibleAttendees = isPersonalScheduleType
+    ? targetItems.filter(
+        (target) => !isSelfTarget(target, detailSchedule.writerId),
+      )
+    : targetItems
+  const navigationTarget = getScheduleNavigationTarget(detailSchedule)
+  const writerSubtitle = [
+    detailSchedule.writerJobGrdNm,
+    detailSchedule.writerDeptNm,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   const modalTitle = (
     <span className="flex items-start gap-3">
       <span
@@ -328,30 +357,59 @@ const CalendarScheduleDetailModal = ({
           </div>
         )}
 
-        <div className="flex gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-            <Clock size={18} />
-          </span>
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400">TIME</p>
-            {detailSchedule.allDay ? (
-              <>
-                <p className="mt-1 text-sm font-bold text-slate-800">
-                  {formatDate(detailSchedule.start)}
-                </p>
-                <p className="mt-0.5 text-sm text-slate-500">종일</p>
-              </>
-            ) : (
-              <div className="mt-1 grid gap-1 text-sm">
-                <p className="font-bold text-slate-800">
-                  시작: {formatDateTime(detailSchedule.start)}
-                </p>
-                <p className="font-bold text-slate-800">
-                  종료: {formatDateTime(detailSchedule.end)}
-                </p>
-              </div>
-            )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div
+            className={`flex gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3 ${
+              detailSchedule.writerName ? '' : 'sm:col-span-2'
+            }`}
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <Clock size={18} />
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400">TIME</p>
+              {detailSchedule.allDay ? (
+                <>
+                  <p className="mt-1 text-sm font-bold text-slate-800">
+                    {formatDate(detailSchedule.start)}
+                  </p>
+                  <p className="mt-0.5 text-sm text-slate-500">종일</p>
+                </>
+              ) : (
+                <div className="mt-1 grid gap-1 text-sm">
+                  <p className="font-bold text-slate-800">
+                    시작: {formatDateTime(detailSchedule.start)}
+                  </p>
+                  <p className="font-bold text-slate-800">
+                    종료: {formatDateTime(detailSchedule.end)}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
+
+          {detailSchedule.writerName && (
+            <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+              <ProfileAvatar
+                fileId={detailSchedule.writerPrflImgFileId}
+                name={detailSchedule.writerName}
+                size={40}
+              />
+              <span className="min-w-0">
+                <span className="block text-xs font-bold uppercase text-slate-400">
+                  작성자
+                </span>
+                <span className="block truncate text-sm font-bold text-slate-800">
+                  {detailSchedule.writerName}
+                </span>
+                {writerSubtitle && (
+                  <span className="block truncate text-xs font-medium text-slate-400">
+                    {writerSubtitle}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>
@@ -372,13 +430,37 @@ const CalendarScheduleDetailModal = ({
 
           {scheduleScopeInfo ? (
             <div
-              className={`rounded-2xl border px-4 py-4 ${scheduleScopeInfo.className}`}
+              role={navigationTarget ? 'button' : undefined}
+              tabIndex={navigationTarget ? 0 : undefined}
+              onClick={
+                navigationTarget
+                  ? () => {
+                      navigate(navigationTarget.path)
+                      onClose()
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                navigationTarget
+                  ? (event) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return
+                      event.preventDefault()
+                      navigate(navigationTarget.path)
+                      onClose()
+                    }
+                  : undefined
+              }
+              className={`rounded-2xl border px-4 py-4 ${scheduleScopeInfo.className} ${
+                navigationTarget
+                  ? 'cursor-pointer transition-opacity hover:opacity-80'
+                  : ''
+              }`}
             >
               <div className="flex items-start gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
                   {scheduleScopeInfo.icon}
                 </span>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p
                     className={`text-sm font-extrabold ${scheduleScopeInfo.titleClassName}`}
                   >
@@ -388,83 +470,38 @@ const CalendarScheduleDetailModal = ({
                     {scheduleScopeInfo.description}
                   </p>
                 </div>
+                {navigationTarget && (
+                  <ArrowUpRight size={18} className="mt-1 shrink-0" />
+                )}
               </div>
             </div>
-          ) : targetItems.length > 0 ? (
-            <div className="flex flex-col gap-4">
-              {departmentTargets.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-extrabold text-slate-800">
-                    <Building2 size={16} className="text-blue-700" />
-                    부서 공유
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {departmentTargets.map((target) => (
-                      <span
-                        key={`${target.targetTypeCd}-${target.targetId}`}
-                        className="rounded-full border border-blue-100 bg-white px-3 py-1.5 text-sm font-bold text-blue-700"
-                      >
+          ) : isPersonalScheduleType && visibleAttendees.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {visibleAttendees.map((target) => {
+                const positionName = getTargetPositionName(target)
+                const departmentName = getTargetDepartmentName(target)
+
+                return (
+                  <div
+                    key={`${target.targetTypeCd}-${target.targetId}`}
+                    className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
+                  >
+                    <ProfileAvatar
+                      fileId={getTargetProfileFileId(target)}
+                      name={getTargetName(target)}
+                      size={40}
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-slate-800">
                         {getTargetName(target)}
                       </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {personalTargetGroups.map((group) => (
-                <div
-                  key={group.departmentName}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-4"
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Building2 size={16} className="shrink-0 text-slate-400" />
-                      <p className="truncate text-sm font-extrabold text-slate-800">
-                        {group.departmentName}
-                      </p>
-                    </div>
-                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
-                      {group.members.length}명
+                      <span className="mt-0.5 block truncate text-xs font-medium text-slate-400">
+                        {[positionName, departmentName].filter(Boolean).join(' · ')}
+                      </span>
                     </span>
                   </div>
-
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {group.members.map((target) => {
-                      const positionName = getTargetPositionName(target)
-
-                      return (
-                        <div
-                          key={`${target.targetTypeCd}-${target.targetId}`}
-                          className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2"
-                        >
-                          <img
-                            src={
-                              hasUsableProfileImageUrl(target.profileImgUrl)
-                                ? target.profileImgUrl
-                                : '/avatar-default.svg'
-                            }
-                            alt=""
-                            className="h-8 w-8 shrink-0 rounded-full object-cover"
-                            onError={(event) => {
-                              event.currentTarget.src = '/avatar-default.svg'
-                            }}
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-bold text-slate-800">
-                              {getTargetName(target)}
-                            </span>
-                            {positionName && (
-                              <span className="mt-0.5 block truncate text-xs font-medium text-slate-400">
-                                {positionName}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="rounded-xl border border-dashed border-slate-200 px-4 py-3 text-sm font-medium text-slate-500">

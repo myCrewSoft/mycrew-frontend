@@ -91,6 +91,13 @@ type DashboardNotificationTarget = NotificationWidgetItem & {
   parentTargetId?: number | null
 }
 
+type TaskWidgetItem = DashboardWidgetResponseMap['task']['tasks'][number]
+
+// TaskItem DTO에 projId 가 아직 없어 옵셔널로 열어두고, 내려오면 바로 사용한다.
+type DashboardTaskTarget = TaskWidgetItem & {
+  projId?: number | null
+}
+
 const statusLabel: Record<string, string> = {
   beforeWork: '출근 전',
   working: '근무 중',
@@ -331,6 +338,14 @@ const getBoardPostPath = (boardType: DashboardBoardType, postId: number) => {
   if (boardType === 'DEPT') return `/boards/departments/${postId}`
   if (boardType === 'PROJ') return '/project'
   return `/boards/notices/${postId}`
+}
+
+const getTaskPath = (task: DashboardTaskTarget) => {
+  if (Number.isInteger(task.projId) && Number(task.projId) > 0) {
+    return `/project/${task.projId}?tab=tasks&taskId=${task.id}`
+  }
+
+  return '/project'
 }
 
 const getNotificationPath = (notification: DashboardNotificationTarget) => {
@@ -965,7 +980,7 @@ const renderWidgetBody = (
                   meta={joinMeta([range, target])}
                   badge="오늘"
                   badgeTone="blue"
-                  onClick={() => navigate('/calendar')}
+                  onClick={() => navigate(`/calendar?scheduleId=${schedule.id}`)}
                 />
               )
             })}
@@ -1049,7 +1064,7 @@ const renderWidgetBody = (
                 badge={status.label}
                 badgeTone={badgeTone}
                 leading="checkbox"
-                onClick={() => navigate('/project')}
+                onClick={() => navigate(getTaskPath(task))}
               />
             )
           })}

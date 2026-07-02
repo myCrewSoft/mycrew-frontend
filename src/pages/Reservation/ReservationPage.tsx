@@ -5,6 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import Button from '../../components/common/button/Button'
 import IconButton from '../../components/common/button/IconButton'
@@ -104,6 +105,11 @@ const ReservationPage = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] =
     useState<ReservationResponse | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [handledDateParam, setHandledDateParam] = useState<string | null>(null)
+  const [handledReservationParam, setHandledReservationParam] = useState<
+    string | null
+  >(null)
 
   const [formValues, setFormValues] = useState<ReservationCreateRequest>({
     roomId: 0,
@@ -163,6 +169,30 @@ const ReservationPage = () => {
     void refreshReservations()
   }, [refreshReservations])
 
+  // 캘린더 등 다른 화면에서 ?reservationId=&date= 로 들어오면 해당 날짜로 이동하고 예약 상세를 자동으로 엽니다.
+  // useEffect 대신 렌더 중 setState 패턴으로 처리해 cascading render를 방지합니다.
+  const dateParam = searchParams.get('date')
+  if (dateParam && dateParam !== handledDateParam) {
+    setHandledDateParam(dateParam)
+    setSelectedDate(dateParam)
+  }
+
+  const reservationIdParam = searchParams.get('reservationId')
+  if (
+    reservationIdParam &&
+    reservationIdParam !== handledReservationParam &&
+    reservations
+  ) {
+    const matchedReservation = reservations.find(
+      (reservation) => String(reservation.reservationId) === reservationIdParam,
+    )
+
+    if (matchedReservation) {
+      setHandledReservationParam(reservationIdParam)
+      setSelectedReservation(matchedReservation)
+    }
+  }
+
   const openCreateModal = (roomId?: number, startDateTime?: string) => {
     const resolvedStartDateTime = startDateTime || `${selectedDate}T09:00:00`
 
@@ -200,6 +230,21 @@ const ReservationPage = () => {
     date.setDate(date.getDate() + 1)
 
     setSelectedDate(formatDateKey(date))
+  }
+
+  const closeReservationDetailModal = () => {
+    setSelectedReservation(null)
+
+    if (searchParams.has('reservationId') || searchParams.has('date')) {
+      setSearchParams(
+        (params) => {
+          params.delete('reservationId')
+          params.delete('date')
+          return params
+        },
+        { replace: true },
+      )
+    }
   }
 
   const handleCreateReservation = async (values: ReservationCreateRequest) => {
@@ -383,9 +428,9 @@ const ReservationPage = () => {
         open={selectedReservation !== null}
         title={selectedReservation?.title || '회의실 예약'}
         description="예약된 회의실 정보를 확인합니다."
-        onClose={() => setSelectedReservation(null)}
+        onClose={closeReservationDetailModal}
         footer={
-          <Button onClick={() => setSelectedReservation(null)}>
+          <Button onClick={closeReservationDetailModal}>
             확인
           </Button>
         }

@@ -17,6 +17,7 @@ import type FullCalendarComponent from '@fullcalendar/react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
+import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown,
   ChevronLeft,
@@ -121,6 +122,8 @@ const calendarFilterGroups: CalendarFilterGroup[] = [
 ]
 
 const CalendarSubSidebarContent = () => {
+  const navigate = useNavigate();
+
   // CalendarContext에서 큰 캘린더와 공유하는 상태를 가져옵니다.
   const {
     upcomingSchedules,
@@ -257,7 +260,9 @@ const CalendarSubSidebarContent = () => {
               {upcomingSchedules.map((schedule) => (
                 <div
                   key={schedule.id}
-                  className="calendar-upcoming-item flex min-w-0 items-center gap-2"
+                  className="calendar-upcoming-item flex min-w-0 cursor-pointer items-center gap-2"
+                  role="button"
+                  tabIndex={0}
                   data-tooltip={
                     activeTooltipScheduleId === schedule.id
                       ? schedule.title
@@ -274,6 +279,12 @@ const CalendarSubSidebarContent = () => {
                     )
                   }}
                   onMouseLeave={() => setActiveTooltipScheduleId(null)}
+                  onClick={() => navigate(`/calendar?scheduleId=${schedule.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    navigate(`/calendar?scheduleId=${schedule.id}`)
+                  }}
                 >
                   <span
                     className="h-7 w-1 shrink-0 rounded-full"

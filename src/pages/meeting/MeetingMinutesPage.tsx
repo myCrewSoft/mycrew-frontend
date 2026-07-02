@@ -145,7 +145,7 @@ const getMomStatusLabel = (code?: string | null) => {
     '04': '확정',
   }
 
-  return code ? (labels[code] ?? '생성 중') : '생성 중'
+  return code ? (labels[code] ?? '생성 중') : '생성 전'
 }
 
 const isApprovalStarted = (code?: string | null) =>
