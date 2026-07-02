@@ -2,10 +2,11 @@ import { ArrowLeft, Edit3, LogOut, Save, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import EmployeeSearchPicker from '../../../common/employeeSearch/EmployeeSearchPicker'
 import type { EmployeeSearchItem } from '../../../common/employeeSearch/EmployeeSearchPicker'
+import ProfileAvatar from '../../../common/avatar/ProfileAvatar'
 import ChatRoomImagePicker from './ChatRoomImagePicker'
 import type { ChatParticipant, ChatRoom } from './messenger.types'
 import {
-  getDirectRoomMeta,
+  getRoomDisplayName,
   getProfileImageUrlByFileId,
   isDirectChatRoom,
   isWorkChatRoom,
@@ -33,16 +34,13 @@ const getParticipantId = (participant: ChatParticipant) => participant.empId
 const getParticipantName = (participant: ChatParticipant) => participant.empNm
 
 const getParticipantPosition = (participant: ChatParticipant) =>
-  participant.jobPstnNm || '-'
+  participant.jobGrdNm || '-'
 
 const getParticipantDepartment = (participant: ChatParticipant) =>
   participant.deptNm || '-'
 
 const getParticipantProfileImageUrl = (participant: ChatParticipant) =>
   getProfileImageUrlByFileId(participant.prflImgFileId)
-
-const getParticipantInitial = (participant: ChatParticipant) =>
-  getParticipantName(participant).trim().charAt(0) || '?'
 
 const toEmployeeSearchItem = (
   participant: ChatParticipant,
@@ -77,7 +75,7 @@ const MessengerRoomInfoPanel = ({
 
   // 부모에서 key={room.id}를 사용하므로 방이 바뀌면 컴포넌트가 remount되어 초기값이 자동으로 갱신됩니다.
   const [editMode, setEditMode] = useState(false)
-  const [roomName, setRoomName] = useState(room.name)
+  const [roomName, setRoomName] = useState(() => getRoomDisplayName(room))
   const [roomDescription, setRoomDescription] = useState(room.description)
   const [roomImageFile, setRoomImageFile] = useState<File | null>(null)
   const [removeRoomImage, setRemoveRoomImage] = useState(false)
@@ -85,7 +83,7 @@ const MessengerRoomInfoPanel = ({
 
   const handleCancelEdit = () => {
     setEditMode(false)
-    setRoomName(room.name)
+    setRoomName(getRoomDisplayName(room))
     setRoomDescription(room.description)
     setRoomImageFile(null)
     setRemoveRoomImage(false)
@@ -137,7 +135,7 @@ const MessengerRoomInfoPanel = ({
 
           <div className="min-w-0">
             <h3 className="truncate text-sm font-bold text-slate-900">
-              {room.name}
+              {getRoomDisplayName(room)}
             </h3>
             <p className="truncate text-[11px] text-slate-400">
               {editMode ? '채팅방 정보 수정' : '채팅방 정보'}
@@ -232,16 +230,14 @@ const MessengerRoomInfoPanel = ({
                   채팅방 이름
                 </p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
-                  {room.name}
+                  {getRoomDisplayName(room)}
                 </p>
               </div>
 
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <p className="text-[11px] font-bold text-slate-400">내용</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">
-                  {isDirectChatRoom(room)
-                    ? getDirectRoomMeta(room)
-                    : room.description}
+                  {room.description || '-'}
                 </p>
               </div>
             </section>
@@ -260,19 +256,11 @@ const MessengerRoomInfoPanel = ({
                     key={getParticipantId(participant)}
                     className="flex items-center gap-3 rounded-lg border border-slate-100 px-3 py-2.5"
                   >
-                    <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-blue-100">
-                      {getParticipantProfileImageUrl(participant) ? (
-                        <img
-                          src={getParticipantProfileImageUrl(participant) ?? ''}
-                          alt={`${getParticipantName(participant)} 프로필`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-xs font-bold text-blue-600">
-                          {getParticipantInitial(participant)}
-                        </div>
-                      )}
-                    </div>
+                    <ProfileAvatar
+                      fileId={participant.prflImgFileId}
+                      name={getParticipantName(participant)}
+                      size={36}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-slate-900">

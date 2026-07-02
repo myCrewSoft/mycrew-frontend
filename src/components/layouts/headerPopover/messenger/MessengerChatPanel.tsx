@@ -1,14 +1,16 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
-import { MoreHorizontal, Search } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { MoreHorizontal } from 'lucide-react'
 import IconButton from '../../../common/button/IconButton'
 import ChatRoomAvatar from './ChatRoomAvatar'
 import type { ChatMessage, ChatRoom } from './messenger.types'
 import {
   formatMessengerTime,
   getDirectRoomMeta,
+  getRoomDisplayName,
   isDirectChatRoom,
 } from './messenger.utils'
 import MessengerMessageInput from './MessengerMessageInput'
+import ProfileAvatar from '../../../common/avatar/ProfileAvatar'
 
 interface MessengerChatPanelProps {
   room: ChatRoom
@@ -18,9 +20,6 @@ interface MessengerChatPanelProps {
   onSendMessage: () => void
   onOpenRoomInfo: () => void
 }
-
-const getMessageSenderInitial = (senderName: string) =>
-  senderName.trim().charAt(0) || '?'
 
 const MessengerChatPanel = ({
   room,
@@ -33,6 +32,16 @@ const MessengerChatPanel = ({
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const initialScrolledRoomIdRef = useRef<number | null>(null)
   const skipNextSmoothScrollRef = useRef(false)
+  const participantsById = useMemo(
+    () =>
+      new Map(
+        (room.participants ?? []).map((participant) => [
+          participant.empId,
+          participant,
+        ]),
+      ),
+    [room.participants],
+  )
 
   useLayoutEffect(() => {
     if (!messageListRef.current || messages.length === 0) return
@@ -87,7 +96,7 @@ const MessengerChatPanel = ({
           <div className="min-w-0">
             <div className="flex min-w-0 items-baseline gap-2">
               <p className="shrink-0 text-sm font-bold text-slate-900">
-                {room.name}
+                {getRoomDisplayName(room)}
               </p>
 
               {/* 1:1 채팅방의 직급/부서는 이름 옆에 작고 연하게 배치합니다. */}
@@ -106,9 +115,6 @@ const MessengerChatPanel = ({
         </div>
 
         <div className="flex items-center gap-1">
-          <IconButton size="sm" aria-label="대화 검색">
-            <Search size={16} />
-          </IconButton>
           <IconButton size="sm" aria-label="채팅방 정보" onClick={onOpenRoomInfo}>
             <MoreHorizontal size={16} />
           </IconButton>
@@ -122,7 +128,10 @@ const MessengerChatPanel = ({
         <div className="flex flex-col gap-3">
           {messages.map((message) => {
             const unreadCount = message.unreadCount ?? 0
-            const senderInitial = getMessageSenderInitial(message.senderName)
+            const sender = participantsById.get(message.senderId)
+            const senderMeta = [sender?.jobGrdNm, sender?.deptNm]
+              .filter(Boolean)
+              .join(' · ')
 
             return (
               <div
@@ -137,12 +146,12 @@ const MessengerChatPanel = ({
                   }`}
                 >
                   {!message.mine && (
-                    <div className="mt-5 h-9 w-9 shrink-0 overflow-hidden rounded-full bg-blue-100 ring-1 ring-white">
-                      {/* ChatMessageResponse에는 아직 보낸 사람 프로필 이미지 필드가 없으므로 이름 초성으로 표시합니다. */}
-                      <div className="flex h-full w-full items-center justify-center text-xs font-bold text-blue-600">
-                        {senderInitial}
-                      </div>
-                    </div>
+                    <ProfileAvatar
+                      fileId={sender?.prflImgFileId}
+                      name={sender?.empNm ?? message.senderName}
+                      size={36}
+                      className="mt-5 ring-1 ring-white"
+                    />
                   )}
 
                   <div
@@ -152,9 +161,16 @@ const MessengerChatPanel = ({
                   >
                     {!message.mine && (
                       // 상대 메시지는 말풍선 위에 보낸 사람 이름을 보여줍니다.
-                      <span className="max-w-40 truncate text-xs font-semibold text-slate-800">
-                        {message.senderName}
-                      </span>
+                      <div className="flex max-w-[240px] items-baseline gap-1.5">
+                        <span className="shrink-0 truncate text-xs font-semibold text-slate-800">
+                          {sender?.empNm ?? message.senderName}
+                        </span>
+                        {senderMeta && (
+                          <span className="truncate text-[10px] font-medium text-slate-400">
+                            {senderMeta}
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     <div

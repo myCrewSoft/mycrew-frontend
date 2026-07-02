@@ -4,7 +4,8 @@ import SearchInput from '../../../common/form/searchInput/SearchInput'
 import ChatRoomAvatar from './ChatRoomAvatar'
 import type { ChatRoom, ChatTab } from './messenger.types'
 import {
-  getRoomListDepartment,
+  getRoomDisplayName,
+  getRoomListMeta,
   isDirectChatRoom,
 } from './messenger.utils'
 
@@ -100,13 +101,13 @@ const MessengerRoomList = ({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
                     <p className="min-w-0 truncate text-sm font-bold text-slate-900">
-                      {room.name}
+                      {getRoomDisplayName(room)}
                     </p>
 
                     {/* 1:1 채팅방일 때만 부서명을 작고 연하게 보여줍니다. */}
-                    {getRoomListDepartment(room) && (
+                    {getRoomListMeta(room) && (
                       <span className="shrink-0 text-[11px] font-medium text-slate-400">
-                        {getRoomListDepartment(room)}
+                        {getRoomListMeta(room)}
                       </span>
                     )}
 

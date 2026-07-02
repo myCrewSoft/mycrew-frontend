@@ -324,16 +324,6 @@ const getWidgetHeaderBadge = (
   }
 }
 
-const isUnreadNotification = (notification: NotificationWidgetItem) => {
-  const record = notification as NotificationWidgetItem & Record<string, unknown>
-  if (typeof record.read === 'boolean') return !record.read
-  if (typeof record.isRead === 'boolean') return !record.isRead
-  if (typeof record.readYn === 'string') return record.readYn !== 'Y'
-  if (typeof record.unreadYn === 'string') return record.unreadYn === 'Y'
-  if (typeof record.readAt === 'string' || record.readAt === null) return !record.readAt
-  return true
-}
-
 const getBoardPostPath = (boardType: DashboardBoardType, postId: number) => {
   if (boardType === 'DEPT') return `/boards/departments/${postId}`
   if (boardType === 'PROJ') return '/project'
@@ -747,8 +737,8 @@ const AttendanceControlWidget = ({
 
       {/* 출퇴근 기록 */}
       <dl className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className="grid grid-cols-2 items-center">
+          <div className="flex min-w-0 items-center justify-center gap-1.5 px-2">
             <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
               <LogIn size={14} className="text-emerald-500" />
               출근
@@ -757,7 +747,7 @@ const AttendanceControlWidget = ({
               {formatClockTime(checkInAt)}
             </dd>
           </div>
-          <div className="flex min-w-0 items-center gap-1.5">
+          <div className="flex min-w-0 items-center justify-center gap-1.5 border-l border-slate-200 px-2">
             <dt className="flex items-center gap-1.5 font-semibold text-slate-600">
               <LogOut size={14} className="text-slate-400" />
               퇴근
@@ -1063,7 +1053,6 @@ const renderWidgetBody = (
                 meta={task.dueDate ? `마감일 ${formatWidgetDate(task.dueDate)}` : undefined}
                 badge={status.label}
                 badgeTone={badgeTone}
-                leading="checkbox"
                 onClick={() => navigate(getTaskPath(task))}
               />
             )
@@ -1247,27 +1236,22 @@ const renderWidgetBody = (
           </div>
           {data.notifications.length ? (
             <ul className="space-y-1">
-              {data.notifications.map((notification) => {
-                const unread = isUnreadNotification(notification)
-
-                return (
-                  <ListRow
-                    key={notification.id}
-                    title={notification.title}
-                    meta={joinMeta([
-                      notification.content,
-                      formatWidgetDateTime(notification.createdAt),
-                    ])}
-                    badge={unread ? '안 읽음' : '읽음'}
-                    badgeTone={unread ? 'blue' : 'slate'}
-                    muted={!unread}
-                    onClick={() => navigate(getNotificationPath(notification))}
-                  />
-                )
-              })}
+              {data.notifications.map((notification) => (
+                <ListRow
+                  key={notification.id}
+                  title={notification.title}
+                  meta={joinMeta([
+                    notification.content,
+                    formatWidgetDateTime(notification.createdAt),
+                  ])}
+                  badge="안 읽음"
+                  badgeTone="blue"
+                  onClick={() => navigate(getNotificationPath(notification))}
+                />
+              ))}
             </ul>
           ) : (
-            <EmptyState label="알림이 없습니다." />
+            <EmptyState label="읽지 않은 알림이 없습니다." />
           )}
         </>
       )

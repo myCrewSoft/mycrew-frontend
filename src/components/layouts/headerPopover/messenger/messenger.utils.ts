@@ -22,6 +22,35 @@ export const isProjectChatRoom = (room: ChatRoom) =>
 export const isTaskChatRoom = (room: ChatRoom) =>
   getRoomType(room) === 'task' || getRoomType(room) === 'M4'
 
+const getCurrentEmpId = () => {
+  const empId = Number(localStorage.getItem('empId'))
+
+  return Number.isFinite(empId) ? empId : null
+}
+
+// 1:1 채팅방에서 나를 뺀 상대방 참여자 정보를 찾습니다.
+// 방 제목은 별명으로 바뀔 수 있어도 참여자 목록의 실명/프로필은 항상 정확하기 때문에
+// 아바타와 이름 표시는 여기서 찾은 상대방 정보를 우선 사용합니다.
+export const getDirectCounterpart = (room: ChatRoom) => {
+  if (!isDirectChatRoom(room)) return undefined
+
+  const currentEmpId = getCurrentEmpId()
+
+  return room.participants?.find(
+    (participant) => participant.empId !== currentEmpId,
+  )
+}
+
+export const getRoomDisplayName = (room: ChatRoom) => {
+  const name = room.name?.trim()
+  if (name) return name
+
+  if (isDirectChatRoom(room)) return '1:1 대화'
+  if (isProjectChatRoom(room)) return '프로젝트 채팅'
+  if (isTaskChatRoom(room)) return '업무 채팅'
+  return '그룹 채팅'
+}
+
 // 현재 선택된 탭에 맞는 채팅방인지 확인합니다.
 // 탭 필터링 조건이 컴포넌트 안에 흩어지지 않도록 함수로 분리했습니다.
 export const matchesChatTab = (room: ChatRoom, tab: ChatTab) => {
@@ -51,15 +80,17 @@ export const getStatusDotClassName = (status?: ChatStatus) => {
   }
 }
 
-// 오른쪽 대화방 헤더에서 이름 옆에 작게 붙일 직급/부서 텍스트를 만듭니다.
-// 왼쪽 목록은 좁기 때문에 이 보조 정보는 오른쪽 헤더에서만 보여줍니다.
-export const getDirectRoomMeta = (room: ChatRoom) =>
-  [room.jobTitle, room.department].filter(Boolean).join(' · ')
+// 대화방 제목 옆에 붙일 상대방 실명/직급/부서 텍스트를 만듭니다.
+// 방 제목이 별명으로 바뀌어 있어도 상대방이 누구인지 알 수 있게 이름을 항상 앞에 붙입니다.
+export const getDirectRoomMeta = (room: ChatRoom) => {
+  const counterpart = getDirectCounterpart(room)
+  const name = counterpart?.empNm
+  return [name].filter(Boolean).join(' · ')
+}
 
-// 왼쪽 대화방 목록에서는 직급은 빼고 부서명만 작게 보여줍니다.
-// 목록은 폭이 좁아서 정보를 많이 넣으면 쉽게 깨지기 때문입니다.
-export const getRoomListDepartment = (room: ChatRoom) =>
-  isDirectChatRoom(room) ? room.department : undefined
+// 왼쪽 대화방 목록에서는 1:1 채팅방일 때만 상대방 이름/직급/부서를 보여줍니다.
+export const getRoomListMeta = (room: ChatRoom) =>
+  isDirectChatRoom(room) ? getDirectRoomMeta(room) : undefined
 
 // 백엔드는 프로필 이미지를 URL이 아니라 첨부파일 ID(prflImgFileId)로 내려줍니다.
 // 실제 파일 조회 API 경로가 바뀌면 메신저 화면 전체가 아니라 이 함수만 수정하면 됩니다.

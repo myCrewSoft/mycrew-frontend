@@ -1,6 +1,6 @@
 // src/pages/admin/Project/AdminProjectsPage.tsx
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BarChart3, CheckCircle2, FolderOpen, Users } from 'lucide-react'
 import Badge from '../../../components/common/dataDisplay/badge/Badge'
 import ContentCard from '../../../components/common/dataDisplay/card/ContentCard'
@@ -11,6 +11,8 @@ import { projectApi } from '../../../api/projectApi'
 import { useApi } from '../../../hooks/useApi'
 import type { AdminProjectListResponseDto } from '../../../types/project'
 import AdminProjectDetailDrawer from './AdminProjectDetailDrawer'
+import ProfileAvatar from '../../../components/common/avatar/ProfileAvatar'
+import { adminApi } from '../../../api/adminApi'
 
 const TODAY = Date.now()
 
@@ -69,7 +71,19 @@ const ProgressBar = ({ value }: { value: number }) => {
 export default function AdminProjectsPage() {
 
   const { data, loading } = useApi(projectApi.getAdminProjectList, { immediateArgs: [] })
+  const { data: employees, execute: fetchEmployees } = useApi(
+    adminApi.getEmployees,
+    { immediate: false },
+  )
   const projects = useMemo(() => data ?? [], [data])
+  const employeesById = useMemo(
+    () => new Map((employees ?? []).map((employee) => [employee.empId, employee])),
+    [employees],
+  )
+
+  useEffect(() => {
+    void fetchEmployees({ page: 0, size: 1000 }).catch(() => undefined)
+  }, [fetchEmployees])
 
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -227,7 +241,16 @@ export default function AdminProjectsPage() {
                         {STATUS_LABEL[proj.projStatCd]}
                       </Badge>
                     </td>
-                    <td className="py-3 pr-4 text-slate-600">{proj.projLdrNm}</td>
+                    <td className="py-3 pr-4 text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <ProfileAvatar
+                          fileId={employeesById.get(proj.projLdrEmpId)?.prflImgFileId}
+                          name={proj.projLdrNm}
+                          size={30}
+                        />
+                        <span>{proj.projLdrNm}</span>
+                      </div>
+                    </td>
                     <td className="py-3 pr-4 text-xs text-slate-500 whitespace-nowrap">
                       {proj.projBgngYmd} ~ {proj.projEndYmd}
                     </td>
@@ -312,6 +335,7 @@ export default function AdminProjectsPage() {
       {/* ── 상세 Drawer ── */}
       <AdminProjectDetailDrawer
         project={selectedProject}
+        employeesById={employeesById}
         onClose={() => setSelectedProject(null)}
       />
 

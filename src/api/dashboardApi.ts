@@ -19,6 +19,7 @@ import type {
   MailWidgetResponse as MailWidgetResponseDto,
   MeetingWidgetResponse as MeetingWidgetResponseDto,
   MessengerWidgetResponse as MessengerWidgetResponseDto,
+  NotificationResponse,
   NotificationWidgetResponse as NotificationWidgetResponseDto,
   ProjectWidgetResponse as ProjectProgressWidgetResponseDto,
   ReservationWidgetResponse as ReservationWidgetResponseDto,
@@ -62,8 +63,39 @@ export const dashboardApi = {
     })
   },
 
-  getNotification: (): Promise<AxiosResponse<ApiResponse<NotificationWidgetResponseDto>>> => {
-    return axiosInstance.get('/api/dashboard/widgets/notification')
+  getNotification: async (): Promise<
+    AxiosResponse<ApiResponse<NotificationWidgetResponseDto>>
+  > => {
+    // 대시보드 위젯 전용 엔드포인트(NotificationItem)는 읽음 여부 필드를 내려주지 않아
+    // 헤더 알림함과 동일한 /api/notifications(alrmCfmtnDt 보유)를 사용해 안 읽은 알림만 추린다.
+    const response = await axiosInstance.get<ApiResponse<NotificationResponse[]>>(
+      '/api/notifications',
+    )
+    const unread = (response.data.data ?? []).filter(
+      (notification) => notification.alrmCfmtnDt === null,
+    )
+    const notifications = unread
+      .slice()
+      .sort((a, b) => b.alrmSndngDt.localeCompare(a.alrmSndngDt))
+      .slice(0, 10)
+      .map((notification) => ({
+        id: notification.alrmRcvrId,
+        title: notification.alrmTtln,
+        content: notification.alrmCn,
+        createdAt: notification.alrmSndngDt,
+        type: notification.alrmTypeCd,
+        targetType: notification.targetType,
+        targetId: notification.targetId,
+        parentTargetId: notification.parentTargetId,
+      }))
+
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        data: { count: unread.length, notifications },
+      },
+    }
   },
 
   getMessenger: (): Promise<AxiosResponse<ApiResponse<MessengerWidgetResponseDto>>> => {
