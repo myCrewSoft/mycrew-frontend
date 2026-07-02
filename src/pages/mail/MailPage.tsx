@@ -1479,6 +1479,7 @@ export default function MailPage() {
 
         <form onSubmit={handleSearch} className="mt-4 flex gap-2">
           <SearchInput
+            wrapperClassName="min-w-0 flex-1"
             value={keywordInput}
             onChange={(event) => setKeywordInput(event.target.value)}
             placeholder="제목, 본문, 이메일 검색"
@@ -1489,6 +1490,7 @@ export default function MailPage() {
             variant="outline"
             leftIcon={<Search size={16} />}
             disabled={trashView}
+            className="min-w-[88px] shrink-0 whitespace-nowrap"
           >
             검색
           </Button>

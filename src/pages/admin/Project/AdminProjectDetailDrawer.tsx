@@ -21,9 +21,11 @@ import { projectApi } from '../../../api/projectApi'
 import { ApiError } from '../../../api/axiosInstance'
 import chatbotApi from '../../../api/chatBotApi'
 import type { AdminProjectListResponseDto } from '../../../types/project'
+import type { AdminEmployeeListItem } from '../../../types/adminEmployee'
 
 interface AdminProjectDetailDrawerProps {
   project: AdminProjectListResponseDto | null
+  employeesById: ReadonlyMap<number, AdminEmployeeListItem>
   onClose: () => void
 }
 
@@ -154,6 +156,7 @@ function AiReportPanel({ projId }: { projId: number }) {
 // ── 메인 컴포넌트 ──────────────────────────
 export default function AdminProjectDetailDrawer({
   project,
+  employeesById,
   onClose,
 }: AdminProjectDetailDrawerProps) {
   const navigate = useNavigate()
@@ -266,7 +269,16 @@ export default function AdminProjectDetailDrawer({
                 <h2 className="truncate text-lg font-bold text-slate-950">
                   {project.projNm}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-500">리더: {project.projLdrNm}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <ProfileAvatar
+                    fileId={employeesById.get(project.projLdrEmpId)?.prflImgFileId}
+                    name={project.projLdrNm}
+                    size={32}
+                  />
+                  <p className="text-sm text-slate-500">
+                    리더: <span className="font-semibold text-slate-700">{project.projLdrNm}</span>
+                  </p>
+                </div>
               </div>
               <button
                 onClick={handleClose}
@@ -338,6 +350,7 @@ export default function AdminProjectDetailDrawer({
                     {memberList.map((member) => (
                       <div key={member.empId} className="flex items-center gap-3">
                         <ProfileAvatar
+                          fileId={employeesById.get(member.empId)?.prflImgFileId}
                           name={member.empNm}
                           size={32}
                         />

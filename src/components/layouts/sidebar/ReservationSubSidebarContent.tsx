@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { meetingRoomReservationApi } from '../../../api/ReservationApi'
 import { useApi } from '../../../hooks/useApi'
 import type { ReservationResponse } from '../../../types'
@@ -47,6 +48,7 @@ const formatReservationDateTime = (dateTime: string) => {
 }
 
 const ReservationSubSidebarContent = () => {
+  const navigate = useNavigate()
   const {
     selectedDate,
     setSelectedDate,
@@ -104,6 +106,15 @@ const ReservationSubSidebarContent = () => {
       : [...checkedRoomIds, roomId]
 
     setCheckedRoomIds(nextRoomIds)
+  }
+
+  const openUpcomingReservation = (reservation: ReservationResponse) => {
+    const reservationDate = formatDateKey(new Date(reservation.startDateTime))
+
+    setSelectedDate(reservationDate)
+    navigate(
+      `/reservations?date=${reservationDate}&reservationId=${reservation.reservationId}`,
+    )
   }
 
   return (
@@ -227,9 +238,7 @@ const ReservationSubSidebarContent = () => {
                 <button
                   key={reservation.reservationId}
                   type="button"
-                  onClick={() =>
-                    setSelectedDate(formatDateKey(new Date(reservation.startDateTime)))
-                  }
+                  onClick={() => openUpcomingReservation(reservation)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition-colors hover:border-blue-200 hover:bg-blue-50"
                 >
                   <p className="truncate text-sm font-bold text-slate-900">

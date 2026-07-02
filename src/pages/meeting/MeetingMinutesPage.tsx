@@ -213,6 +213,8 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
   )
 
   const isOfflineMeeting = meeting.vconfId === null
+  const canCreateManualMinutes =
+    meeting.mtngSttus === 'ended' || isOfflineMeeting
   const approvalStarted = isApprovalStarted(
     momData?.momSttusCd ?? meeting.momSttusCd,
   )
@@ -239,7 +241,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
     }
   }
 
-  const handleStartOfflineMinutes = async () => {
+  const handleStartManualMinutes = async () => {
     try {
       let existingResponse: Awaited<ReturnType<typeof fetchMom>> | null = null
 
@@ -475,30 +477,30 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                 회의 내용
               </h3>
               <Button
-                variant={!momData && isOfflineMeeting ? 'primary' : 'outline'}
+                variant={!momData && canCreateManualMinutes ? 'primary' : 'outline'}
                 size="sm"
-                disabled={!momData && !isOfflineMeeting}
+                disabled={!momData && !canCreateManualMinutes}
                 loading={createEmptyMomLoading || updateMomLoading}
                 leftIcon={
                   minutesEditing ? <Save size={15} /> : <Pencil size={15} />
                 }
                 onClick={() => {
                   if (minutesEditing) void handleSave()
-                  else if (!momData && isOfflineMeeting) {
-                    void handleStartOfflineMinutes()
+                  else if (!momData && canCreateManualMinutes) {
+                    void handleStartManualMinutes()
                   } else startEditing()
                 }}
               >
                 {minutesEditing
                   ? '저장'
-                  : !momData && isOfflineMeeting
+                  : !momData && canCreateManualMinutes
                     ? '회의록 작성'
                     : '수정'}
               </Button>
             </div>
 
             {minutesEditing ? (
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4">
                 {(
                   [
                     ['purpose', '1. 회의 목적', '회의 목적을 입력하세요.'],
@@ -511,7 +513,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                   ] as const
                 ).map(([key, label, placeholder]) => (
                   <div key={key}>
-                    <div className="mb-2 border-l-4 border-blue-500 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                    <div className="mb-1.5 border-l-4 border-blue-500 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700">
                       {label}
                     </div>
                     <Textarea
@@ -522,7 +524,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                           [key]: event.target.value,
                         }))
                       }
-                      className="min-h-20"
+                      className="!min-h-16 !rounded-lg !px-3 !py-2 leading-5"
                       placeholder={placeholder}
                     />
                   </div>
@@ -641,7 +643,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                 </div>
 
                 <div>
-                  <div className="mb-2 border-l-4 border-blue-500 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                  <div className="mb-1.5 border-l-4 border-blue-500 bg-slate-50 px-3 py-1.5 text-sm font-bold text-slate-700">
                     5. 특이사항 / 기타
                   </div>
                   <Textarea
@@ -652,7 +654,7 @@ const MeetingMinutesPage = ({ meeting, onBack }: MeetingMinutesPageProps) => {
                         notes: event.target.value,
                       }))
                     }
-                    className="min-h-20"
+                    className="!min-h-16 !rounded-lg !px-3 !py-2 leading-5"
                     placeholder="특이사항이나 기타 내용을 입력하세요."
                   />
                 </div>

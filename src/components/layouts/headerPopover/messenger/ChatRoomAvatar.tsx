@@ -3,7 +3,9 @@ import ProfileAvatar from '../../../common/avatar/ProfileAvatar'
 import useImage from '../../../../hooks/useImage'
 import type { ChatRoom } from './messenger.types'
 import {
+  getDirectCounterpart,
   getStatusDotClassName,
+  getRoomDisplayName,
   isDirectChatRoom,
   isProjectChatRoom,
 } from './messenger.utils'
@@ -41,6 +43,8 @@ const ChatRoomAvatar = ({
 }: ChatRoomAvatarProps) => {
   const customImageId = room.chatRoomImageAtchFileId
   const directChat = isDirectChatRoom(room)
+  const counterpart = directChat ? getDirectCounterpart(room) : undefined
+  const counterpartImageId = counterpart?.prflImgFileId || room.prflImgFileId
   const iconSize = Math.round(size * 0.45)
 
   return (
@@ -50,12 +54,12 @@ const ChatRoomAvatar = ({
     >
       {customImageId ? (
         <div className="relative h-full w-full overflow-hidden rounded-full bg-slate-100">
-          <ChatRoomImage fileId={customImageId} name={room.name} />
+          <ChatRoomImage fileId={customImageId} name={getRoomDisplayName(room)} />
         </div>
       ) : directChat ? (
         <ProfileAvatar
-          fileId={room.prflImgFileId}
-          name={room.name}
+          fileId={counterpartImageId}
+          name={counterpart?.empNm || getRoomDisplayName(room)}
           size={size}
         />
       ) : (

@@ -16,8 +16,12 @@ import {
   FileText,
   Video,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import type { AdminMtngDetailResponse, AdminMtngListRequest, AdminMtngListResponse } from '../../../types'
+import type {
+  AdminMtngDetailResponse,
+  AdminMtngListRequest,
+  AdminMtngListResponse,
+  AdminMtngPtcptResponse,
+} from '../../../types'
 import type { AdminEmployeeListItem } from '../../../types/adminEmployee'
 import { useApi } from '../../../hooks/useApi'
 import { adminMtngApi } from '../../../api/adminMtngApi'
@@ -106,7 +110,6 @@ const INITIAL_FILTER: AdminMtngListRequest = {
 }
 
 export default function AdminMtngPage() {
-  const navigate = useNavigate()
   const [filter, setFilter] = useState<AdminMtngListRequest>(INITIAL_FILTER)
   const [selectedMtng, setSelectedMtng] = useState<AdminMtngDetailResponse | null>(null)
   const [showFilter, setShowFilter] = useState(false)
@@ -231,19 +234,6 @@ export default function AdminMtngPage() {
               iconBg="bg-[#dae2fd] text-[#565e74]"
               valueColor="text-[#565e74]"
             />
-          </div>
-
-          {/* 탭 */}
-          <div className="flex gap-6 border-b border-[#c0c6d5]">
-            <button className="border-b-2 border-[#005cad] pb-3 text-sm font-semibold text-[#005cad]">
-              전체 회의
-            </button>
-            <button
-              onClick={() => navigate('/admin/meeting/stats')}
-              className="pb-3 text-sm font-medium text-[#717785] hover:text-[#414753]"
-            >
-              통계
-            </button>
           </div>
 
           {/* 테이블 카드 */}
@@ -502,7 +492,7 @@ export default function AdminMtngPage() {
                                 {participant.empNm}
                               </p>
                               <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-                                {participant.jbgdNm} · {participant.deptNm}
+                                {formatParticipantMeta(participant, employee)}
                               </p>
                             </div>
                             {participantStatus ? (
@@ -713,6 +703,14 @@ function formatEmployeeMeta(employee?: AdminEmployeeListItem) {
 
   if (position && department) return `${position} · ${department}`
   return position ?? department ?? '직급/부서 정보 없음'
+}
+
+function formatParticipantMeta(participant: AdminMtngPtcptResponse, employee?: AdminEmployeeListItem) {
+  const position = employee?.jobGrade?.jobGrdNm ?? employee?.jobPosition?.jobPstnNm ?? participant.jbgdNm
+  const department = employee?.department?.deptNm ?? participant.deptNm
+
+  if (position && department) return `${position} · ${department}`
+  return position || department || '직급/부서 정보 없음'
 }
 
 function formatDt(dt: string) {

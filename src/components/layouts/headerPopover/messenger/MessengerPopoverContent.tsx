@@ -90,8 +90,17 @@ const MessengerPopoverContent = () => {
   const [roomDetail, setRoomDetail] = useState<ChatRoom | null>(null)
   const lastMarkedReadMessageIdByRoomRef = useRef<Record<number, number>>({})
 
-  // Provider가 관리하는 최신 채팅방 목록을 화면용 배열로 사용합니다.
-  const roomSource = useMemo(() => socketRooms, [socketRooms])
+  // 목록/소켓이 내려주는 방 데이터에는 참여자 목록이 비어 있으므로, 단건 조회로 받은
+  // 참여자 정보를 같은 id의 방에 합쳐서 1:1 상대 이름/아바타를 목록에서도 정확히 보여줍니다.
+  const roomSource = useMemo(() => {
+    if (!roomDetail?.participants?.length) return socketRooms
+
+    return socketRooms.map((room) =>
+      room.id === roomDetail.id
+        ? { ...room, participants: roomDetail.participants }
+        : room,
+    )
+  }, [socketRooms, roomDetail])
 
   // 선택한 채팅방의 과거 메시지 REST 응답을 빈 배열로 보정합니다.
   const messageSource = useMemo(() => apiMessages ?? [], [apiMessages])
@@ -333,6 +342,13 @@ const MessengerPopoverContent = () => {
           setSelectedRoomId(roomId)
           setRoomDetail(null)
           setViewMode('chat')
+          // 1:1 채팅방 상대 이름/아바타를 목록/헤더에서 바로 보여주려면 참여자 정보가 필요해서
+          // 대화방 열람 시점에도 단건 조회를 먼저 실행합니다.
+          void loadRoomDetail(roomId).then((response) => {
+            if (response.data) {
+              setRoomDetail(response.data)
+            }
+          })
         }}
         onClickCreate={() => setViewMode('create')}
       />

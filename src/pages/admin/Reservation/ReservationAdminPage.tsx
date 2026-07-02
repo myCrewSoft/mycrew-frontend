@@ -57,7 +57,7 @@ export default function ReservationAdminPage() {
 
     return (
         <section className="flex h-full gap-6">
-            <div className="flex flex-1 flex-col gap-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-6">
 
                 <section className="grid grid-cols-4 gap-4">
                     {statsLoading || !stats ? (
