@@ -69,12 +69,20 @@ export interface CalendarEventItem {
   scheduleTypeCode: ScheduleTypeCode
   detail?: string
   deptCd?: string
+  deptNm?: string
   projId?: number
   taskId?: number
+  mtngId?: number
+  rsrvId?: number
   repeat?: boolean
   repeatTypeCode?: RepeatTypeCode
   repeatEndDate?: string
   targets?: ScheduleTargetResponseDto[]
+  writerId?: number
+  writerName?: string
+  writerDeptNm?: string
+  writerJobGrdNm?: string
+  writerPrflImgFileId?: number
   backgroundColor: string
   borderColor: string
   textColor: string

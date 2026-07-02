@@ -214,7 +214,7 @@ const getMomStatusLabel = (cd?: string | null) => {
     '03': '검토 중',
     '04': '확정',
   }
-  return cd ? (map[cd] ?? '생성 중') : '생성 중'
+  return cd ? (map[cd] ?? '생성 중') : '생성 전'
 }
 
 const groupMeetingsByDate = (meetings: MeetingListItem[]) =>
