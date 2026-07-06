@@ -1,0 +1,157 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+
+const STORAGE_KEY_CHECKED_TYPES = 'calendar_checked_types'
+
+const loadCheckedTypes = (fallback: ScheduleTypeCode[]): ScheduleTypeCode[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_CHECKED_TYPES)
+    if (!stored) return fallback
+    const parsed = JSON.parse(stored) as unknown
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return Array.from(
+        new Set([...parsed, 'PUBLIC_HOLIDAY', 'ANNIVERSARY']),
+      ) as ScheduleTypeCode[]
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return fallback
+}
+import { scheduleApi, type ScheduleListParams } from '../../api/scheduleApi'
+import { useApi } from '../../hooks/useApi'
+import type { ScheduleResponseDto } from '../../types'
+import {
+  type CalendarEventItem,
+  type ScheduleTypeCode,
+} from '../../types/calendar'
+import { formatDateKey } from '../../utils/date'
+import { CalendarContext } from './CalendarContext'
+import { toCalendarEvent } from './calendar.mapper'
+
+interface CalendarProviderProps {
+  children: ReactNode
+}
+
+const defaultCheckedScheduleTypeCodes: ScheduleTypeCode[] = [
+  'C001',
+  'C002',
+  'C003',
+  'C004',
+  'C005',
+  'C006',
+  'C007',
+  'C008',
+  'PUBLIC_HOLIDAY',
+  'ANNIVERSARY',
+]
+
+export const CalendarProvider = ({ children }: CalendarProviderProps) => {
+  const [scheduleRange, setScheduleRange] = useState<ScheduleListParams | null>(
+    null,
+  )
+
+  const {
+    data: schedules,
+    loading: calendarLoading,
+    error,
+    execute: fetchSchedules,
+  } = useApi<ScheduleResponseDto[], [ScheduleListParams]>(
+    scheduleApi.getSchedules,
+    {
+      immediate: false,
+      initialData: [],
+    },
+  )
+
+  const refreshSchedules = useCallback(async () => {
+    if (!scheduleRange) return
+
+    await fetchSchedules(scheduleRange)
+  }, [fetchSchedules, scheduleRange])
+
+  useEffect(() => {
+    void refreshSchedules()
+  }, [refreshSchedules])
+
+
+
+  const { calendarEvents, mapperErrorMessage } = useMemo(() => {
+    try {
+      return {
+        calendarEvents: (schedules ?? [])
+          .map(toCalendarEvent)
+          .filter((event): event is CalendarEventItem => event !== null),
+        mapperErrorMessage: null,
+      }
+    } catch (mapperError) {
+      return {
+        calendarEvents: [],
+        mapperErrorMessage:
+          mapperError instanceof Error
+            ? mapperError.message
+            : 'Failed to convert schedule data for the calendar view.',
+      }
+    }
+  }, [schedules])
+
+  const [checkedScheduleTypeCodes, setCheckedScheduleTypeCodesRaw] = useState<
+    ScheduleTypeCode[]
+  >(() => loadCheckedTypes(defaultCheckedScheduleTypeCodes))
+
+  const setCheckedScheduleTypeCodes = useCallback((nextCodes: ScheduleTypeCode[]) => {
+    localStorage.setItem(STORAGE_KEY_CHECKED_TYPES, JSON.stringify(nextCodes))
+    setCheckedScheduleTypeCodesRaw(nextCodes)
+  }, [])
+
+  const [selectedDate, setSelectedDate] = useState(() =>
+    formatDateKey(new Date()),
+  )
+
+  const visibleCalendarEvents = useMemo(
+    () =>
+      calendarEvents.filter((event) =>
+        event.scheduleTypeCode === 'PUBLIC_HOLIDAY' ||
+        event.scheduleTypeCode === 'ANNIVERSARY' ||
+        checkedScheduleTypeCodes.includes(event.scheduleTypeCode),
+      ),
+    [calendarEvents, checkedScheduleTypeCodes],
+  )
+
+  const upcomingSchedules = useMemo(() => {
+    const now = new Date()
+
+    return visibleCalendarEvents
+      .filter((event) => {
+        const startDate = new Date(event.start)
+
+        return !Number.isNaN(startDate.getTime()) && startDate >= now
+      })
+      .sort(
+        (firstEvent, secondEvent) =>
+          new Date(firstEvent.start).getTime() -
+          new Date(secondEvent.start).getTime(),
+      )
+      .slice(0, 2)
+  }, [visibleCalendarEvents])
+
+  return (
+    <CalendarContext.Provider
+      value={{
+        calendarEvents,
+        visibleCalendarEvents,
+        upcomingSchedules,
+        checkedScheduleTypeCodes,
+        setCheckedScheduleTypeCodes,
+        selectedDate,
+        setSelectedDate,
+        scheduleRange,
+        setScheduleRange,
+        calendarLoading,
+        calendarErrorMessage: mapperErrorMessage ?? error?.message ?? null,
+        refreshSchedules
+      }}
+    >
+      {children}
+    </CalendarContext.Provider>
+  )
+}

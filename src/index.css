@@ -1,3 +1,102 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+.toastui-editor-contents .board-text-align-center {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  text-align: center !important;
+}
+
+.toastui-editor-contents .board-text-align-right {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  text-align: right !important;
+}
+
+.board-content-viewer .toastui-editor-contents img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  margin-left: auto;
+  margin-right: auto;
+  cursor: zoom-in;
+  image-rendering: auto;
+}
+
+.mycrew-admin-content .bg-white {
+  background-color: #fbfdfb !important;
+}
+
+.mycrew-admin-content .bg-slate-50,
+.mycrew-admin-content [class*="bg-[#f2f4f6]"] {
+  background-color: #edf4ee !important;
+}
+
+.mycrew-admin-content [class*="bg-[#f7f9fb]"] {
+  background-color: #f4f8f5 !important;
+}
+
+.mycrew-admin-content [class*="bg-blue-50"],
+.mycrew-admin-content [class*="bg-blue-100"],
+.mycrew-admin-content [class*="bg-[#E8EFFF]"],
+.mycrew-admin-content [class*="bg-[#dae2fd]"] {
+  background-color: #dcfce7 !important;
+}
+
+.mycrew-admin-content [class*="bg-blue-500"],
+.mycrew-admin-content [class*="bg-blue-600"],
+.mycrew-admin-content [class*="bg-[#005cad]"] {
+  background-color: #16a34a !important;
+}
+
+.mycrew-admin-content .from-blue-600.to-sky-400 {
+  background-image: linear-gradient(to right, #16a34a, #4ade80) !important;
+}
+
+.mycrew-admin-content .border-slate-200,
+.mycrew-admin-content [class*="border-blue-"],
+.mycrew-admin-content [class*="border-[#c0c6d5]"],
+.mycrew-admin-content [class*="border-[#3377FF]"] {
+  border-color: #cfded4 !important;
+}
+
+.mycrew-admin-content [class*="text-blue-"],
+.mycrew-admin-content [class*="text-[#005cad]"],
+.mycrew-admin-content [class*="text-[#0044CC]"] {
+  color: #15803d !important;
+}
+
+.mycrew-admin-content [class*="hover:text-blue-"]:hover,
+.mycrew-admin-content [class*="hover:text-[#005cad]"]:hover {
+  color: #15803d !important;
+}
+
+.mycrew-admin-content [class*="hover:bg-blue-"]:hover,
+.mycrew-admin-content [class*="hover:bg-[#f2f4f6]"]:hover {
+  background-color: #e4f2e7 !important;
+}
+
+.mycrew-admin-content [class*="focus:border-blue-"]:focus,
+.mycrew-admin-content [class*="focus:border-[#005cad]"]:focus {
+  border-color: #16a34a !important;
+}
+
+.mycrew-admin-content [class*="focus:ring-blue-"]:focus,
+.mycrew-admin-content [class*="focus:ring-[#005cad]"]:focus {
+  --tw-ring-color: rgb(34 197 94 / 0.22) !important;
+}

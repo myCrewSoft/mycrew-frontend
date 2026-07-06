@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git stash *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:80/ --max-time 3)",
+      "Bash(npx --version)",
+      "Bash(npm ls *)",
+      "Bash(where chromium-cli *)",
+      "Bash(cat > *)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

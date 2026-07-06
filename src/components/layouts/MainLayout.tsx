@@ -1,14 +1,35 @@
-import { Outlet } from 'react-router-dom';
+import { useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import Header from './Header'
+import { MessengerSocketProvider } from './headerPopover/messenger/MessengerSocketProvider'
+import { useNotificationStream } from './headerPopover/useNotificationStream'
+import MainSidebar from './sidebar/MainSidebar'
+import SubSidebar from './sidebar/SubSidebar'
 
-// TODO: Header, Footer 컴포넌트 추가
 export default function MainLayout() {
+  const [isSubOpen, setIsSubOpen] = useState(true)
+  useNotificationStream()
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* <Header /> */}
-      <main className="flex-1 container mx-auto px-4 py-6">
-        <Outlet />
-      </main>
-      {/* <Footer /> */}
-    </div>
-  );
+    <MessengerSocketProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-slate-50">
+        <MainSidebar />
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <Header />
+
+          <div className="flex min-h-0 flex-1">
+            <SubSidebar
+              isOpen={isSubOpen}
+              onToggle={() => setIsSubOpen((current) => !current)}
+            />
+
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f1f5f9] p-6 [scrollbar-gutter:stable]">
+              <Outlet />
+            </main>
+          </div>
+        </div>
+      </div>
+    </MessengerSocketProvider>
+  )
 }

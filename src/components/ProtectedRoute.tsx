@@ -1,16 +1,28 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../store/AuthContext';
 
 interface Props {
   children: React.ReactNode;
-  role?: string;
 }
 
-export default function ProtectedRoute({ children, role }: Props) {
-  const token = localStorage.getItem('accessToken');
-  if (!token) return <Navigate to="/login" replace />;
-  if (role) {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    if (!payload.roles?.includes(role)) return <Navigate to="/unauthorized" replace />;
+export default function ProtectedRoute({ children }: Props) {
+  const { auth } = useAuth();
+  const location = useLocation();
+  const hasRefreshToken = Boolean(localStorage.getItem('refreshToken'));
+  const firstLoginRequired =
+    localStorage.getItem('firstLoginRequired') === 'true';
+
+  if (!auth.payload && !hasRefreshToken) {
+    return <Navigate to="/login" replace />;
   }
+
+  if (auth.isExpired && !hasRefreshToken) {
+    return <Navigate to="/login?expired=true" replace />;
+  }
+
+  if (firstLoginRequired && location.pathname !== '/first-login') {
+    return <Navigate to="/first-login" replace />;
+  }
+
   return <>{children}</>;
 }
